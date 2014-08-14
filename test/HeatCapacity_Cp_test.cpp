@@ -5,6 +5,7 @@
  *      Author: nate
  */
 
+#include "print.h"
 #include<iostream>
 #include<stdio.h>
 #include<fstream>
