@@ -13,6 +13,9 @@
 #include <cantera/kernel/speciesThermoTypes.h> // contains definitions for which polynomial is being used
 #include <cantera/IdealGasMix.h>
 
+#include <sstream>
+#include <exception>
+
 namespace Cantera_CXX{ class IdealGasMix; } // location of polynomial coefficients
 
 /**
