@@ -5,10 +5,6 @@
  *      Author: nate
  */
 
-#define MIX
-//#define CONSTVOLUME
-//#define FIND
-
 #include<iostream>
 #include<stdio.h>
 #include<fstream>
@@ -79,20 +75,7 @@ int main(){
 
       typedef Expr::PlaceHolder <CellField > Temp;
       typedef Expr::PlaceHolder <CellField > MassFracs;
-#ifdef MIX
-#ifdef CONSTVOLUME
-      typedef HeatCapacity_Cv <CellField> HeatCapacity;
-#else
-      typedef HeatCapacity < CellField > HeatCapacity;
-#endif
-#else
-#ifdef CONSTVOLUME
-      typedef HeatCapacity_cv <CellField> HeatCapacity;
-#else
-      typedef HeatCapacity <CellField> HeatCapacity;
-#endif
-#endif
-
+      typedef HeatCapacity_Cp < CellField > HeatCapacity;
 
       Expr::ExpressionFactory exprFactory;
 

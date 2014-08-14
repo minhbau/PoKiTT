@@ -1,5 +1,5 @@
-#ifndef HeatCapacity_Expr_h
-#define HeatCapacity_Expr_h
+#ifndef HeatCapacity_Cp_Expr_h
+#define HeatCapacity_Cp_Expr_h
 
 #include <expression/Expression.h>
 
@@ -14,7 +14,7 @@
 namespace Cantera_CXX{ class IdealGasMix; } // location of polynomial coefficients
 
 /**
- *  \class  HeatCapacity
+ *  \class  HeatCapacity_Cp
  *  \author Nate Yonkee
  *  \date May, 2014
  *
@@ -41,7 +41,7 @@ namespace Cantera_CXX{ class IdealGasMix; } // location of polynomial coefficien
  *
  */
 template< typename FieldT >
-class HeatCapacity
+class HeatCapacity_Cp
  : public Expr::Expression<FieldT>
 {
   typedef std::vector<FieldT*> SpecT;
@@ -53,13 +53,13 @@ class HeatCapacity
   bool nasaFlag_; // flag to specify if any NASA polynomials are present
   bool shomateFlag_; // flag to specify if any Shomate polynomials are present
 
-  HeatCapacity( const Expr::Tag& tTag );
+  HeatCapacity_Cp( const Expr::Tag& tTag );
 public:
   class Builder : public Expr::ExpressionBuilder
   {
   public:
     /**
-     *  @brief Build a HeatCapacity expression
+     *  @brief Build a HeatCapacity_Cp expression
      *  @param resultTags the list of tags for each species' heat capacity, order must be consistent with Cantera's input file
      *  @param tTag tag for temperature
      */
@@ -72,7 +72,7 @@ public:
     const Expr::Tag tTag_;
   };
 
-  ~HeatCapacity();
+  ~HeatCapacity_Cp();
   void advertise_dependents( Expr::ExprDeps& exprDeps );
   void bind_fields( const Expr::FieldManagerList& fml );
   void bind_operators( const SpatialOps::OperatorDatabase& opDB );
@@ -93,8 +93,8 @@ public:
 
 
 template< typename FieldT >
-HeatCapacity<FieldT>::
-HeatCapacity( const Expr::Tag& tTag )
+HeatCapacity_Cp<FieldT>::
+HeatCapacity_Cp( const Expr::Tag& tTag )
   : Expr::Expression<FieldT>(),
     tTag_( tTag ),
     gasMix_( CanteraObjects::self().get_gasmix() ),
@@ -119,8 +119,8 @@ HeatCapacity( const Expr::Tag& tTag )
 //--------------------------------------------------------------------
 
 template< typename FieldT >
-HeatCapacity<FieldT>::
-~HeatCapacity()
+HeatCapacity_Cp<FieldT>::
+~HeatCapacity_Cp()
 {
   CanteraObjects::self().restore_gasmix(gasMix_);
 }
@@ -129,7 +129,7 @@ HeatCapacity<FieldT>::
 
 template< typename FieldT >
 void
-HeatCapacity<FieldT>::
+HeatCapacity_Cp<FieldT>::
 advertise_dependents( Expr::ExprDeps& exprDeps )
 {
   exprDeps.requires_expression( tTag_ );
@@ -139,7 +139,7 @@ advertise_dependents( Expr::ExprDeps& exprDeps )
 
 template< typename FieldT >
 void
-HeatCapacity<FieldT>::
+HeatCapacity_Cp<FieldT>::
 bind_fields( const Expr::FieldManagerList& fml )
 {
   t_ = &fml.template field_ref< FieldT >( tTag_ );
@@ -149,7 +149,7 @@ bind_fields( const Expr::FieldManagerList& fml )
 
 template< typename FieldT >
 void
-HeatCapacity<FieldT>::
+HeatCapacity_Cp<FieldT>::
 bind_operators( const SpatialOps::OperatorDatabase& opDB )
 {
 
@@ -159,7 +159,7 @@ bind_operators( const SpatialOps::OperatorDatabase& opDB )
 
 template< typename FieldT >
 void
-HeatCapacity<FieldT>::
+HeatCapacity_Cp<FieldT>::
 evaluate()
 {
   boost::timer time;
@@ -237,7 +237,7 @@ evaluate()
 //--------------------------------------------------------------------
 
 template< typename FieldT >
-HeatCapacity<FieldT>::
+HeatCapacity_Cp<FieldT>::
 Builder::Builder( const Expr::TagList& resultTags,
                   const Expr::Tag& tTag )
   : ExpressionBuilder( resultTags ),
@@ -248,10 +248,10 @@ Builder::Builder( const Expr::TagList& resultTags,
 
 template< typename FieldT >
 Expr::ExpressionBase*
-HeatCapacity<FieldT>::
+HeatCapacity_Cp<FieldT>::
 Builder::build() const
 {
-  return new HeatCapacity<FieldT>( tTag_ );
+  return new HeatCapacity_Cp<FieldT>( tTag_ );
 }
 
 
@@ -504,4 +504,4 @@ Builder::build() const
 }
 
 
-#endif // HeatCapacity_Expr_h
+#endif // HeatCapacity_Cp_Expr_h
