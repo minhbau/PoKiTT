@@ -5,7 +5,6 @@
  *      Author: nate
  */
 
-#include "print.h"
 #include<iostream>
 #include<stdio.h>
 #include<fstream>
@@ -21,6 +20,7 @@
 
 #include <boost/lexical_cast.hpp>
 #include <boost/timer.hpp>
+#include <boost/foreach.hpp>
 
 #define GASCONSTANT 8314.47215
 
@@ -239,9 +239,6 @@ int main(){
         if( fabs(diff) > hc_maxerror) hc_maxerror = fabs(diff);
         if( fabs(diff) >= 1.0e-8){
           std::cout<<"hc mix failed at T="<<*itemp<<std::endl;
-          print("my hc mix",*ihc);
-          print("cantera's",hc_results[i]);
-          print("diff",diff);
         }
       }
       hcdiff.push_back(hc_maxerror);
@@ -271,18 +268,12 @@ int main(){
           if( fabs(diff) > hc_maxerror ) hc_maxerror = fabs(diff);
           if( fabs(diff) >= 1.0e-8){
             std::cout<<"cp failed at T= "<<*itemp<<" for species n= "<<n<<std::endl;
-            print("my hc",*ihc);
-            print("cantera's",hc_results[i]);
-            print("diff",diff);
           }
         }
       }
       hcdiff.push_back(hc_maxerror);
 
 #endif
-      //      print("cp max error",cp_maxerror);
-      //      print("cv max error",cv_maxerror);
-      //      print("cp mix max error",cp_mix_maxerror);
       std::cout<<std::endl;
 
     }
@@ -290,11 +281,10 @@ int main(){
       Cantera::showErrors();
     }
   }
-print("cantera time",hctimes);
-#ifdef MIX
-  print("hc mix max diff",hcdiff);
-#else
-  print("hc max diff",hcdiff);
-#endif
+  BOOST_FOREACH( double time, hctimes )
+      {std::cout << "cantera time " << time << std::endl;}
+  std::cout<<std::endl;
+  BOOST_FOREACH( double diff, hcdiff )
+      {std::cout << "hc max diff " << diff << std::endl;}
   return 0;
 }
