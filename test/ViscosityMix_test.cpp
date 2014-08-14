@@ -5,23 +5,12 @@
  *      Author: nate
  */
 
-//#define AURORA
-//#define FINDME
-#include<iostream>
-#include<stdio.h>
-#include<fstream>
+#include <iostream>
+#include <fstream>
 
 #include <boost/timer.hpp>
 
-#include"print.h"
-#include"CanteraObjects.h"
-#include"myViscosityMixMass.h"
-
-#ifdef AURORA
-#include "/scratch/local/aurora/yonkee/Cantera/build/include/cantera/IdealGasMix.h"
-#else
-#include<cantera/transport.h>
-#endif
+#include "myViscosityMixMass.h"
 
 #include <expression/ExprLib.h>
 

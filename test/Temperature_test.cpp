@@ -4,26 +4,13 @@
  *      Author: nate
  */
 
-//#define AURORA
-//#define FIND
-
-#include<iostream>
+#include <iostream>
 
 #include <boost/timer.hpp>
 #include <boost/lexical_cast.hpp>
 
-#include"print.h"
-#include"CanteraObjects.h"
-#include"myTemperatureMass.h"
-#include "MixtureMolWeightExpr.h"
-
-#ifdef AURORA
-#include "/scratch/local/aurora/yonkee/Cantera/build/include/cantera/kernel/SpeciesThermoInterpType.h"
-#include "/scratch/local/aurora/yonkee/Cantera/build/include/cantera/IdealGasMix.h"
-#else
-#include <cantera/kernel/SpeciesThermoInterpType.h>
-#include <cantera/IdealGasMix.h>
-#endif
+#include "myTemperatureMass.h"
+#include <pokitt/MixtureMolWeightExpr.h>
 
 #include <expression/ExprLib.h>
 

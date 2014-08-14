@@ -5,7 +5,7 @@
 
 #include <boost/timer.hpp>
 
-#include <CanteraObjects.h> //include cantera wrapper
+#include <pokitt/CanteraObjects.h> //include cantera wrapper
 
 #include <cantera/kernel/speciesThermoTypes.h> // contains definitions for which polynomial is being used
 #include <cantera/IdealGasMix.h>

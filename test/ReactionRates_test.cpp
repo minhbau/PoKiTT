@@ -4,37 +4,21 @@
  *  Created on: Mar 31, 2014
  *      Author: nate
  */
-//#define AURORA
-//#define FIND
-#include"print.h"
 
-#include<string>
-#include<iostream>
-#include<cmath>
-#include<numeric>
-#include<stdlib.h>
+#include <string>
+#include <iostream>
+#include <cmath>
+#include <numeric>
+#include <stdlib.h>
 
-#include<boost/timer.hpp>
-
-#include"CanteraObjects.h"
-
-#ifdef AURORA
-#include"/scratch/local/aurora/yonkee/Cantera/build/include/cantera/IdealGasMix.h"
-#include"/scratch/local/aurora/yonkee/Cantera/build/include/cantera/kernel/ReactionData.h"
-#elif defined PRISM
-#include"/scratch/local/prism_large/yonkee/Cantera/build/include/cantera/IdealGasMix.h"
-#include"/scratch/local/prism_large/yonkee/Cantera/build/include/cantera/kernel/ReactionData.h"
-#else
-#include"cantera/IdealGasMix.h"
-#include<cantera/kernel/ReactionData.h>
-#endif
+#include <boost/timer.hpp>
 
 #include <expression/ExprLib.h>
 
 #include <spatialops/structured/Grid.h>
 
-#include "myReactionRateMass.h"
-#include "MixtureMolWeightExpr.h"
+#include <pokitt/kinetics/ReactionRates.h>
+#include <pokitt/MixtureMolWeightExpr.h>
 
 //#include "mechanism_verify.h"
 //#include "ReactionRates.h"

@@ -5,23 +5,14 @@
  *      Author: nate
  */
 
-//#define AURORA
-//#define FIND
-#include<iostream>
-#include<stdio.h>
+#include <iostream>
+#include <stdio.h>
 
 #include <boost/timer.hpp>
 
-#include "print.h"
-#include "CanteraObjects.h"
-#include "myDiffusionCoeffMixMass.h"
-#include "MixtureMolWeightExpr.h"
+#include <pokitt/transport/DiffusionCoeffMix.h>
+#include <pokitt/MixtureMolWeightExpr.h>
 
-#ifdef AURORA
-#include "/scratch/local/aurora/yonkee/Cantera/build/include/cantera/IdealGasMix.h"
-#else
-#include<cantera/transport.h>
-#endif
 
 #include <expression/ExprLib.h>
 

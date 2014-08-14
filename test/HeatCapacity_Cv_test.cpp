@@ -6,15 +6,11 @@
  */
 
 #define MIX
-//#define CONSTVOLUME
-//#define FIND
-#include"print.h"
 
-#include<iostream>
-#include<stdio.h>
-#include<fstream>
+#include <iostream>
+#include <stdio.h>
+#include <fstream>
 
-#include "CanteraObjects.h"
 #include "myTemperaturePowers.h"
 #ifdef MIX
 #include "myHeatCapacityMixMass.h"
@@ -22,11 +18,7 @@
 #include "myHeatCapacityMass.h"
 #endif
 
-#ifdef AURORA
-#include "/scratch/local/aurora/yonkee/Cantera/build/include/cantera/IdealGasMix.h"
-#else
 #include <cantera/IdealGasMix.h>
-#endif
 
 #include <expression/ExprLib.h>
 
@@ -93,19 +85,7 @@ int main(){
 
       typedef Expr::PlaceHolder <CellField > Temp;
       typedef Expr::PlaceHolder <CellField > MassFracs;
-#ifdef MIX
-#ifdef CONSTVOLUME
-      typedef HeatCapacity_Cv <CellField> HeatCapacity;
-#else
-      typedef HeatCapacity < CellField > HeatCapacity;
-#endif
-#else
-#ifdef CONSTVOLUME
-      typedef HeatCapacity_cv <CellField> HeatCapacity;
-#else
-      typedef HeatCapacity <CellField> HeatCapacity;
-#endif
-#endif
+      typedef HeatCapacity < CellField > HeatCap;
 
       find(1);
 
@@ -136,13 +116,13 @@ int main(){
       exprFactory.register_expression( new Temp::Builder(tTag) );
       for( size_t n=0; n<nSpec; ++n)
         exprFactory.register_expression( new MassFracs::Builder (yiTags[n]) );
-      const Expr::ExpressionID hc_id = exprFactory.register_expression( new HeatCapacity::Builder( hcMixTag, tTag, tPowTags, yiTag ));
+      const Expr::ExpressionID hc_id = exprFactory.register_expression( new HeatCap::Builder( hcMixTag, tTag, tPowTags, yiTag ));
 #else
       Expr::TagList hcTags;
       for( n=0; n<nSpec; ++n )
         hcTags.push_back( Expr::Tag( "hc" + boost::lexical_cast<std::string>(n), Expr::STATE_NONE ) );
       exprFactory.register_expression( new Temp::Builder(tTag) );
-      const Expr::ExpressionID hc_id   = exprFactory.register_expression( new HeatCapacity   ::Builder(hcTags,tTag) );
+      const Expr::ExpressionID hc_id   = exprFactory.register_expression( new HeatCap   ::Builder(hcTags,tTag) );
 #endif
 
       const SS::BoundaryCellInfo cellBCInfo = SS::BoundaryCellInfo::build<CellField>(false,false,false);
@@ -172,7 +152,7 @@ int main(){
       }
 #else
       {
-        std::ofstream fout( "HeatCapacity.dot" );
+        std::ofstream fout( "HeatCap.dot" );
         tree.write_tree(fout);
       }
 #endif

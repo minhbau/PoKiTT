@@ -6,23 +6,14 @@
  */
 
 //#define MIX
-//#define FIND
-#include"print.h"
 
-#include<iostream>
-#include<stdio.h>
-#include<fstream>
+#include <iostream>
+#include <stdio.h>
+#include <fstream>
 
-#include "CanteraObjects.h"
 #include "myEnthalpyMass.h"
 #include "myEnthalpyMixMass.h"
-#include "MixtureMolWeightExpr.h"
-
-#ifdef AURORA
-#include "/scratch/local/aurora/yonkee/Cantera/build/include/cantera/IdealGasMix.h"
-#else
-#include <cantera/IdealGasMix.h>
-#endif
+#include <pokitt/MixtureMolWeightExpr.h>
 
 #include <expression/ExprLib.h>
 

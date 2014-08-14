@@ -8,7 +8,7 @@
 #include <boost/timer.hpp>
 #endif
 
-#include <CanteraObjects.h> // include cantera wrapper
+#include <pokitt/CanteraObjects.h> // include cantera wrapper
 
 #include <cantera/kernel/reaction_defs.h>
 #include <cantera/kernel/speciesThermoTypes.h> // contains definitions for which polynomial is being used

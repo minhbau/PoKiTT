@@ -1,0 +1,19 @@
+# PoKiTTConfig.cmake - defines variables to use the expression
+#  library in another cmake project.  The following variables are
+#  defined:
+#
+# PoKiTT_FOUND - true (1)
+# 
+# PoKiTT_INCLUDE_DIR - the include directory for the installed header files
+#
+# typical usage:
+#   find_package( PoKiTT )
+#   include_directories_( ${PoKiTT_INCLUDE_DIR} )
+#
+
+set( PoKiTT_INCLUDE_DIR @PoKiTT_INCLUDE@ @TPL_INCLUDE_DIRS@ )
+set( PoKiTT_TPL_LIBS @TPL_LIBRARIES@ )
+
+find_package( SpatialOps PATHS @SpatialOps_DIR@ )
+include( @CMAKE_INSTALL_PREFIX@/lib/expression/PoKiTT.cmake )
+

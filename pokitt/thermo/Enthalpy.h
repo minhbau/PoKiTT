@@ -11,7 +11,7 @@
 #include <cantera/kernel/SpeciesThermoInterpType.h> // contains definitions for which polynomial is being used
 #include <cantera/IdealGasMix.h>
 
-#include <CanteraObjects.h> //include cantera wrapper
+#include <pokitt/CanteraObjects.h> //include cantera wrapper
 
 #define GASCONSTANT 8314.47215 //J/kmole K - value which matches Cantera results
 

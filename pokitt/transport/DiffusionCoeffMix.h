@@ -8,7 +8,7 @@
 #include <boost/timer.hpp>
 #endif
 
-#include <CanteraObjects.h> //include cantera wrapper
+#include <pokitt/CanteraObjects.h> //include cantera wrapper
 
 #include <cantera/transport.h>
 

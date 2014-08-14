@@ -1,0 +1,7 @@
+#ifndef PoKiTT_Version_h
+#define PoKiTT_Version_h
+
+#define PoKiTTVersionHash @PoKiTT_REPO_HASH@
+#define PoKiTTVersionDate @PoKiTT_REPO_DATE@
+
+#endif // PoKiTT_Version_h
