@@ -8,12 +8,11 @@
 #include <boost/timer.hpp>
 #endif
 
+#include <cantera/kernel/ct_defs.h> // contains value of gas constant
 #include <cantera/kernel/SpeciesThermoInterpType.h> // contains definitions for which polynomial is being used
 #include <cantera/IdealGasMix.h>
 
 #include <pokitt/CanteraObjects.h> //include cantera wrapper
-
-#define GASCONSTANT 8314.47215 //J/kmole K - value which matches Cantera results
 
 namespace Cantera_CXX{ class IdealGasMix; } //location of polynomial
 
@@ -164,6 +163,7 @@ evaluate()
   boost::timer timer;
 #endif
   using namespace SpatialOps;
+  using namespace Cantera;
   SpecT& enthalpies = this->get_value_vec();
 
   const FieldT& temp = *t_;
@@ -223,7 +223,7 @@ evaluate()
        * If the temperature is out of range, the value is set to the value at the min or max temp
        */
       for( ; ic != icend; ++ic)
-        *ic *= GASCONSTANT / molecularWeights[n]; // dimensionalize the coefficients
+        *ic *= GasConstant / molecularWeights[n]; // dimensionalize the coefficients
       *enthalpies[n] <<= cond( temp <= c[0] && temp >= minT, c[ 6] + c[1] * temp + c[2]/2 * *t2 + c[ 3]/3 * *t3 + c[ 4]/4 * *t4 + c[ 5]/5 * *t5) // if low temp
                              ( temp >  c[0] && temp <= maxT, c[13] + c[8] * temp + c[9]/2 * *t2 + c[10]/3 * *t3 + c[11]/4 * *t4 + c[12]/5 * *t5)  // else if high temp
                              ( temp <  minT                 , c[1] * temp + c[2] * minT * (temp-minT/2) + c[ 3] * minT * minT * (temp - 2*minT/3) + c[ 4] * pow(minT,3) * (temp - 3*minT/4) + c[ 5] * pow(minT,4) * (temp - 4*minT/5) + c[ 6]) // else if out of bounds - low

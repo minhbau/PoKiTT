@@ -9,12 +9,11 @@
 #include <boost/timer.hpp>
 #endif
 
+#include <cantera/kernel/ct_defs.h> // contains value of gas constant
 #include <cantera/kernel/speciesThermoTypes.h> // contains definitions for which polynomial is being used
 #include <cantera/IdealGasMix.h>
 
 #include <pokitt/CanteraObjects.h> // include Cantera wrapper
-
-#define GASCONSTANT 8314.47215 // J/kmole K - value which matches Cantera results
 
 namespace Cantera_CXX{ class IdealGasMix; } // location of polynomial coefficients
 
@@ -195,6 +194,7 @@ evaluate()
 boost::timer timer;
 #endif
   using namespace SpatialOps;
+  using namespace Cantera;
   FieldT& temp = this->value();
 
   int mtype;
@@ -281,7 +281,7 @@ boost::timer timer;
           break;
         case NASA2:
           for( ; ic != icend; ++ic)
-            *ic *= GASCONSTANT / molecularWeights[n]; // dimensionalize the coefficients
+            *ic *= GasConstant / molecularWeights[n]; // dimensionalize the coefficients
           delH <<= delH - *massFracs_[n] * cond( temp <= c[0] , c[ 6] + c[1] * temp + c[2]/2 * *t2 + c[ 3]/3 * *t3 + c[ 4]/4 * *t4 + c[ 5]/5 * *t5) // if low temp
                                                (                c[13] + c[8] * temp + c[9]/2 * *t2 + c[10]/3 * *t3 + c[11]/4 * *t4 + c[12]/5 * *t5); // else if high temp
 
@@ -319,7 +319,7 @@ boost::timer timer;
           break;
         case NASA2:
           for( ; ic != icend; ++ic)
-            *ic *= GASCONSTANT / molecularWeights[n]; // dimensionalize the coefficients
+            *ic *= GasConstant / molecularWeights[n]; // dimensionalize the coefficients
           delH <<= delH - *massFracs_[n] * cond( temp <= c[0] && temp >= minT, c[ 6] + c[1] * temp + c[2]/2 * *t2 + c[ 3]/3 * *t3 + c[ 4]/4 * *t4 + c[ 5]/5 * *t5 ) // if low temp
                                                ( temp >  c[0] && temp <= maxT, c[13] + c[8] * temp + c[9]/2 * *t2 + c[10]/3 * *t3 + c[11]/4 * *t4 + c[12]/5 * *t5 )  // else if high temp
                                                ( temp < minT, c[ 6] + c[1] * temp + c[2] * minT * (temp - minT/2) + c[ 3] * minT * minT * (temp - 2*minT/3) + c[ 4]*pow(minT,3) * (temp - 3*minT/4) + c[ 5]*pow(minT,4) * (temp - 4*minT/5) ) // else if out of bounds - low
@@ -571,6 +571,7 @@ evaluate()
   boost::timer timer;
 #endif
   using namespace SpatialOps;
+  using namespace Cantera;
   FieldT& temp = this->value();
 
   int mtype;
@@ -642,8 +643,8 @@ evaluate()
       if( nebo_max(temp) <= maxT && nebo_min(temp) >= minT){ // if true, temperature can only be either high or low
         switch (polyType) {
         case SIMPLE: // constant cv
-          c[3] -= GASCONSTANT; // change coefficients from enthalpy to internal energy
-          c[1] -= GASCONSTANT * c[0];
+          c[3] -= GasConstant; // change coefficients from enthalpy to internal energy
+          c[1] -= GasConstant * c[0];
           delE0<<=delE0 - *massFracs_[n] * ( c[1] + c[3]*(temp-c[0]) )
                                          / molecularWeights[n];
 
@@ -654,7 +655,7 @@ evaluate()
           c[1] -= 1.0; //change coefficients from enthalpy to internal energy
           c[8] -= 1.0;
           for( ; ic != icend; ++ic)
-            *ic *= GASCONSTANT / molecularWeights[n]; // dimensionalize the coefficients
+            *ic *= GasConstant / molecularWeights[n]; // dimensionalize the coefficients
           delE0 <<= delE0 - *massFracs_[n] * cond( temp <= c[0], c[ 6] + c[1] * temp + c[2]/2 * *t2 + c[ 3]/3 * *t3 + c[ 4]/4 * *t4 + c[ 5]/5 * *t5 ) // if low temp
                                                  (               c[13] + c[8] * temp + c[9]/2 * *t2 + c[10]/3 * *t3 + c[11]/4 * *t4 + c[12]/5 * *t5 );// else if high temp
 
@@ -662,8 +663,8 @@ evaluate()
                                                  (               c[8] + c[9] * temp + c[10] * *t2 + c[11] * *t3 + c[12] * *t4);// else if high temp
         break;
         case SHOMATE2:
-          c[1] -= GASCONSTANT * 1e-3; //change coefficients from enthalpy to internal energy
-          c[8] -= GASCONSTANT * 1e-3;
+          c[1] -= GasConstant * 1e-3; //change coefficients from enthalpy to internal energy
+          c[8] -= GasConstant * 1e-3;
           for( ; ic != icend; ++ic)
             *ic *= 1e6 / molecularWeights[n]; // scale the coefficients again to keep units consistent
           delE0 <<= delE0 - *massFracs_[n] * cond( temp <= c[0], c[ 6] + c[1] * temp*1e-3 + c[2]/2 * *t2*1e-6 + c[ 3]/3 * *t3*1e-9 + c[ 4]/4 * *t4*1e-12 - c[ 5] * *recipT*1e3 ) // if low temp
@@ -682,8 +683,8 @@ evaluate()
        */
         switch (polyType) {
         case SIMPLE: // constant cv
-          c[3] -= GASCONSTANT; // change coefficients from enthalpy to internal energy
-          c[1] -= GASCONSTANT * c[0];
+          c[3] -= GasConstant; // change coefficients from enthalpy to internal energy
+          c[1] -= GasConstant * c[0];
           delE0<<=delE0 - *massFracs_[n] * ( c[1] + c[3] * (temp-c[0]) )
                                          / molecularWeights[n];
 
@@ -694,7 +695,7 @@ evaluate()
           c[1] -= 1.0; //change coefficients from enthalpy to internal energy
           c[8] -= 1.0;
           for( ; ic != icend; ++ic)
-            *ic *= GASCONSTANT / molecularWeights[n];
+            *ic *= GasConstant / molecularWeights[n];
           delE0 <<= delE0 - *massFracs_[n] * cond( temp <= c[0] && temp >= minT, c[ 6] + c[1] * temp + c[2]/2 * *t2 + c[ 3]/3 * *t3 + c[ 4]/4 * *t4 + c[ 5]/5 * *t5 ) // if low temp
                                                  ( temp >  c[0] && temp <= maxT, c[13] + c[8] * temp + c[9]/2 * *t2 + c[10]/3 * *t3 + c[11]/4 * *t4 + c[12]/5 * *t5 )  // else if high temp
                                                  ( temp < minT, c[1] * temp + c[2] * minT * (temp - minT/2) + c[ 3] * minT * minT * (temp - 2*minT/3) + c[ 4]*pow(minT,3) * (temp - 3*minT/4) + c[ 5]*pow(minT,4) * (temp - 4*minT/5) + c[ 6] ) // else if out of bounds - low
@@ -710,8 +711,8 @@ evaluate()
           case SHOMATE2:
           double minTScaled = minT/1000;
           double maxTScaled = maxT/1000;
-          c[1] -= GASCONSTANT * 1e-3; //change coefficients from enthalpy to internal energy
-          c[8] -= GASCONSTANT * 1e-3;
+          c[1] -= GasConstant * 1e-3; //change coefficients from enthalpy to internal energy
+          c[8] -= GasConstant * 1e-3;
           for( ; ic != icend; ++ic)
             *ic *= 1e6 / molecularWeights[n]; // scale the coefficients again to keep units consistent
           delE0 <<= delE0 - *massFracs_[n] * cond( temp <= c[0] && temp >= minT, c[ 6] + c[1] * temp*1e-3 + c[2]/2 * *t2*1e-6 + c[ 3]/3 * *t3*1e-9 + c[ 4]/4 * *t4*1e-12 - c[ 5] * *recipT*1e3 ) // if low temp

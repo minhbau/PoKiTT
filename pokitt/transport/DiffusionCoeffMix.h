@@ -12,8 +12,6 @@
 
 #include <cantera/transport.h>
 
-#define GASCONSTANT 8314.47215 //J/kmole K - value which matches Cantera results
-
 /**
  *  \class  DiffusionCoeff
  *  \author Nate Yonkee

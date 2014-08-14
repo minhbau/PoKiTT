@@ -10,11 +10,10 @@
 
 #include <pokitt/CanteraObjects.h> // include cantera wrapper
 
+#include <cantera/kernel/ct_defs.h> // contains value of gas constant
 #include <cantera/kernel/reaction_defs.h>
 #include <cantera/kernel/speciesThermoTypes.h> // contains definitions for which polynomial is being used
 #include <cantera/IdealGasMix.h>
-
-#define GASCONSTANT 8314.47215
 
 namespace Cantera_CXX{ class IdealGasMix; } // location of polynomial coefficients for gibbs energy
 
@@ -284,8 +283,8 @@ evaluate()
 #ifdef TIMINGS
   boost::timer timer;
 #endif
-  using namespace Cantera; // for reaction type definitions
   using namespace SpatialOps;
+  using namespace Cantera;
 
   SpecT& rRates = this->get_value_vec();
   const FieldT& t = *t_;
@@ -327,7 +326,7 @@ evaluate()
 
   trecip <<= 1/ t;
   logt <<= log(t);
-  conc <<= trecip * p / GASCONSTANT; // molar concentration
+  conc <<= trecip * p / GasConstant; // molar concentration
   logConc <<= log(conc);
   conc <<= conc * *mmw_; // mass concentration
   conc2 <<= conc * conc;
@@ -372,7 +371,7 @@ evaluate()
         std::vector<double>::iterator ic = c.begin() + 1;
         std::vector<double>::iterator icend = c.end();
         for( ; ic != icend; ++ic)
-          *ic *= GASCONSTANT; // dimensionalize the coefficients
+          *ic *= GasConstant; // dimensionalize the coefficients
         *gPtrvec[n] <<= cond( t <= c[0], c[ 6] + (c[1] - c[ 7]) * t - c[2]/2 * t2 - c[ 3]/6 * t3 - c[ 4]/12 * t4 - c[ 5]/20 * t5 - c[1] * tlogt ) // if low temp
                             (            c[13] + (c[8] - c[14]) * t - c[9]/2 * t2 - c[10]/6 * t3 - c[11]/12 * t4 - c[12]/20 * t5 - c[8] * tlogt ); // else if high temp
       }
@@ -485,7 +484,7 @@ evaluate()
       for( rit = products.begin(); rit!=products.end(); ++rit, ++sit)
         dg <<= dg + *sit * *gPtrvec[*rit];
 
-      kr <<= k * exp( dg * trecip / GASCONSTANT + dOrder_[r] * logConc ); // reversible rate constant
+      kr <<= k * exp( dg * trecip / GasConstant + dOrder_[r] * logConc ); // reversible rate constant
     }
     else
       kr <<= 0.0; // 0 if not reversible

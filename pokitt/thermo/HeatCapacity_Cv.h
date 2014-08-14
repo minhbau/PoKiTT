@@ -7,10 +7,9 @@
 
 #include <pokitt/CanteraObjects.h> //include cantera wrapper
 
+#include <cantera/kernel/ct_defs.h> // contains value of gas constant
 #include <cantera/kernel/speciesThermoTypes.h> // contains definitions for which polynomial is being used
 #include <cantera/IdealGasMix.h>
-
-#define GASCONSTANT 8314.47215 // J/kmole K - value which matches Cantera results
 
 namespace Cantera_CXX{ class IdealGasMix; } // location of polynomial coefficients
 
@@ -165,6 +164,7 @@ evaluate()
 {
   boost::timer time;
   using namespace SpatialOps;
+  using namespace Cantera;
   SpecT& cps = this->get_value_vec();
 
   SpatFldPtr<FieldT> t2;
@@ -214,7 +214,7 @@ evaluate()
      */
     else if (polyType==NASA2){
       for( std::vector<double>::iterator ic = c.begin() + 1; ic!=c.end(); ++ic )
-        *ic *= GASCONSTANT; // dimensionalize the coefficients
+        *ic *= GasConstant; // dimensionalize the coefficients
       *cps[n] <<= cond( *t_ <= c[0] && *t_ >= minTemp, c[1] + c[2] * *t_ + c[ 3] * *t2 + c[ 4] * *t3 + c[ 5] * *t4) // if low temp
                       ( *t_ >  c[0] && *t_ <= maxTemp, c[8] + c[9] * *t_ + c[10] * *t2 + c[11] * *t3 + c[12] * *t4)  // else if high temp
                       ( *t_ < minTemp, c[1] + c[2] * minTemp + c[ 3] * minTemp * minTemp + c[ 4] * pow(minTemp,3) + c[ 5] * pow(minTemp,4))  // else if out of bounds - low
@@ -407,6 +407,7 @@ evaluate()
 {
   boost::timer time;
   using namespace SpatialOps;
+  using namespace Cantera;
   SpecT& cvs = this->get_value_vec();
 
   SpatFldPtr<FieldT> t2;
@@ -450,7 +451,7 @@ evaluate()
   for( size_t n=0; n<nSpec_; ++n ){
     spThermo.reportParams(n, polyType, &c[0], minTemp, maxTemp, refPressure);
     if (polyType==CONSTANT_CP | polyType==SIMPLE){
-      c[3] -= GASCONSTANT; // change coefficients from enthalpy to internal energy
+      c[3] -= GasConstant; // change coefficients from enthalpy to internal energy
       *cvs[n] <<= c[3];
     }// constant heat capacity
       /* polynomials are applicable in two temperature ranges - high and low
@@ -460,7 +461,7 @@ evaluate()
       c[1] -= 1.0; //change coefficients from enthalpy to internal energy
       c[8] -= 1.0;
       for( std::vector<double>::iterator ic = c.begin() + 1; ic!=c.end(); ++ic )
-        *ic *= GASCONSTANT;
+        *ic *= GasConstant;
       *cvs[n] <<= cond( *t_ <= c[0] && *t_ >= minTemp, c[1] + c[2] * *t_ + c[ 3] * *t2 + c[ 4] * *t3 + c[ 5] * *t4) // if low temp
                       ( *t_ >  c[0] && *t_ <= maxTemp, c[8] + c[9] * *t_ + c[10] * *t2 + c[11] * *t3 + c[12] * *t4)  // else if high temp
                       ( *t_ < minTemp, c[1] + c[2] * minTemp + c[ 3] * minTemp * minTemp + c[ 4] * pow(minTemp,3) + c[ 5] * pow(minTemp,4))  // else if out of bounds - low
@@ -469,8 +470,8 @@ evaluate()
     else if (polyType==SHOMATE2){
       double minTempScaled = minTemp/1000;
       double maxTempScaled = maxTemp/1000;
-      c[1] -= GASCONSTANT * 1e-3; //change coefficients from enthalpy to internal energy
-      c[8] -= GASCONSTANT * 1e-3;
+      c[1] -= GasConstant * 1e-3; //change coefficients from enthalpy to internal energy
+      c[8] -= GasConstant * 1e-3;
       for( std::vector<double>::iterator ic = c.begin() + 1; ic!=c.end(); ++ic )
         *ic *= 1e3; // scale the coefficients again to keep units consistent
       *cvs[n] <<= cond( *t_ <= c[0] && *t_ >= minTemp, c[1] + c[2] * *t_*1e-3 + c[ 3] * *t2*1e-6 + c[ 4] * *t3*1e-9 + c[ 5] * *recipRecipT*1e6) // if low temp
