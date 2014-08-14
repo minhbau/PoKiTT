@@ -231,7 +231,7 @@ evaluate()
                       (                c[8] + c[9] * maxTempScaled + c[10] * maxTempScaled * maxTempScaled + c[11] * pow(maxTempScaled,3) + c[12] * pow(maxTempScaled,-2)); // else out of bounds - high
     }
   }
-  print("cp time",time.elapsed());
+
 }
 
 //--------------------------------------------------------------------
@@ -480,8 +480,6 @@ evaluate()
                       (                c[8] + c[9] * maxTempScaled + c[10] * maxTempScaled * maxTempScaled + c[11] * pow(maxTempScaled,3) + c[12] * pow(maxTempScaled,-2)); // else out of bounds - high
     }
   }
-
-  print("cv time",time.elapsed());
 
 }
 
