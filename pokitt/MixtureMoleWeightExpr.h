@@ -1,66 +1,66 @@
-#ifndef MixtureMolWeightExpr_h
-#define MixtureMolWeightExpr_h
+#ifndef MixtureMolWeight_Expr_h
+#define MixtureMolWeight_Expr_h
 
-#include <expression/ExprLib.h>
-        // defines field types
-typedef SpatialOps::SVolField   VolField;
-//====================================================================
+#include <expression/Expression.h>
 
 /**
- *  @class MixtureMolWeightExpr
- *  @date January, 2011
- *  @author Naveen Punati
- *  @brief Caculates mixture molecular weight given the invidual species mass fractions and molecular weights
- *         Used for Initial conditions and BC's
+ *  \class MixtureMolWeight
  */
-class MixtureMolWeightExpr : public Expr::Expression< VolField >
+template< typename FieldT >
+class MixtureMolWeight
+ : public Expr::Expression<FieldT>
 {
-public:
-  typedef std::vector<const VolField*> ConstSpecT;
-  struct Builder : public Expr::ExpressionBuilder
-  {
-    Builder( const Expr::Tag& result,
-             const Expr::Tag& yiTag,
-             const std::vector<double>& specMw )
-      : ExpressionBuilder(result),
-        yiT_( yiTag ),
-        specMw_(specMw)
-    {}
+  const Expr::Tag yiTag_;
+  const FieldT* yi_;
+  const std::vector<double> specMW_;
 
-    Expr::ExpressionBase* build() const{ return new MixtureMolWeightExpr(yiT_,specMw_ ); }
+    MixtureMolWeight( const Expr::Tag& yiTag,
+                      const std::vector<double>& specMw  );
+public:
+  class Builder : public Expr::ExpressionBuilder
+  {
+  public:
+    /**
+     *  @brief Build a MixtureMolWeight expression
+     *  @param resultTag the tag for mixture molecular weight
+     *  @param yiTag tag for mass fractions
+     *  @param specMW vector of species molecular weights
+     */
+    Builder( const Expr::Tag& resultTag,
+             const Expr::Tag& yiTag,
+             const std::vector<double>& specMW );
+
+    Expr::ExpressionBase* build() const;
 
   private:
-    const Expr::Tag yiT_;
-    const std::vector<double> specMw_;
-
+    const Expr::Tag yiTag_;
+    const std::vector<double> specMW_;
   };
 
+  ~MixtureMolWeight();
   void advertise_dependents( Expr::ExprDeps& exprDeps );
   void bind_fields( const Expr::FieldManagerList& fml );
+  void bind_operators( const SpatialOps::OperatorDatabase& opDB );
   void evaluate();
-
-private:
-
-  MixtureMolWeightExpr( const Expr::Tag& yiTag,
-                        const std::vector<double>& specMw );
-
-  ~MixtureMolWeightExpr();
-
-  const std::vector<double> specMw_;
-  const int nspec_;
-  Expr::TagList specTags_;
-
-  ConstSpecT yi_;
 };
 
-//====================================================================
 
-MixtureMolWeightExpr::
-MixtureMolWeightExpr( const Expr::Tag& yiTag,
-                      const std::vector<double>& specMw )
-  : Expr::Expression<VolField>(),
-    specMw_(specMw),
-    nspec_(specMw_.size())
+
+// ###################################################################
+//
+//                          Implementation
+//
+// ###################################################################
+
+
+
+template< typename FieldT >
+MixtureMolWeight<FieldT>::
+MixtureMolWeight( const Expr::Tag& yiTag,
+                  const std::vector<double>& specMW )
+  : Expr::Expression<FieldT>(),
+    yiTag_( yiTag ),
+    specMW_(specMW)
 {
   specTags_.clear();
   for( int i=0; i<nspec_; ++i ){
@@ -72,13 +72,16 @@ MixtureMolWeightExpr( const Expr::Tag& yiTag,
 
 //--------------------------------------------------------------------
 
-MixtureMolWeightExpr::~MixtureMolWeightExpr()
+template< typename FieldT >
+MixtureMolWeight<FieldT>::
+~MixtureMolWeight()
 {}
 
 //--------------------------------------------------------------------
 
+template< typename FieldT >
 void
-MixtureMolWeightExpr::
+MixtureMolWeight<FieldT>::
 advertise_dependents( Expr::ExprDeps& exprDeps )
 {
   for( Expr::TagList::const_iterator itag=specTags_.begin(); itag!=specTags_.end(); ++itag ){
@@ -88,8 +91,9 @@ advertise_dependents( Expr::ExprDeps& exprDeps )
 
 //--------------------------------------------------------------------
 
+template< typename FieldT >
 void
-MixtureMolWeightExpr::
+MixtureMolWeight<FieldT>::
 bind_fields( const Expr::FieldManagerList& fml )
 {
   const Expr::FieldMgrSelector<VolField>::type& fm = fml.field_manager<VolField>();
@@ -102,19 +106,52 @@ bind_fields( const Expr::FieldManagerList& fml )
 
 //--------------------------------------------------------------------
 
+template< typename FieldT >
 void
-MixtureMolWeightExpr::
+MixtureMolWeight<FieldT>::
+bind_operators( const SpatialOps::OperatorDatabase& opDB )
+{
+
+}
+
+//--------------------------------------------------------------------
+
+template< typename FieldT >
+void
+MixtureMolWeight<FieldT>::
 evaluate()
 {
   using namespace SpatialOps;
-  VolField& result = this->value();
+  FieldT& mixMW = this->value();
 
-  /// \todo implement in till to avoid double grid loop...
-  result  <<= 0.0;
-  for( size_t i=0; i<nspec_; ++i ){
-    result <<= result + *yi_[i] / specMw_[i];
-  }
-  result <<= 1.0 / result;
+  result <<= 0.0;
+    for( size_t n=0; n<nspec_; ++n ){
+      result <<= result + *yi_[n] / specMW_[n];
+    }
+    result <<= 1.0 / result;
 }
 
-#endif // MixtureMolWeightExpr_h
+//--------------------------------------------------------------------
+
+template< typename FieldT >
+MixtureMolWeight<FieldT>::
+Builder::Builder( const Expr::Tag& resultTag,
+                  const Expr::Tag& yiTag,
+                  const std::vector<double>& specMW )
+  : ExpressionBuilder( resultTag ),
+    yiTag_( yiTag ),
+    specMW_( specMW )
+{}
+
+//--------------------------------------------------------------------
+
+template< typename FieldT >
+Expr::ExpressionBase*
+MixtureMolWeight<FieldT>::
+Builder::build() const
+{
+  return new MixtureMolWeight<FieldT>( yiTag_, specMW_ );
+}
+
+
+#endif // MixtureMolWeight_Expr_h
