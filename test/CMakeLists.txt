@@ -38,8 +38,8 @@ include_directories( ${CMAKE_SOURCE_DIR}/src )
 #add_executable( enthalpy_test Enthalpy_test.cpp )
 #target_link_libraries( enthalpy_test exprlib )
 
-#add_executable( cp_test HeatCapacity_Cp_test.cpp )
-#target_link_libraries( cp_test exprlib )
+add_executable( cp_test HeatCapacity_Cp_test.cpp )
+target_link_libraries( cp_test exprlib )
 
 #add_executable( cv_test HeatCapacity_Cv_test.cpp )
 #target_link_libraries( cv_test exprlib )
