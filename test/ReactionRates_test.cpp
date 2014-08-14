@@ -35,7 +35,6 @@ void print(std::string label, CellField& field);
 
 int main(){
 
-  find(-0.8);
 
   std::vector<double> rtimes;
   std::vector<double> rdiff;
@@ -58,8 +57,6 @@ int main(){
     try{
 
       CanteraObjects& cantera = CanteraObjects::self();
-
-      find(0.2);
 
 //            const CanteraObjects::Setup setup =CanteraObjects::Setup("Mix","gri30.xml","gri30_mix");
 //            const CanteraObjects::Setup setup =CanteraObjects::Setup("Mix","h2o2.xml","ohmech");
@@ -92,11 +89,9 @@ int main(){
 //      const CanteraObjects::Setup setup =CanteraObjects::Setup("","orgphospropkin.cti","gas");
 //      const CanteraObjects::Setup setup =CanteraObjects::Setup("","prfkin.cti","gas");
 
-      find(0.4);
 
       cantera.setup_cantera(setup);
 
-      find(0.5);
 
       Cantera_CXX::IdealGasMix* const gasMix=cantera.get_gasmix();
       const double pressure = gasMix->pressure();
@@ -104,12 +99,10 @@ int main(){
       std::vector<double> molecularWeights(nSpec);
       gasMix->getMolecularWeights(&molecularWeights[0]);
 
-      find(1);
 
       size_t i;
       size_t n;
 
-      find(2);
 
       std::vector<double> tVec;
       for( i=0; i<*ptit+2; ++i)
@@ -131,27 +124,18 @@ int main(){
       std::vector<double>::const_iterator itemp;
       std::vector<double>::const_iterator itend = tVec.end();
       const std::vector<Cantera::ReactionData> m_datavec = gasMix->getReactionData();
-      find(2.2);
       int NRXNS = m_datavec.size();
 #ifdef CANTERATEST
       i=0;
       for( itemp = tVec.begin(); itemp!=itend; ++itemp,++i){
         gasMix->setState_TPX(*itemp,pressure,&concentrations[i][0]);
-        find(2.1);
         const std::vector<Cantera::ReactionData> m_datavec = gasMix->getReactionData();
-        find(2.2);
         NRXNS = m_datavec.size();
-        find(2.3);
         std::vector<std::vector<double> > mcalcs = rates(gasMix);
-        find(2.4);
         std::vector<double> kfwdvec=mcalcs[0];
-        find(2.5);
         std::vector<double> fROPvec=mcalcs[1];
-        find(2.6);
         std::vector<double> rROPvec=mcalcs[2];
-        find(2.7);
         std::vector<double> nROPvec=mcalcs[3];
-        find(2.8);
         std::vector<double> rateverify=mcalcs[4];
 
         //        print("rateverify",rateverify);
@@ -219,7 +203,6 @@ int main(){
 
       const Expr::Tag mmwTag( "mmw", Expr::STATE_NONE);
 
-      find(3);
 
       SS::IntVec npts(*ptit,1,1);
 
@@ -257,7 +240,6 @@ int main(){
       zcoord.add_device( GPU_INDEX );
 # endif
 
-      find(4);
 
       Expr::ExpressionTree tree( rRate_id, exprFactory, 0 );
       Expr::FieldManagerList fml;
@@ -267,7 +249,6 @@ int main(){
         tree.write_tree(fout);
       }
 
-      find(5);
 
       tree.register_fields( fml );
       //
@@ -283,7 +264,6 @@ int main(){
       tree.bind_fields( fml );
       //
 
-      find(6);
       using namespace SpatialOps;
 
       Expr::FieldMgrSelector<CellField>::type& cellFM = fml.field_manager< CellField>();
@@ -308,7 +288,6 @@ int main(){
         //        print("xi",xi);
       }
 
-      find(7);
       t <<= 500.0 + 1000.0 * xcoord;
 
       CellField& p = cellFM.field_ref(pTag);
@@ -320,11 +299,9 @@ int main(){
       //        if( fabs(diff) > 1e-15) print("temp diff",diff);
       //      }
 
-      find(8);
 
       tree.lock_fields(fml);  // prevent fields from being deallocated so that we can get them after graph execution.
 
-      find(8.5);
 
       std::cout<<setup.inputFile<<" - "<<*ptit<<std::endl;
 
@@ -332,7 +309,6 @@ int main(){
       tree.execute_tree();
       //      print("tree time",treetime.elapsed());
 
-      find(8.6);
 
 #ifdef ENABLE_CUDA
       for( n=0; n<nSpec; ++n){

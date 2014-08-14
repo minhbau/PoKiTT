@@ -155,18 +155,14 @@ int main(){
       tree.lock_fields(fml);  // prevent fields from being deallocated so that we can get them after graph execution.
 
       std::cout<<setup.inputFile<<" - "<<*ptit<<std::endl;
-find(0.05);
       boost::timer treetime;
       tree.execute_tree();
       //      print("tree time",treetime.elapsed());
-find(0.1);
       CellField& tCondMix = cellFM.field_ref(tCondMixTag);
-find(1);
 #ifdef ENABLE_CUDA
       tCondMix.add_device(CPU_INDEX);
       tCondMix.set_device_as_active(CPU_INDEX);
 #endif
-find(2);
       std::vector<std::vector<double> > concentrations;
       for( i=0; i<*ptit+2; ++i){
         std::vector<double> concentration;
@@ -185,9 +181,7 @@ find(2);
 
       std::vector<double> results(*ptit+2);
       i=0;
-      find(1);
       std::vector<double>::const_iterator itend = tVec.end();
-      find(2);
       std::vector<double>::const_iterator itemp;
       boost::timer cTimer;
       //      boost::timer setStateTime;
@@ -202,12 +196,10 @@ find(2);
       tctime.push_back(cTimer.elapsed());
       //      print("setstatetime",totalt);
 
-      find(4);
       std::vector<double>::iterator rit = results.begin();
       itemp = tVec.begin();
       double maxerror = 0.0;
       for ( CellField::const_iterator itc= tCondMix.begin(); itc!= tCondMix.end(); ++rit, ++itc, ++itemp){
-        find(5);
         const double err = (*rit-*itc)/ *rit;
         if( std::abs(err) > maxerror) maxerror = std::abs(err);
         if(std::abs(err) >= 1e-4) {
@@ -216,7 +208,6 @@ find(2);
           print("my value",*itc);
           print("err",err);
         }
-        find(6);
       }
       tcdiff.push_back(maxerror);
       //      print("maxerror",maxerror);

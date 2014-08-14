@@ -177,9 +177,7 @@ int main(){
 
       std::vector<double> results(*ptit+2);
       i=0;
-      find(1);
       std::vector<double>::const_iterator itend = tVec.end();
-      find(2);
       std::vector<double>::const_iterator itemp;
       //    boost::timer stateTimer;
       //    double stateTime = 0.0;
@@ -195,12 +193,10 @@ int main(){
       //    print("cantera time",cTimer.elapsed());
       //    print("state time",stateTime);
 
-      find(4);
       std::vector<double>::iterator rit = results.begin();
       itemp = tVec.begin();
       double maxerror = 0.0;
       for ( CellField::const_iterator ivis= visMix.begin(); ivis!= visMix.end(); ++rit, ++ivis, ++itemp){
-        find(5);
         const double err = (*rit-*ivis)/ *rit;
         if( fabs(err) > maxerror) maxerror = fabs(err);
 //        if(std::abs(err) >= 1e-4) {
@@ -209,7 +205,6 @@ int main(){
 //          print("my value",*ivis);
 //          print("err",err);
 //        }
-        find(6);
       }
 
       vdiff.push_back(maxerror);

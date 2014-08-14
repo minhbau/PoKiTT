@@ -194,7 +194,6 @@ int main(){
 
       tempe0 <<= 500.0 + 1000* xcoord;
 
-      find(2);
 
       std::vector<double> tVec;
       for( i=0; i<*ptit+2; ++i)
@@ -315,19 +314,15 @@ int main(){
 
       tempe0<<=tempe0 + 25 - 50 * xcoord;
       temp<<=temp + 25 - 50 * xcoord;
-      find(5);
 
       std::vector<double> tVecDiff;
       for( i=0; i<*ptit+2; ++i)
         tVecDiff.push_back( 525.0 + 950.0 * (i-0.5)/ *ptit);
 
-      find(6);
       tree.lock_fields(fml);  // prevent fields from being deallocated so that we can get them after graph execution.
       treee0.lock_fields(fmle0);
-      find(7);
       tree.execute_tree();
       treee0.execute_tree();
-      find(8);
 
 #ifdef ENABLE_CUDA
       temp.add_device_sync(CPU_INDEX);
@@ -337,7 +332,6 @@ int main(){
       std::vector<double> results(*ptit+2,0.0);
       i=0;
       boost::timer cTimer;
-      find(2);
 
       std::vector<double>::const_iterator itempd;
       std::vector<double>::const_iterator itendd = tVecDiff.end();
@@ -362,7 +356,6 @@ int main(){
       tdiff.push_back(maxerror);
 
 
-      find(2);
 
       std::vector<double> resultse0(*ptit+2,0.0);
       i=0;

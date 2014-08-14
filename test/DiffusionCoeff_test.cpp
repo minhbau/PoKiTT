@@ -165,9 +165,8 @@ int main(){
 
       std::cout<<setup.inputFile<<" - "<<*ptit<<std::endl;
 
-      find(1);
       tree.execute_tree();
-      find(2);
+
 #ifdef ENABLE_CUDA
       for( n=0; n<nSpec; ++n){
         CellField& d = fml.field_manager<CellField>().field_ref(diffusionCoeffMixTags[n]);
@@ -176,7 +175,7 @@ int main(){
         d.set_field_loc_active(CPU_INDEX);
       }
 #endif
-      find(3);
+
       std::vector<std::vector<double> > concentrations;
       for( i=0; i<*ptit+2; ++i){
         std::vector<double> concentration;
@@ -188,11 +187,11 @@ int main(){
           molefrac.push_back(concentration[n]/sum);
         concentrations.push_back(molefrac);
       }
-      find(4);
+
       std::vector<double> tVec;
       for( i=0; i<*ptit+2; ++i)
         tVec.push_back( 500.0 + 1000.0 * (i-0.5)/ *ptit);
-      find(1);
+
       std::vector< std::vector<double> > d_results(*ptit+2);
       i=0;
       std::vector<double>::const_iterator itemp;

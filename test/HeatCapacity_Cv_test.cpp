@@ -54,20 +54,15 @@ int main(){
       size_t i;
       size_t n;
 
-      find(0);
 //            const CanteraObjects::Setup setup =CanteraObjects::Setup("Mix","gri30.xml","gri30_mix");
 //            const CanteraObjects::Setup setup =CanteraObjects::Setup("Mix","h2o2.xml","ohmech");
 //                  const CanteraObjects::Setup setup =CanteraObjects::Setup("Mix","cp_tester.xml","const_cp");
 //                      const CanteraObjects::Setup setup =CanteraObjects::Setup("Mix","cp_tester.xml","shomate_cp");
       const CanteraObjects::Setup setup =CanteraObjects::Setup("Mix","ethanol_mech.xml","gas");
 
-      find(0.05);
       CanteraObjects& cantera = CanteraObjects::self();
-      find(0.06);
       cantera.setup_cantera(setup);
-      find(0.1);
       Cantera_CXX::IdealGasMix* const gasMix=cantera.get_gasmix();
-      find(0.2);
       const int nSpec=gasMix->nSpecies();
 
       const double refPressure=gasMix->pressure();
@@ -83,7 +78,6 @@ int main(){
       typedef Expr::PlaceHolder <CellField > MassFracs;
       typedef HeatCapacity < CellField > HeatCap;
 
-      find(1);
 
       Expr::ExpressionFactory exprFactory;
 
@@ -131,16 +125,13 @@ int main(){
       grid.set_coord<SpatialOps::XDIR>( xcoord );
       grid.set_coord<SpatialOps::YDIR>( ycoord );
       grid.set_coord<SpatialOps::ZDIR>( zcoord );
-      find(2);
 # ifdef ENABLE_CUDA
       xcoord.add_device_sync( GPU_INDEX );
       ycoord.add_device_sync( GPU_INDEX );
       zcoord.add_device_sync( GPU_INDEX );
 # endif
 
-      find(3);
       Expr::ExpressionTree tree( hc_id, exprFactory, 0 );
-      find(3.1);
 #ifdef MIX
       {
         std::ofstream fout( "HeatCapacity_mix.dot" );
@@ -153,11 +144,9 @@ int main(){
       }
 #endif
 
-      find(3.3);
       Expr::FieldManagerList fml;
 
       tree.register_fields( fml );
-      find(3);
       //
       // allocate all fields on the patch for this tree
       //
@@ -170,13 +159,10 @@ int main(){
 
       tree.bind_fields( fml );
 
-      find(4);
 
 
       using namespace SpatialOps;
-      find(5.8);
       CellField& temp = fml.field_manager<CellField>().field_ref(tTag);
-      find(5.9);
       temp <<= 500.0 + 1000*(xcoord);
 
 #ifdef MIX
@@ -192,15 +178,12 @@ int main(){
         xi <<= xi / *sum;
       }
 #endif
-      find(6);
 
       std::cout<<setup.inputFile<<" - "<<*ptit<<std::endl;
-find(6.1);
 
       tree.lock_fields(fml);  // prevent fields from being deallocated so that we can get them after graph execution.
 
       tree.execute_tree();
-      find(6.2);
 #ifdef MIX
       CellField& hc = fml.field_manager<CellField>().field_ref(hcMixTag);
 

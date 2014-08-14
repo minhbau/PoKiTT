@@ -53,20 +53,20 @@ int main(){
       int i;
       int n;
 
-      find(0);
+
 //            const CanteraObjects::Setup setup =CanteraObjects::Setup("Mix","gri30.xml","gri30_mix");
 //            const CanteraObjects::Setup setup =CanteraObjects::Setup("Mix","h2o2.xml","ohmech");
 //                  const CanteraObjects::Setup setup =CanteraObjects::Setup("Mix","cp_tester.xml","const_cp");
 //                      const CanteraObjects::Setup setup =CanteraObjects::Setup("Mix","cp_tester.xml","shomate_cp");
       const CanteraObjects::Setup setup =CanteraObjects::Setup("Mix","ethanol_mech.xml","gas");
 
-      find(0.05);
+
       CanteraObjects& cantera = CanteraObjects::self();
-      find(0.06);
+
       cantera.setup_cantera(setup);
-      find(0.1);
+
       Cantera_CXX::IdealGasMix* const gasMix=cantera.get_gasmix();
-      find(0.2);
+
       const int nSpec=gasMix->nSpecies();
       const double refPressure=gasMix->pressure();
       std::vector<double> molecularWeights(nSpec);
@@ -80,8 +80,6 @@ int main(){
       typedef Expr::PlaceHolder <CellField > MassFracs;
       typedef SpeciesEnthalpy <CellField> Enthalpy;
       typedef EnthalpyMix < CellField > EnthalpyMix;
-
-      find(1);
 
       Expr::ExpressionFactory exprFactory;
       Expr::ExpressionFactory exprFactory_mix;
@@ -121,35 +119,35 @@ int main(){
       grid.set_coord<SS::XDIR>( xcoord );
       grid.set_coord<SS::YDIR>( ycoord );
       grid.set_coord<SS::ZDIR>( zcoord );
-      find(2);
+
 # ifdef ENABLE_CUDA
       xcoord.add_device( GPU_INDEX );
       ycoord.add_device( GPU_INDEX );
       zcoord.add_device( GPU_INDEX );
 # endif
 
-      find(3);
+
       Expr::ExpressionTree tree( h_id, exprFactory, 0 );
       Expr::ExpressionTree tree_mix( hMix_id, exprFactory_mix, 0);
-      find(3.1);
+
       {
         std::ofstream fout( "Enthalpy.dot" );
         tree.write_tree(fout);
       }
-      find(3.2);
+
 
       {
         std::ofstream fout( "EnthalpyMix.dot" );
         tree_mix.write_tree(fout);
       }
 
-      find(3.3);
+
       Expr::FieldManagerList fml;
       Expr::FieldManagerList fml_mix;
-      find(3.4);
+
       tree.register_fields( fml );
       tree_mix.register_fields( fml_mix );
-      find(3);
+
       //
       // allocate all fields on the patch for this tree
       //
@@ -164,17 +162,14 @@ int main(){
       tree.bind_fields( fml );
       tree_mix.bind_fields( fml_mix );
 
-      find(4);
-
-
       using namespace SpatialOps;
-      find(5.8);
+
       CellField& temp = fml.field_manager<CellField>().field_ref(tTag);
-      find(5.9);
+
       temp <<= 500.0 + 1000*(xcoord);
 
       CellField& temp_mix = fml_mix.field_manager<CellField>().field_ref(tTag);
-      find(5.9);
+
       temp_mix <<= 500.0 + 1000*(xcoord);
 
       SpatFldPtr<CellField> sum  = SpatialFieldStore::get<CellField>(temp_mix);
@@ -189,20 +184,16 @@ int main(){
         xi <<= xi / *sum;
       }
 
-      find(6);
-
       std::cout<<setup.inputFile<<" - "<<*ptit<<std::endl;
-find(6.1);
+
 #ifdef MIX
       tree_mix.lock_fields(fml_mix);  // prevent fields from being deallocated so that we can get them after graph execution.
 
       tree_mix.execute_tree();
-      find(6.4);
 #else
       tree.lock_fields(fml);  // prevent fields from being deallocated so that we can get them after graph execution.
 
       tree.execute_tree();
-      find(6.2);
 #endif
 
 
