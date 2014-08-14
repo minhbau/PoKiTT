@@ -162,7 +162,9 @@ void
 HeatCapacity_Cp<FieldT>::
 evaluate()
 {
+#ifdef TIMINGS
   boost::timer time;
+#endif
   using namespace SpatialOps;
   using namespace Cantera;
   SpecT& cps = this->get_value_vec();
@@ -231,7 +233,9 @@ evaluate()
                       (                c[8] + c[9] * maxTempScaled + c[10] * maxTempScaled * maxTempScaled + c[11] * pow(maxTempScaled,3) + c[12] * pow(maxTempScaled,-2)); // else out of bounds - high
     }
   }
-
+#ifdef TIMINGS
+  std::cout<<"HeatCapacity_Cp time "<<timer.elapsed()<<std::endl;
+#endif
 }
 
 //--------------------------------------------------------------------
