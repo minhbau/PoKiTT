@@ -11,12 +11,8 @@
 #include <stdio.h>
 #include <fstream>
 
-#include "myTemperaturePowers.h"
-#ifdef MIX
-#include "myHeatCapacityMixMass.h"
-#else
-#include "myHeatCapacityMass.h"
-#endif
+#include <pokitt/thermo/TemperaturePowers.h>
+#include <pokitt/thermo/HeatCapacity_Cv.h>
 
 #include <cantera/IdealGasMix.h>
 

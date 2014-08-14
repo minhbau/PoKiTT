@@ -11,8 +11,7 @@
 #include <stdio.h>
 #include <fstream>
 
-#include "myEnthalpyMass.h"
-#include "myEnthalpyMixMass.h"
+#include <pokitt/thermo/Enthalpy.h>
 #include <pokitt/MixtureMolWeightExpr.h>
 
 #include <expression/ExprLib.h>

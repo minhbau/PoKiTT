@@ -10,7 +10,7 @@
 
 #include <boost/timer.hpp>
 
-#include "myViscosityMixMass.h"
+#include <pokitt/transport/ViscosityMix.h>
 
 #include <expression/ExprLib.h>
 

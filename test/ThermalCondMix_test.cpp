@@ -11,7 +11,7 @@
 
 #include <boost/timer.hpp>
 
-#include "myThermalConductivityMixMass.h"
+#include <pokitt/transport/ThermalCondMix.h>
 #include <pokitt/MixtureMolWeightExpr.h>
 
 #include <expression/ExprLib.h>

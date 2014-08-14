@@ -9,7 +9,7 @@
 #include <boost/timer.hpp>
 #include <boost/lexical_cast.hpp>
 
-#include "myTemperatureMass.h"
+#include <pokitt/thermo/Temperature.h>
 #include <pokitt/MixtureMolWeightExpr.h>
 
 #include <expression/ExprLib.h>

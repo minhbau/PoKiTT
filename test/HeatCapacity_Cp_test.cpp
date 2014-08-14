@@ -8,25 +8,15 @@
 #define MIX
 //#define CONSTVOLUME
 //#define FIND
-#include"print.h"
 
 #include<iostream>
 #include<stdio.h>
 #include<fstream>
 
-#include "CanteraObjects.h"
-#include "myTemperaturePowers.h"
-#ifdef MIX
-#include "myHeatCapacityMixMass.h"
-#else
-#include "myHeatCapacityMass.h"
-#endif
+#include <pokitt/thermo/TemperaturePowers.h>
+#include <pokitt/thermo/HeatCapacity_Cp.h>
 
-#ifdef AURORA
-#include "/scratch/local/aurora/yonkee/Cantera/build/include/cantera/IdealGasMix.h"
-#else
 #include <cantera/IdealGasMix.h>
-#endif
 
 #include <expression/ExprLib.h>
 
