@@ -167,14 +167,10 @@ evaluate()
   using namespace SpatialOps;
   SpecT& cps = this->get_value_vec();
 
-  find(4);
-
   SpatFldPtr<FieldT> t2;
   SpatFldPtr<FieldT> t3;
   SpatFldPtr<FieldT> t4;
   SpatFldPtr<FieldT> recipRecipT;
-
-  find(4.5);
 
   int mtype;
 # ifdef ENABLE_CUDA
@@ -183,7 +179,6 @@ evaluate()
   mtype = CPU_INDEX;
 # endif
 
-  find(5);
   // pre-compute powers of t for polynomial evaluations
     if( nasaFlag_ == true | shomateFlag_ == true){
       t2 = SpatialFieldStore::get<FieldT>(*t_,mtype);
@@ -414,14 +409,10 @@ evaluate()
   using namespace SpatialOps;
   SpecT& cvs = this->get_value_vec();
 
-  find(4);
-
   SpatFldPtr<FieldT> t2;
   SpatFldPtr<FieldT> t3;
   SpatFldPtr<FieldT> t4;
   SpatFldPtr<FieldT> recipRecipT;
-
-  find(4.5);
 
   int mtype;
 # ifdef ENABLE_CUDA
@@ -430,7 +421,6 @@ evaluate()
   mtype = CPU_INDEX;
 # endif
 
-  find(5);
 // pre-compute powers of t for polynomial evaluations
   if( nasaFlag_ == true | shomateFlag_ == true){
     t2 = SpatialFieldStore::get<FieldT>(*t_,mtype);
