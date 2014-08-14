@@ -75,11 +75,7 @@ public:
   ~HeatCapacity_Cp();
   void advertise_dependents( Expr::ExprDeps& exprDeps );
   void bind_fields( const Expr::FieldManagerList& fml );
-  void bind_operators( const SpatialOps::OperatorDatabase& opDB );
   void evaluate();
-
-
-
 };
 
 
@@ -97,7 +93,7 @@ HeatCapacity_Cp<FieldT>::
 HeatCapacity_Cp( const Expr::Tag& tTag )
   : Expr::Expression<FieldT>(),
     tTag_( tTag ),
-    gasMix_( CanteraObjects::self().get_gasmix() ),
+    gasMix_( CanteraObjects::get_gasmix() ),
     nSpec_( gasMix_->nSpecies() ),
     nasaFlag_( false ),
     shomateFlag_( false )
@@ -122,7 +118,7 @@ template< typename FieldT >
 HeatCapacity_Cp<FieldT>::
 ~HeatCapacity_Cp()
 {
-  CanteraObjects::self().restore_gasmix(gasMix_);
+  CanteraObjects::restore_gasmix(gasMix_);
 }
 
 //--------------------------------------------------------------------
@@ -143,16 +139,6 @@ HeatCapacity_Cp<FieldT>::
 bind_fields( const Expr::FieldManagerList& fml )
 {
   t_ = &fml.template field_ref< FieldT >( tTag_ );
-}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-void
-HeatCapacity_Cp<FieldT>::
-bind_operators( const SpatialOps::OperatorDatabase& opDB )
-{
-
 }
 
 //--------------------------------------------------------------------
@@ -233,9 +219,9 @@ evaluate()
                       (                c[8] + c[9] * maxTempScaled + c[10] * maxTempScaled * maxTempScaled + c[11] * pow(maxTempScaled,3) + c[12] * pow(maxTempScaled,-2)); // else out of bounds - high
     }
   }
-#ifdef TIMINGS
-  std::cout<<"HeatCapacity_Cp time "<<timer.elapsed()<<std::endl;
-#endif
+# ifdef TIMINGS
+  std::cout << "HeatCapacity_Cp time " << timer.elapsed() << std::endl;
+# endif
 }
 
 //--------------------------------------------------------------------

@@ -40,7 +40,6 @@ public:
   ~MixtureMolWeight();
   void advertise_dependents( Expr::ExprDeps& exprDeps );
   void bind_fields( const Expr::FieldManagerList& fml );
-  void bind_operators( const SpatialOps::OperatorDatabase& opDB );
   void evaluate();
 };
 
@@ -102,16 +101,6 @@ bind_fields( const Expr::FieldManagerList& fml )
   for( Expr::TagList::const_iterator itag=specTags_.begin(); itag!=specTags_.end(); ++itag ){
     yi_.push_back( &fm.field_ref( *itag ) );
   }
-}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-void
-MixtureMolWeight<FieldT>::
-bind_operators( const SpatialOps::OperatorDatabase& opDB )
-{
-
 }
 
 //--------------------------------------------------------------------

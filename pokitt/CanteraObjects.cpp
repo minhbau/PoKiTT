@@ -7,6 +7,31 @@
 #include <cantera/transport.h>
 #include <cantera/IdealGasMix.h>
 
+
+#ifdef EXPRESSION_THREADS
+
+#include <boost/thread/mutex.hpp>
+class CanteraMutex
+{
+  const boost::mutex::scoped_lock lock;
+  inline boost::mutex& get_mutex() const
+  {
+    static boost::mutex m; return m;
+  }
+public:
+  CanteraMutex() : lock( get_mutex() ) {}
+  ~CanteraMutex(){}
+};
+
+#else
+
+struct CanteraMutex{
+  inline explicit CanteraMutex(){}
+  inline ~CanteraMutex(){}
+};
+
+#endif  // EXPRESSION_THREADS
+
 //====================================================================
 
 CanteraObjects::Setup::
@@ -56,24 +81,24 @@ void
 CanteraObjects::setup_cantera( const Setup& options,
 			       const int ncopies )
 {
-  assert( !hasBeenSetup_ );
-  for( int i=0; i<ncopies; ++i ){
-    build_new(options);
-  }
-  hasBeenSetup_ = true;
-  options_ = options;
+  CanteraObjects& co = CanteraObjects::self();
+
+  assert( !co.hasBeenSetup_ );
+  co.options_ = options;
+  for( int i=0; i<ncopies; ++i ) co.build_new();
+  co.hasBeenSetup_ = true;
 }
 
 //--------------------------------------------------------------------
 
 void
-CanteraObjects::build_new( const Setup& options )
+CanteraObjects::build_new()
 {
   Cantera_CXX::IdealGasMix * gas   = NULL;
   Cantera::Transport       * trans = NULL;
   try{
-    gas = new Cantera_CXX::IdealGasMix( options.inputFile, options.inputGroup ) ;
-    trans = Cantera::TransportFactory::factory()->newTransport( options.transportName, gas );
+    gas = new Cantera_CXX::IdealGasMix( options_.inputFile, options_.inputGroup ) ;
+    trans = Cantera::TransportFactory::factory()->newTransport( options_.transportName, gas );
   }
   catch( Cantera::CanteraError& ){
     Cantera::showErrors();
@@ -89,10 +114,12 @@ Cantera_CXX::IdealGasMix*
 CanteraObjects::get_gasmix()
 {
   CanteraMutex lock;
-  assert( hasBeenSetup_ );
-  if( available_.size() == 0 ) build_new( options_ );
-  IdealGas* ig = available_.front().first;
-  available_.pop();
+  CanteraObjects& co = CanteraObjects::self();
+
+  assert( co.hasBeenSetup_ );
+  if( co.available_.size() == 0 ) co.build_new();
+  IdealGas* ig = co.available_.front().first;
+  co.available_.pop();
   return ig;
 }
 
@@ -102,10 +129,11 @@ Cantera::Transport*
 CanteraObjects::get_transport()
 {
   CanteraMutex lock;
-  assert( hasBeenSetup_ );
-  if( available_.size() == 0 ) build_new( options_ );
-  Trans* tr = available_.front().second;
-  available_.pop();
+  CanteraObjects& co = CanteraObjects::self();
+  assert( co.hasBeenSetup_ );
+  if( co.available_.size() == 0 ) co.build_new();
+  Trans* tr = co.available_.front().second;
+  co.available_.pop();
   return tr;
 }
 
@@ -115,10 +143,11 @@ void
 CanteraObjects::restore_transport( Cantera::Transport* const trans )
 {
   CanteraMutex lock;
-  assert( hasBeenSetup_ );
-  const GasTransMap::right_iterator itg = gtm_.right.find(trans);
-  assert( itg != gtm_.right.end() );
-  available_.push( make_pair(itg->second,itg->first) );
+  CanteraObjects& co = CanteraObjects::self();
+  assert( co.hasBeenSetup_ );
+  const GasTransMap::right_iterator itg = co.gtm_.right.find(trans);
+  assert( itg != co.gtm_.right.end() );
+  co.available_.push( make_pair(itg->second,itg->first) );
 }
 
 //--------------------------------------------------------------------
@@ -127,11 +156,12 @@ void
 CanteraObjects::restore_gasmix( Cantera_CXX::IdealGasMix* const gas )
 {
   CanteraMutex lock;
-  assert( hasBeenSetup_ );
-  const GasTransMap::left_iterator igt = gtm_.left.find(gas);
-  assert( igt != gtm_.left.end() );
+  CanteraObjects& co = CanteraObjects::self();
+  assert( co.hasBeenSetup_ );
+  const GasTransMap::left_iterator igt = co.gtm_.left.find(gas);
+  assert( igt != co.gtm_.left.end() );
   std::pair<IdealGas*,Trans*> pp( igt->first, igt->second );
-  available_.push( pp );
+  co.available_.push( pp );
 }
 
 //--------------------------------------------------------------------

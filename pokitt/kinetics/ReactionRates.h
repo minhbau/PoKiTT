@@ -133,7 +133,6 @@ public:
   ~ReactionRates();
   void advertise_dependents( Expr::ExprDeps& exprDeps );
   void bind_fields( const Expr::FieldManagerList& fml );
-  void bind_operators( const SpatialOps::OperatorDatabase& opDB );
   void evaluate();
 };
 
@@ -157,7 +156,7 @@ ReactionRates( const Expr::Tag& tTag,
       tTag_( tTag ),
       pTag_( pTag ),
       mmwTag_( mmwTag ),
-      gasMix_( CanteraObjects::self().get_gasmix() ),
+      gasMix_( CanteraObjects::get_gasmix() ),
       pressure_( gasMix_->pressure()),
       nSpec_( gasMix_->nSpecies() ),
       nRxns_( gasMix_->getReactionData().size())
@@ -233,7 +232,7 @@ template< typename FieldT >
 ReactionRates<FieldT>::
 ~ReactionRates()
 {
-  CanteraObjects::self().restore_gasmix(gasMix_);
+  CanteraObjects::restore_gasmix(gasMix_);
 }
 
 //--------------------------------------------------------------------
@@ -261,16 +260,6 @@ bind_fields( const Expr::FieldManagerList& fml )
   p_ = &fm.field_ref( pTag_ );
   mmw_ = &fm.field_ref( mmwTag_ );
   for (size_t n=0; n<nSpec_; ++n) massFracs_.push_back(&fm.field_ref( massFracTags_[n] ));
-}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-void
-ReactionRates<FieldT>::
-bind_operators( const SpatialOps::OperatorDatabase& opDB )
-{
-
 }
 
 //--------------------------------------------------------------------

@@ -80,7 +80,6 @@ public:
   ~Viscosity();
   void advertise_dependents( Expr::ExprDeps& exprDeps );
   void bind_fields( const Expr::FieldManagerList& fml );
-  void bind_operators( const SpatialOps::OperatorDatabase& opDB );
   void evaluate();
 };
 
@@ -100,7 +99,7 @@ Viscosity( const Expr::Tag& temperatureTag,
     const Expr::Tag& massFracTag )
     : Expr::Expression<FieldT>(),
       temperatureTag_( temperatureTag ),
-      trans_( dynamic_cast<Cantera::MixTransport*>( CanteraObjects::self().get_transport() )), // cast gas transport object as mix transport
+      trans_( dynamic_cast<Cantera::MixTransport*>( CanteraObjects::get_transport() )), // cast gas transport object as mix transport
       nSpec_( trans_->thermo().nSpecies() )
       {
   this->set_gpu_runnable( true );
@@ -149,7 +148,7 @@ template< typename FieldT >
 Viscosity<FieldT>::
 ~Viscosity()
 {
-  CanteraObjects::self().restore_transport( trans_ );
+  CanteraObjects::restore_transport( trans_ );
 }
 
 //--------------------------------------------------------------------
@@ -173,16 +172,6 @@ bind_fields( const Expr::FieldManagerList& fml )
   const typename Expr::FieldMgrSelector<FieldT>::type& fm = fml.field_manager<FieldT>();
   temperature_ = &fm.field_ref( temperatureTag_ );
   for (size_t n=0; n<nSpec_; ++n) massFracs_.push_back(&fm.field_ref( massFracTags_[n] ));
-}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-void
-Viscosity<FieldT>::
-bind_operators( const SpatialOps::OperatorDatabase& opDB )
-{
-
 }
 
 //--------------------------------------------------------------------

@@ -78,10 +78,7 @@ public:
   ~HeatCapacity_Cv();
   void advertise_dependents( Expr::ExprDeps& exprDeps );
   void bind_fields( const Expr::FieldManagerList& fml );
-  void bind_operators( const SpatialOps::OperatorDatabase& opDB );
   void evaluate();
-
-
 
 };
 
@@ -100,7 +97,7 @@ HeatCapacity_Cv<FieldT>::
 HeatCapacity_Cv( const Expr::Tag& tTag )
   : Expr::Expression<FieldT>(),
     tTag_( tTag ),
-    gasMix_( CanteraObjects::self().get_gasmix() ),
+    gasMix_( CanteraObjects::get_gasmix() ),
     nSpec_( gasMix_->nSpecies() ),
     nasaFlag_( false ),
     shomateFlag_( false )
@@ -108,14 +105,19 @@ HeatCapacity_Cv( const Expr::Tag& tTag )
   this->set_gpu_runnable( true );
   const Cantera::SpeciesThermo& spThermo = gasMix_->speciesThermo();
 
-  for(size_t n=0; n<nSpec_; ++n){
-    int type = spThermo.reportType(n);
-    if( type == NASA2 )
-      nasaFlag_=true;
-    else if( type == SHOMATE2 )
-      shomateFlag_=true;
-    else if( type != SIMPLE )
-      std::cout<<"Thermo type not supported,\nType = "<<type<<" species # "<<n<<std::endl;
+  for( size_t n=0; n<nSpec_; ++n ){
+    const int type = spThermo.reportType(n);
+    switch( type )
+    case NASA2   : nasaFlag_    = true; break;
+    case SHOMATE2: shomateFlag_ = true; break;
+    case SIMPLE  :                      break;
+    default:{
+      std::ostringstream msg;
+      msg << __FILE__ << " : " << __LINE__
+          << "\nThermo type not supported,\n Type = " << type
+          << ", species # " << n << std::endl;
+      throw std::invalid_argument( msg.str() );
+    }
   }
 }
 
@@ -125,7 +127,7 @@ template< typename FieldT >
 HeatCapacity_Cv<FieldT>::
 ~HeatCapacity_Cv()
 {
-  CanteraObjects::self().restore_gasmix(gasMix_);
+  CanteraObjects::restore_gasmix(gasMix_);
 }
 
 //--------------------------------------------------------------------
@@ -153,21 +155,11 @@ bind_fields( const Expr::FieldManagerList& fml )
 template< typename FieldT >
 void
 HeatCapacity_Cv<FieldT>::
-bind_operators( const SpatialOps::OperatorDatabase& opDB )
-{
-
-}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-void
-HeatCapacity_Cv<FieldT>::
 evaluate()
 {
-#ifdef TIMINGS
+# ifdef TIMINGS
   boost::timer time;
-#endif
+# endif
   using namespace SpatialOps;
   using namespace Cantera;
   SpecT& cvs = this->get_value_vec();
@@ -177,17 +169,10 @@ evaluate()
   SpatFldPtr<FieldT> t4;
   SpatFldPtr<FieldT> recipRecipT;
 
-  int mtype;
-# ifdef ENABLE_CUDA
-  mtype = GPU_INDEX;
-# else
-  mtype = CPU_INDEX;
-# endif
-
-// pre-compute powers of t for polynomial evaluations
+  // pre-compute powers of t for polynomial evaluations
   if( nasaFlag_ == true | shomateFlag_ == true){
-    t2 = SpatialFieldStore::get<FieldT>(*t_,mtype);
-    t3 = SpatialFieldStore::get<FieldT>(*t_,mtype);
+    t2 = SpatialFieldStore::get<FieldT>(*t_);
+    t3 = SpatialFieldStore::get<FieldT>(*t_);
 
     *t2 <<= *t_ * *t_; // t^2
     *t3 <<= *t2 * *t_; // t^3
@@ -242,9 +227,9 @@ evaluate()
                       (                c[8] + c[9] * maxTempScaled + c[10] * maxTempScaled * maxTempScaled + c[11] * pow(maxTempScaled,3) + c[12] * pow(maxTempScaled,-2)); // else out of bounds - high
     }
   }
-#ifdef TIMINGS
-  std::cout<<"HeatCapacity_Cv time "<<timer.elapsed()<<std::endl;
-#endif
+# ifdef TIMINGS
+  std::cout << "HeatCapacity_Cv time " << timer.elapsed() << std::endl;
+# endif
 }
 
 //--------------------------------------------------------------------
@@ -266,6 +251,5 @@ Builder::build() const
 {
   return new HeatCapacity_Cv<FieldT>( tTag_ );
 }
-
 
 #endif // HeatCapacity_Cv_Expr_h

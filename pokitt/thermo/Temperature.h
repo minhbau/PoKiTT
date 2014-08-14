@@ -89,7 +89,6 @@ public:
   ~Temperature();
   void advertise_dependents( Expr::ExprDeps& exprDeps );
   void bind_fields( const Expr::FieldManagerList& fml );
-  void bind_operators( const SpatialOps::OperatorDatabase& opDB );
   void evaluate();
 };
 
@@ -109,7 +108,7 @@ Temperature( const Expr::Tag& massFracTag,
     const Expr::Tag& enthTag )
     : Expr::Expression<FieldT>(),
       enthTag_( enthTag ),
-      gasMix_( CanteraObjects::self().get_gasmix() ),
+      gasMix_( CanteraObjects::get_gasmix() ),
       nSpec_( gasMix_->nSpecies() ),
       nasaFlag_ ( false ),
       shomateFlag_ ( false )
@@ -147,7 +146,7 @@ template< typename FieldT >
 Temperature<FieldT>::
 ~Temperature()
 {
-  CanteraObjects::self().restore_gasmix(gasMix_);
+  CanteraObjects::restore_gasmix(gasMix_);
 }
 
 //--------------------------------------------------------------------
@@ -171,16 +170,6 @@ bind_fields( const Expr::FieldManagerList& fml )
   const typename Expr::FieldMgrSelector<FieldT>::type& fm = fml.field_manager<FieldT>();
   for (size_t n=0; n<nSpec_; ++n) massFracs_.push_back(&fm.field_ref( massFracTags_[n] ));
   enth_ = &fm.field_ref( enthTag_ );
-}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-void
-Temperature<FieldT>::
-bind_operators( const SpatialOps::OperatorDatabase& opDB )
-{
-
 }
 
 //--------------------------------------------------------------------
@@ -461,7 +450,6 @@ public:
   ~TemperatureFromE0();
   void advertise_dependents( Expr::ExprDeps& exprDeps );
   void bind_fields( const Expr::FieldManagerList& fml );
-  void bind_operators( const SpatialOps::OperatorDatabase& opDB );
   void evaluate();
 };
 
@@ -483,7 +471,7 @@ TemperatureFromE0( const Expr::Tag& massFracTag,
     : Expr::Expression<FieldT>(),
       e0Tag_( e0Tag ),
       keTag_( keTag ),
-      gasMix_( CanteraObjects::self().get_gasmix() ),
+      gasMix_( CanteraObjects::get_gasmix() ),
       nSpec_( gasMix_->nSpecies() ),
       nasaFlag_ ( false ),
       shomateFlag_ ( false )
@@ -522,7 +510,7 @@ template< typename FieldT >
 TemperatureFromE0<FieldT>::
 ~TemperatureFromE0()
 {
-  CanteraObjects::self().restore_gasmix(gasMix_);
+  CanteraObjects::restore_gasmix(gasMix_);
 }
 
 //--------------------------------------------------------------------
@@ -548,16 +536,6 @@ bind_fields( const Expr::FieldManagerList& fml )
   for (size_t n=0; n<nSpec_; ++n) massFracs_.push_back(&fm.field_ref( massFracTags_[n] ));
   e0_ = &fm.field_ref( e0Tag_ );
   ke_ = &fm.field_ref( keTag_ );
-}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-void
-TemperatureFromE0<FieldT>::
-bind_operators( const SpatialOps::OperatorDatabase& opDB )
-{
-
 }
 
 //--------------------------------------------------------------------

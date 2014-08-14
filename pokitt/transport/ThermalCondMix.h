@@ -77,7 +77,6 @@ public:
   ~ThermalConductivity();
   void advertise_dependents( Expr::ExprDeps& exprDeps );
   void bind_fields( const Expr::FieldManagerList& fml );
-  void bind_operators( const SpatialOps::OperatorDatabase& opDB );
   void evaluate();
 };
 
@@ -99,7 +98,7 @@ ThermalConductivity( const Expr::Tag& temperatureTag,
     : Expr::Expression<FieldT>(),
       temperatureTag_( temperatureTag ),
       mmwTag_( mmwTag ),
-      trans_( dynamic_cast<Cantera::MixTransport*>( CanteraObjects::self().get_transport() )),
+      trans_( dynamic_cast<Cantera::MixTransport*>( CanteraObjects::get_transport() )),
       nSpec_( trans_->thermo().nSpecies() )
       {
   this->set_gpu_runnable( true );
@@ -118,7 +117,7 @@ template< typename FieldT >
 ThermalConductivity<FieldT>::
 ~ThermalConductivity()
 {
-  CanteraObjects::self().restore_transport( trans_ );
+  CanteraObjects::restore_transport( trans_ );
 }
 
 //--------------------------------------------------------------------
@@ -144,16 +143,6 @@ bind_fields( const Expr::FieldManagerList& fml )
   temperature_ = &fm.field_ref( temperatureTag_ );
   mmw_ = &fm.field_ref( mmwTag_ );
   for (size_t n=0; n<nSpec_; ++n) massFracs_.push_back(&fm.field_ref( massFracTags_[n] ));
-}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-void
-ThermalConductivity<FieldT>::
-bind_operators( const SpatialOps::OperatorDatabase& opDB )
-{
-
 }
 
 //--------------------------------------------------------------------

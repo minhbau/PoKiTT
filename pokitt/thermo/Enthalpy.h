@@ -68,11 +68,7 @@ public:
   ~SpeciesEnthalpy();
   void advertise_dependents( Expr::ExprDeps& exprDeps );
   void bind_fields( const Expr::FieldManagerList& fml );
-  void bind_operators( const SpatialOps::OperatorDatabase& opDB );
   void evaluate();
-
-
-
 };
 
 
@@ -90,7 +86,7 @@ SpeciesEnthalpy<FieldT>::
 SpeciesEnthalpy( const Expr::Tag& tTag )
   : Expr::Expression<FieldT>(),
     tTag_( tTag ),
-    gasMix_( CanteraObjects::self().get_gasmix() ),
+    gasMix_( CanteraObjects::get_gasmix() ),
     nSpec_( gasMix_->nSpecies() )
 {
   this->set_gpu_runnable( true );
@@ -119,7 +115,7 @@ template< typename FieldT >
 SpeciesEnthalpy<FieldT>::
 ~SpeciesEnthalpy()
 {
-  CanteraObjects::self().restore_gasmix(gasMix_);
+  CanteraObjects::restore_gasmix(gasMix_);
 }
 
 //--------------------------------------------------------------------
@@ -140,16 +136,6 @@ SpeciesEnthalpy<FieldT>::
 bind_fields( const Expr::FieldManagerList& fml )
 {
   t_ = &fml.template field_ref< FieldT >( tTag_ );
-}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-void
-SpeciesEnthalpy<FieldT>::
-bind_operators( const SpatialOps::OperatorDatabase& opDB )
-{
-
 }
 
 //--------------------------------------------------------------------

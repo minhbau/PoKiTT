@@ -89,7 +89,6 @@ public:
   ~DiffusionCoeff();
   void advertise_dependents( Expr::ExprDeps& exprDeps );
   void bind_fields( const Expr::FieldManagerList& fml );
-  void bind_operators( const SpatialOps::OperatorDatabase& opDB );
   void evaluate();
 };
 
@@ -113,7 +112,7 @@ DiffusionCoeff( const Expr::Tag& temperatureTag,
       temperatureTag_( temperatureTag ),
       pTag_( pTag ),
       mmwTag_( mmwTag ),
-      transport_( dynamic_cast<Cantera::MixTransport*>( CanteraObjects::self().get_transport() )),
+      transport_( dynamic_cast<Cantera::MixTransport*>( CanteraObjects::get_transport() )),
       nSpec_( transport_->thermo().nSpecies() ),
       pressure_( transport_->thermo().pressure() )
       {
@@ -144,7 +143,7 @@ template< typename FieldT >
 DiffusionCoeff<FieldT>::
 ~DiffusionCoeff()
 {
-  CanteraObjects::self().restore_transport( transport_ );
+  CanteraObjects::restore_transport( transport_ );
 }
 
 //--------------------------------------------------------------------
@@ -172,16 +171,6 @@ bind_fields( const Expr::FieldManagerList& fml )
   p_ = &fm.field_ref( pTag_ );
   mmw_ = &fm.field_ref( mmwTag_ );
   for (size_t n=0; n<nSpec_; ++n) massFracs_.push_back(&fm.field_ref( massFracTags_[n] ));
-}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-void
-DiffusionCoeff<FieldT>::
-bind_operators( const SpatialOps::OperatorDatabase& opDB )
-{
-
 }
 
 //--------------------------------------------------------------------

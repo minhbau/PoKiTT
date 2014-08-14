@@ -37,7 +37,6 @@ public:
   ~TemperaturePowers();
   void advertise_dependents( Expr::ExprDeps& exprDeps );
   void bind_fields( const Expr::FieldManagerList& fml );
-  void bind_operators( const SpatialOps::OperatorDatabase& opDB );
   void evaluate();
 };
 
@@ -84,16 +83,6 @@ bind_fields( const Expr::FieldManagerList& fml )
 {
 
   t_ = &fml.template field_ref< FieldT >( tTag_ );
-}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-void
-TemperaturePowers<FieldT>::
-bind_operators( const SpatialOps::OperatorDatabase& opDB )
-{
-
 }
 
 //--------------------------------------------------------------------

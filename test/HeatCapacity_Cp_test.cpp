@@ -2,17 +2,15 @@
  * HeatCapacity_test.cpp
  *
  *  Created on: Mar 31, 2014
- *      Author: nate
+ *      Author: Nathan Yonkee
  */
 
-#include<iostream>
-#include<stdio.h>
-#include<fstream>
+#include <iostream>
+#include <stdio.h>
+#include <fstream>
 
 #include <pokitt/thermo/TemperaturePowers.h>
 #include <pokitt/thermo/HeatCapacity_Cp.h>
-
-#include <cantera/IdealGasMix.h>
 
 #include <expression/ExprLib.h>
 
@@ -43,6 +41,14 @@ int main(){
   ptvec.push_back(128*128*128);
 #endif
 
+  const CanteraObjects::Setup setup( "Mix", "ethanol_mech.xml", "gas" );
+//  const CanteraObjects::Setup setup =CanteraObjects::Setup("Mix","gri30.xml","gri30_mix");
+//  const CanteraObjects::Setup setup =CanteraObjects::Setup("Mix","h2o2.xml","ohmech");
+//  const CanteraObjects::Setup setup =CanteraObjects::Setup("Mix","cp_tester.xml","const_cp");
+//  const CanteraObjects::Setup setup =CanteraObjects::Setup("Mix","cp_tester.xml","shomate_cp");
+  CanteraObjects::setup_cantera(setup);
+  Cantera_CXX::IdealGasMix* const gasMix=CanteraObjects::get_gasmix();
+
   std::ofstream myfile ("../timings.txt", std::ios::app);
   myfile<<"\nHeat Capacity times\n";
   myfile<<"ExprLib\n";
@@ -53,16 +59,6 @@ int main(){
       size_t i;
       size_t n;
 
-//            const CanteraObjects::Setup setup =CanteraObjects::Setup("Mix","gri30.xml","gri30_mix");
-//            const CanteraObjects::Setup setup =CanteraObjects::Setup("Mix","h2o2.xml","ohmech");
-//                  const CanteraObjects::Setup setup =CanteraObjects::Setup("Mix","cp_tester.xml","const_cp");
-//                      const CanteraObjects::Setup setup =CanteraObjects::Setup("Mix","cp_tester.xml","shomate_cp");
-      const CanteraObjects::Setup setup =CanteraObjects::Setup("Mix","ethanol_mech.xml","gas");
-
-
-      CanteraObjects& cantera = CanteraObjects::self();
-      cantera.setup_cantera(setup);
-      Cantera_CXX::IdealGasMix* const gasMix=cantera.get_gasmix();
       const int nSpec=gasMix->nSpecies();
 
       const double refPressure=gasMix->pressure();
@@ -158,8 +154,6 @@ int main(){
 
       tree.bind_fields( fml );
 
-
-
       using namespace SpatialOps;
       CellField& temp = fml.field_manager<CellField>().field_ref(tTag);
       temp <<= 500.0 + 1000*(xcoord);
@@ -178,7 +172,7 @@ int main(){
       }
 #endif
 
-      std::cout<<setup.inputFile<<" - "<<*ptit<<std::endl;
+      std::cout << setup.inputFile << " - " << *ptit << std::endl;
 
       tree.lock_fields(fml);  // prevent fields from being deallocated so that we can get them after graph execution.
 
@@ -193,7 +187,6 @@ int main(){
 #ifdef ENABLE_CUDA
       for( n=0; n<nSpec; ++n){
         CellField& hc = fml.field_manager<CellField>().field_ref(hcTags[n]);
-
         hc.add_device_sync(CPU_INDEX);
       }
 #endif
@@ -281,10 +274,16 @@ int main(){
       Cantera::showErrors();
     }
   }
-  BOOST_FOREACH( double time, hctimes )
-      {std::cout << "cantera time " << time << std::endl;}
+  BOOST_FOREACH( double time, hctimes ){
+    std::cout << "cantera time " << time << std::endl;
+  }
   std::cout<<std::endl;
-  BOOST_FOREACH( double diff, hcdiff )
-      {std::cout << "hc max diff " << diff << std::endl;}
+
+  bool isFailed = false;
+  BOOST_FOREACH( double diff, hcdiff ){
+    if( diff > 1e-14 ) isFailed = true;
+    std::cout << "hc max diff " << diff << std::endl;
+  }
+  if( isFailed ) return -1;
   return 0;
 }
