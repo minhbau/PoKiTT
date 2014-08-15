@@ -5,7 +5,7 @@
  *      Author: Nathan Yonkee
  */
 
-//#define MIX
+#define MIX
 
 #include <iostream>
 #include <stdio.h>
@@ -22,10 +22,8 @@
 #include <boost/timer.hpp>
 #include <boost/foreach.hpp>
 
-#define GASCONSTANT 8314.47215
-
-namespace SS = SpatialOps;
-typedef SS::SVolField   CellField;
+namespace So = SpatialOps;
+typedef So::SVolField   CellField;
 
 namespace Cantera_CXX{ class IdealGasMix; } //location of polynomial
 
@@ -48,6 +46,7 @@ int main(){
 //  const CanteraObjects::Setup setup =CanteraObjects::Setup("Mix","h2o2.xml","ohmech");
   const CanteraObjects::Setup setup =CanteraObjects::Setup("Mix","thermo_tester.xml","const_cp");
 //  const CanteraObjects::Setup setup =CanteraObjects::Setup("Mix","cp_tester.xml","shomate_cp");
+
   CanteraObjects::setup_cantera(setup);
   Cantera_CXX::IdealGasMix* const gasMix=CanteraObjects::get_gasmix();
 
@@ -62,12 +61,11 @@ int main(){
       size_t n;
 
       const int nSpec=gasMix->nSpecies();
-
       const double refPressure=gasMix->pressure();
       const std::vector<double>& molecularWeights = gasMix->molecularWeights();
       std::vector< double > concentrations(nSpec,1.0);
 
-      SS::IntVec npts(*ptit,1,1);
+      So::IntVec npts(*ptit,1,1);
 
       std::vector<double> length(3,1.0);
 
@@ -87,6 +85,9 @@ int main(){
       tPowTags.push_back(Expr::Tag("tRecip",Expr::STATE_NONE));
       tPowTags.push_back(Expr::Tag("tRecipRecip",Expr::STATE_NONE));
 
+      exprFactory.register_expression( new Temp::Builder(tTag) );
+      exprFactory.register_expression( new TemperaturePowers::Builder( tPowTags, tTag));
+
 #ifdef MIX
       typedef HeatCapacity_Cp   < CellField > HeatCapacity;
       const Expr::Tag yiTag ( "yi", Expr::STATE_NONE );
@@ -97,8 +98,6 @@ int main(){
         yiTags.push_back( Expr::Tag(name.str(),yiTag.context()) );
       }
       Expr::Tag hcMixTag ("hc mix", Expr::STATE_NONE);
-      exprFactory.register_expression( new Temp::Builder(tTag) );
-      exprFactory.register_expression( new TemperaturePowers::Builder( tPowTags, tTag));
       for( size_t n=0; n<nSpec; ++n)
         exprFactory.register_expression( new MassFracs::Builder (yiTags[n]) );
       const Expr::ExpressionID hc_id = exprFactory.register_expression( new HeatCapacity::Builder( hcMixTag, tTag, tPowTags, yiTag ));
@@ -107,27 +106,25 @@ int main(){
       Expr::TagList hcTags;
       for( n=0; n<nSpec; ++n )
         hcTags.push_back( Expr::Tag( "hc" + boost::lexical_cast<std::string>(n), Expr::STATE_NONE ) );
-      exprFactory.register_expression( new Temp::Builder(tTag) );
-      exprFactory.register_expression( new TemperaturePowers::Builder( tPowTags, tTag));
       std::set< Expr::ExpressionID > hc_id;
       for( n=0; n<nSpec; ++n )
         hc_id.insert(exprFactory.register_expression( new HeatCapacity::Builder(hcTags[n], tTag, tPowTags, n) ));
 #endif
 
-      const SS::BoundaryCellInfo cellBCInfo = SS::BoundaryCellInfo::build<CellField>(false,false,false);
-      const SS::GhostData cellGhosts(1);
-      const SS::MemoryWindow vwindow( SS::get_window_with_ghost(npts,cellGhosts,cellBCInfo) );
+      const So::BoundaryCellInfo cellBCInfo = So::BoundaryCellInfo::build<CellField>(false,false,false);
+      const So::GhostData cellGhosts(1);
+      const So::MemoryWindow vwindow( So::get_window_with_ghost(npts,cellGhosts,cellBCInfo) );
       CellField xcoord( vwindow, cellBCInfo, cellGhosts, NULL );
       CellField ycoord( vwindow, cellBCInfo, cellGhosts, NULL );
       CellField zcoord( vwindow, cellBCInfo, cellGhosts, NULL );
-      SS::Grid grid( npts, length );
+      So::Grid grid( npts, length );
       grid.set_coord<SpatialOps::XDIR>( xcoord );
       grid.set_coord<SpatialOps::YDIR>( ycoord );
       grid.set_coord<SpatialOps::ZDIR>( zcoord );
 # ifdef ENABLE_CUDA
-      xcoord.add_device_sync( GPU_INDEX );
-      ycoord.add_device_sync( GPU_INDEX );
-      zcoord.add_device_sync( GPU_INDEX );
+      xcoord.add_device( GPU_INDEX );
+      ycoord.add_device( GPU_INDEX );
+      zcoord.add_device( GPU_INDEX );
 # endif
 
       Expr::ExpressionTree tree( hc_id, exprFactory, 0 );
@@ -174,20 +171,6 @@ int main(){
       tree.lock_fields(fml);  // prevent fields from being deallocated so that we can get them after graph execution.
 
       tree.execute_tree();
-#ifdef MIX
-      CellField& hc = fml.field_manager<CellField>().field_ref(hcMixTag);
-
-#ifdef ENABLE_CUDA
-      hc.add_device_sync(CPU_INDEX);
-#endif
-#else
-#ifdef ENABLE_CUDA
-      for( n=0; n<nSpec; ++n){
-        CellField& hc = fml.field_manager<CellField>().field_ref(hcTags[n]);
-        hc.add_device_sync(CPU_INDEX);
-      }
-#endif
-#endif
 
       std::vector<double> tVec;
       for( i=0; i<*ptit+2; ++i)
@@ -196,30 +179,32 @@ int main(){
       std::vector<double>::const_iterator itend = tVec.end();
 
 #ifdef MIX
-      std::vector<std::vector<double> > molefracs;
+      std::vector<std::vector<double> > massfracs;
       for( i=0; i<*ptit+2; ++i){
         std::vector<double> concentration;
-        for( n=0; n<nSpec; ++n)concentration.push_back(1 + n + (i-0.5)/ *ptit);
+        for( n=0; n<nSpec; ++n)
+          concentration.push_back(1 + n + (i-0.5)/ *ptit);
         std::vector<double> massfrac;
         double sum = 0.0;
         for( n=0; n<nSpec; ++n) sum+=concentration[n];
         for( n=0; n<nSpec; ++n)
           massfrac.push_back(concentration[n]/sum);
-        molefracs.push_back(massfrac);
+        massfracs.push_back(massfrac);
       }
 
       std::vector< double > hc_results(*ptit+2);
       i=0;
       boost::timer hctimer;
       for( itemp = tVec.begin(); itemp!=itend; ++itemp,++i ){
-        gasMix->setState_TPY(*itemp,refPressure,&molefracs[i][0]);
-#ifdef CONSTVOLUME
-        hc_results[i]=gasMix->cv_mass();
-#else
+        gasMix->setState_TPY(*itemp,refPressure,&massfracs[i][0]);
         hc_results[i]=gasMix->cp_mass();
-#endif
       }
       hctimes.push_back(hctimer.elapsed());
+
+      CellField& hc = fml.field_manager<CellField>().field_ref(hcMixTag);
+#ifdef ENABLE_CUDA
+      hc.add_device_sync(CPU_INDEX);
+#endif
 
       double hc_maxerror = 0.0;
       i=0;
@@ -243,6 +228,13 @@ int main(){
         hc_results[i]=hc_result;
       }
       hctimes.push_back(hctime.elapsed());
+
+#ifdef ENABLE_CUDA
+      for( n=0; n<nSpec; ++n){
+        CellField& hc = fml.field_manager<CellField>().field_ref(hcTags[n]);
+        hc.add_device(CPU_INDEX);
+      }
+#endif
 
       n=0;
       double hc_maxerror = 0.0;
