@@ -32,13 +32,17 @@ int main()
   std::vector<double> hctimes;
   std::vector<double> hcdiff;
   std::vector<int> ptvec;
-  ptvec.push_back(10);
-//  ptvec.push_back(8*8*8);
-//  ptvec.push_back(16*16*16);
-//  ptvec.push_back(32*32*32);
-//  ptvec.push_back(64*64*64);
+
+#ifdef TIMINGS
+  ptvec.push_back(8*8*8);
+  ptvec.push_back(16*16*16);
+  ptvec.push_back(32*32*32);
+  ptvec.push_back(64*64*64);
 #ifdef ENABLE_CUDA
   ptvec.push_back(128*128*128);
+#endif
+#else
+  ptvec.push_back(10);
 #endif
 
 //  const CanteraObjects::Setup setup( "Mix", "ethanol_mech.xml", "gas" );
@@ -166,7 +170,9 @@ int main()
       }
 #endif
 
-      std::cout << setup.inputFile << " - " << *ptit << std::endl;
+#ifdef TIMINGS
+      std::cout << std::endl << setup.inputFile << " - " << *ptit << std::endl;
+#endif
 
       tree.lock_fields(fml);  // prevent fields from being deallocated so that we can get them after graph execution.
 
@@ -254,17 +260,19 @@ int main()
       hcdiff.push_back(hc_maxerror);
 
 #endif
-      std::cout<<std::endl;
 
     }
     catch( Cantera::CanteraError& ){
       Cantera::showErrors();
     }
   }
+#ifdef TIMINGS
+  std::cout<<std::endl;
   BOOST_FOREACH( double time, hctimes ){
     std::cout << "cantera time " << time << std::endl;
   }
   std::cout<<std::endl;
+#endif
 
   bool isFailed = false;
   BOOST_FOREACH( double diff, hcdiff ){
