@@ -279,18 +279,11 @@ evaluate()
   const FieldT& t = *t_;
   const FieldT& p = *p_;
 
-  int mtype;
-# ifdef ENABLE_CUDA
-  mtype = GPU_INDEX;
-# else
-  mtype = CPU_INDEX;
-# endif
-
   SpatFldPtr<FieldT> concPtr  = SpatialFieldStore::get<FieldT>(t); // total mass concentration [kg/m^3]
   SpatFldPtr<FieldT> conc2Ptr = SpatialFieldStore::get<FieldT>(t); // total mass concentration squared
   SpatFldPtr<FieldT> logConcPtr  = SpatialFieldStore::get<FieldT>(t); // log of molar concentration
 
-  SpatFldPtr<FieldT> kPtr  = SpatialFieldStore::get<FieldT>(t,mtype); // forward rate constant
+  SpatFldPtr<FieldT> kPtr  = SpatialFieldStore::get<FieldT>(t); // forward rate constant
   SpatFldPtr<FieldT> krPtr  = SpatialFieldStore::get<FieldT>(t); // reverse rate constant
 
   SpatFldPtr<FieldT> trecipPtr  = SpatialFieldStore::get<FieldT>(t); // t^-1

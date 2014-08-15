@@ -159,28 +159,21 @@ boost::timer timer;
 
   FieldT& result = this->value();
 
-  int mtype;
-# ifdef ENABLE_CUDA
-  mtype = GPU_INDEX;
-# else
-  mtype = CPU_INDEX;
-# endif
-
   // pre-compute powers of temperature used in polynomial evaluations
-  SpatFldPtr<FieldT> logtPtr  = SpatialFieldStore::get<FieldT>(*temperature_,mtype); // log(t)
-  SpatFldPtr<FieldT> logttPtr  = SpatialFieldStore::get<FieldT>(*temperature_,mtype); // log(t)*log(t)
-  SpatFldPtr<FieldT> logtttPtr  = SpatialFieldStore::get<FieldT>(*temperature_,mtype); // log(t)*log(t)*log(t)
+  SpatFldPtr<FieldT> logtPtr  = SpatialFieldStore::get<FieldT>(*temperature_); // log(t)
+  SpatFldPtr<FieldT> logttPtr  = SpatialFieldStore::get<FieldT>(*temperature_); // log(t)*log(t)
+  SpatFldPtr<FieldT> logtttPtr  = SpatialFieldStore::get<FieldT>(*temperature_); // log(t)*log(t)*log(t)
   SpatFldPtr<FieldT> sqrtTPtr; // sqrt(t)
   SpatFldPtr<FieldT> logt4Ptr; // pow( log(t),4 )
   if( trans_->model() == Cantera::cMixtureAveraged ) { // as opposed to CK mode
-    logt4Ptr  = SpatialFieldStore::get<FieldT>(*temperature_,mtype);
-    sqrtTPtr  = SpatialFieldStore::get<FieldT>(*temperature_,mtype);
+    logt4Ptr  = SpatialFieldStore::get<FieldT>(*temperature_);
+    sqrtTPtr  = SpatialFieldStore::get<FieldT>(*temperature_);
   }
 
-  SpatFldPtr<FieldT> speciesTCondPtr  = SpatialFieldStore::get<FieldT>(*temperature_,mtype); // temporary to store the thermal conductivity for an individual species
+  SpatFldPtr<FieldT> speciesTCondPtr  = SpatialFieldStore::get<FieldT>(*temperature_); // temporary to store the thermal conductivity for an individual species
 
-  SpatFldPtr<FieldT> sumPtr  = SpatialFieldStore::get<FieldT>(*temperature_,mtype); // for mixing rule
-  SpatFldPtr<FieldT> inverseSumPtr  = SpatialFieldStore::get<FieldT>(*temperature_,mtype);
+  SpatFldPtr<FieldT> sumPtr  = SpatialFieldStore::get<FieldT>(*temperature_); // for mixing rule
+  SpatFldPtr<FieldT> inverseSumPtr  = SpatialFieldStore::get<FieldT>(*temperature_);
 
   FieldT& speciesTCond = *speciesTCondPtr;
 

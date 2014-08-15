@@ -189,23 +189,16 @@ boost::timer timer;
 
   const FieldT& p = *p_;
 
-  int mtype;
-# ifdef ENABLE_CUDA
-  mtype = GPU_INDEX;
-# else
-  mtype = CPU_INDEX;
-# endif
-
   //pre-compute powers of log(t) for polynomial evaluation of binary diffusion coefficients
-  SpatFldPtr<FieldT> logtPtr  = SpatialFieldStore::get<FieldT>(*temperature_,mtype);
-  SpatFldPtr<FieldT> logttPtr  = SpatialFieldStore::get<FieldT>(*temperature_,mtype);
-  SpatFldPtr<FieldT> logtttPtr  = SpatialFieldStore::get<FieldT>(*temperature_,mtype);
+  SpatFldPtr<FieldT> logtPtr  = SpatialFieldStore::get<FieldT>(*temperature_);
+  SpatFldPtr<FieldT> logttPtr  = SpatialFieldStore::get<FieldT>(*temperature_);
+  SpatFldPtr<FieldT> logtttPtr  = SpatialFieldStore::get<FieldT>(*temperature_);
   SpatFldPtr<FieldT> tThreeHalvesPtr;
   SpatFldPtr<FieldT> logt4Ptr;
 
   if( transport_->model() == Cantera::cMixtureAveraged ) { // as opposed to CK mode
-    logt4Ptr  = SpatialFieldStore::get<FieldT>(*temperature_,mtype);
-    tThreeHalvesPtr  = SpatialFieldStore::get<FieldT>(*temperature_,mtype);
+    logt4Ptr  = SpatialFieldStore::get<FieldT>(*temperature_);
+    tThreeHalvesPtr  = SpatialFieldStore::get<FieldT>(*temperature_);
   }
 
   FieldT& logt = *logtPtr; // log(t)
@@ -222,11 +215,11 @@ boost::timer timer;
     tThreeHalves <<= pow( *temperature_, 1.5 );
   }
 
-  SpatFldPtr<FieldT> dPtr = SpatialFieldStore::get<FieldT>(*temperature_,mtype);
+  SpatFldPtr<FieldT> dPtr = SpatialFieldStore::get<FieldT>(*temperature_);
   FieldT& d = *dPtr;
-  SpatFldPtr<FieldT> sum1Ptr = SpatialFieldStore::get<FieldT>(*temperature_,mtype);
+  SpatFldPtr<FieldT> sum1Ptr = SpatialFieldStore::get<FieldT>(*temperature_);
   FieldT& sum1 = *sum1Ptr;
-  SpatFldPtr<FieldT> sum2Ptr = SpatialFieldStore::get<FieldT>(*temperature_,mtype);
+  SpatFldPtr<FieldT> sum2Ptr = SpatialFieldStore::get<FieldT>(*temperature_);
   FieldT& sum2 = *sum2Ptr;
 
   const std::vector< std::vector<double> >& diffusionPolyCoeffs = transport_->getDiffusionPolyCoefficients();

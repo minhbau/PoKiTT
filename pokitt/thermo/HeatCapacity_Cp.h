@@ -160,28 +160,21 @@ evaluate()
   SpatFldPtr<FieldT> t4;
   SpatFldPtr<FieldT> recipRecipT;
 
-  int mtype;
-# ifdef ENABLE_CUDA
-  mtype = GPU_INDEX;
-# else
-  mtype = CPU_INDEX;
-# endif
-
   // pre-compute powers of t for polynomial evaluations
     if( nasaFlag_ == true | shomateFlag_ == true){
-      t2 = SpatialFieldStore::get<FieldT>(*t_,mtype);
-      t3 = SpatialFieldStore::get<FieldT>(*t_,mtype);
+      t2 = SpatialFieldStore::get<FieldT>(*t_);
+      t3 = SpatialFieldStore::get<FieldT>(*t_);
 
       *t2 <<= *t_ * *t_; // t^2
       *t3 <<= *t2 * *t_; // t^3
 
       if( nasaFlag_ == true ){
-        t4 = SpatialFieldStore::get<FieldT>(*t_,mtype);
+        t4 = SpatialFieldStore::get<FieldT>(*t_);
         *t4 <<= *t3 * *t_; // t^4
       }
 
       if( shomateFlag_ == true ){
-        recipRecipT = SpatialFieldStore::get<FieldT>(*t_,mtype);
+        recipRecipT = SpatialFieldStore::get<FieldT>(*t_);
         *recipRecipT <<= 1/ *t2; // = t^-2
       }
     }

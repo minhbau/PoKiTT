@@ -188,27 +188,20 @@ boost::timer timer;
 
   FieldT& result = this->value();
 
-  int mtype;
-# ifdef ENABLE_CUDA
-  mtype = GPU_INDEX;
-# else
-  mtype = CPU_INDEX;
-# endif
-
   std::vector< SpatFldPtr<FieldT> > sqrtSpeciesVis;
   for( size_t n=0; n<nSpec_; ++n)
-    sqrtSpeciesVis.push_back(SpatialFieldStore::get<FieldT>(*temperature_,mtype));
+    sqrtSpeciesVis.push_back(SpatialFieldStore::get<FieldT>(*temperature_));
 
   // pre-compute power of log(t) for the species viscosity polynomial
-  SpatFldPtr<FieldT> logtPtr  = SpatialFieldStore::get<FieldT>(*temperature_,mtype);
-  SpatFldPtr<FieldT> logttPtr  = SpatialFieldStore::get<FieldT>(*temperature_,mtype);
-  SpatFldPtr<FieldT> logtttPtr  = SpatialFieldStore::get<FieldT>(*temperature_,mtype);
+  SpatFldPtr<FieldT> logtPtr  = SpatialFieldStore::get<FieldT>(*temperature_);
+  SpatFldPtr<FieldT> logttPtr  = SpatialFieldStore::get<FieldT>(*temperature_);
+  SpatFldPtr<FieldT> logtttPtr  = SpatialFieldStore::get<FieldT>(*temperature_);
   SpatFldPtr<FieldT> logt4Ptr;
   SpatFldPtr<FieldT> tOneFourthPtr;
 
   if( trans_->model() == Cantera::cMixtureAveraged ) { // as opposed to CK mode
-    logt4Ptr  = SpatialFieldStore::get<FieldT>(*temperature_,mtype);
-    tOneFourthPtr  = SpatialFieldStore::get<FieldT>(*temperature_,mtype);
+    logt4Ptr  = SpatialFieldStore::get<FieldT>(*temperature_);
+    tOneFourthPtr  = SpatialFieldStore::get<FieldT>(*temperature_);
   }
 
   FieldT& logt = *logtPtr;
@@ -244,7 +237,7 @@ boost::timer timer;
   result <<= 0.0; // set result to 0 before summing species contributions
 
 #ifdef NFIELDS // requires nSpec_ temporary fields
-  SpatFldPtr<FieldT> phiPtr  = SpatialFieldStore::get<FieldT>(*temperature_,mtype);
+  SpatFldPtr<FieldT> phiPtr  = SpatialFieldStore::get<FieldT>(*temperature_);
   FieldT& phi = *phiPtr;
 
   for( size_t k=0; k!=nSpec_; ++k){ // start looping over species contributions
@@ -256,11 +249,11 @@ boost::timer timer;
     result <<= result + *sqrtSpeciesVis[k] * *sqrtSpeciesVis[k] * *massFracs_[k] / phi; // mixing rule
   }
 #else // requires 2*nSpec_ temporary fields
-  SpatFldPtr<FieldT> temporary = SpatialFieldStore::get<FieldT>(*temperature_,mtype);
+  SpatFldPtr<FieldT> temporary = SpatialFieldStore::get<FieldT>(*temperature_);
   std::vector< SpatFldPtr<FieldT> > phivec;
 
   for(size_t k=0; k<nSpec_; ++k){
-    phivec.push_back(SpatialFieldStore::get<FieldT>(*temperature_,mtype));
+    phivec.push_back(SpatialFieldStore::get<FieldT>(*temperature_));
     *phivec[k] <<= *massFracs_[k] * molecularWeightsInv[k]; // begin sum with the k=j case, phi = y_k / M_k
   }
 

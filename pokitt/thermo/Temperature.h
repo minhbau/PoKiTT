@@ -186,17 +186,9 @@ boost::timer timer;
   using namespace Cantera;
   FieldT& temp = this->value();
 
-  int mtype;
-# ifdef ENABLE_CUDA
-  mtype = GPU_INDEX;
-# else
-  mtype = CPU_INDEX;
-# endif
-
-
-  SpatFldPtr<FieldT> delHPtr  = SpatialFieldStore::get<FieldT>(temp,mtype); // difference between enthalpy field value and enthalpy evaluated at current temperature
-  SpatFldPtr<FieldT> dhdTPtr = SpatialFieldStore::get<FieldT>(temp,mtype); // dhdT for Newton's method
-  SpatFldPtr<FieldT> resPtr  = SpatialFieldStore::get<FieldT>(temp,mtype); // change in temperature for new Newton's iteration
+  SpatFldPtr<FieldT> delHPtr  = SpatialFieldStore::get<FieldT>(temp); // difference between enthalpy field value and enthalpy evaluated at current temperature
+  SpatFldPtr<FieldT> dhdTPtr = SpatialFieldStore::get<FieldT>(temp); // dhdT for Newton's method
+  SpatFldPtr<FieldT> resPtr  = SpatialFieldStore::get<FieldT>(temp); // change in temperature for new Newton's iteration
   FieldT& delH = *delHPtr;
   FieldT& res = *resPtr;
   FieldT& dhdT = *dhdTPtr;
@@ -210,17 +202,17 @@ boost::timer timer;
 
   if( nasaFlag_ == true || shomateFlag_ == true){
 
-    t2 = SpatialFieldStore::get<FieldT>(temp,mtype);
-    t3 = SpatialFieldStore::get<FieldT>(temp,mtype);
-    t4 = SpatialFieldStore::get<FieldT>(temp,mtype);
+    t2 = SpatialFieldStore::get<FieldT>(temp);
+    t3 = SpatialFieldStore::get<FieldT>(temp);
+    t4 = SpatialFieldStore::get<FieldT>(temp);
 
     if( nasaFlag_ == true ){
-      t5 = SpatialFieldStore::get<FieldT>(temp,mtype);
+      t5 = SpatialFieldStore::get<FieldT>(temp);
     }
 
     if( shomateFlag_ == true ){
-      recipT = SpatialFieldStore::get<FieldT>(temp,mtype);
-      recipRecipT = SpatialFieldStore::get<FieldT>(temp,mtype);
+      recipT = SpatialFieldStore::get<FieldT>(temp);
+      recipRecipT = SpatialFieldStore::get<FieldT>(temp);
     }
 
   }
@@ -552,16 +544,9 @@ evaluate()
   using namespace Cantera;
   FieldT& temp = this->value();
 
-  int mtype;
-# ifdef ENABLE_CUDA
-  mtype = GPU_INDEX;
-# else
-  mtype = CPU_INDEX;
-# endif
-
-  SpatFldPtr<FieldT> delE0Ptr  = SpatialFieldStore::get<FieldT>(temp,mtype); // difference between internal energy field value and internal energy at current temperature
-  SpatFldPtr<FieldT> dE0dTPtr = SpatialFieldStore::get<FieldT>(temp,mtype); // dE0dT for Newton's method
-  SpatFldPtr<FieldT> resPtr  = SpatialFieldStore::get<FieldT>(temp,mtype); // change in temperature for new Newton's iteration
+  SpatFldPtr<FieldT> delE0Ptr  = SpatialFieldStore::get<FieldT>(temp); // difference between internal energy field value and internal energy at current temperature
+  SpatFldPtr<FieldT> dE0dTPtr = SpatialFieldStore::get<FieldT>(temp); // dE0dT for Newton's method
+  SpatFldPtr<FieldT> resPtr  = SpatialFieldStore::get<FieldT>(temp); // change in temperature for new Newton's iteration
 
   FieldT& delE0 = *delE0Ptr;
   FieldT& res = *resPtr;
@@ -575,14 +560,14 @@ evaluate()
   SpatFldPtr<FieldT> recipRecipT; // t^-2
 
   if( nasaFlag_ == true || shomateFlag_ == true){
-    t2 = SpatialFieldStore::get<FieldT>(temp,mtype);
-    t3 = SpatialFieldStore::get<FieldT>(temp,mtype);
-    t4 = SpatialFieldStore::get<FieldT>(temp,mtype);
+    t2 = SpatialFieldStore::get<FieldT>(temp);
+    t3 = SpatialFieldStore::get<FieldT>(temp);
+    t4 = SpatialFieldStore::get<FieldT>(temp);
     if( nasaFlag_ == true )
-      t5 = SpatialFieldStore::get<FieldT>(temp,mtype);
+      t5 = SpatialFieldStore::get<FieldT>(temp);
     if( shomateFlag_ == true ){
-      recipT = SpatialFieldStore::get<FieldT>(temp,mtype);
-      recipRecipT = SpatialFieldStore::get<FieldT>(temp,mtype);
+      recipT = SpatialFieldStore::get<FieldT>(temp);
+      recipRecipT = SpatialFieldStore::get<FieldT>(temp);
     }
   }
 

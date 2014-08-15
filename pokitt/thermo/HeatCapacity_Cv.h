@@ -181,12 +181,12 @@ evaluate()
     *t3 <<= *t2 * *t_; // t^3
 
     if( nasaFlag_ == true ){
-      t4 = SpatialFieldStore::get<FieldT>(*t_,mtype);
+      t4 = SpatialFieldStore::get<FieldT>(*t_);
       *t4 <<= *t3 * *t_; // t^4
     }
 
     if( shomateFlag_ == true ){
-      recipRecipT = SpatialFieldStore::get<FieldT>(*t_,mtype);
+      recipRecipT = SpatialFieldStore::get<FieldT>(*t_);
       *recipRecipT <<= 1/ *t2; // = t^-2
     }
   }
