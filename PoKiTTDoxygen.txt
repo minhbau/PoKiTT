@@ -1,0 +1,66 @@
+/**
+
+\mainpage
+
+Portable Kinetics Thermodynamics & Transport (PoKiTT) is a library that 
+facilitates calculation of a variety of quantities related to reacting and
+nonreacting flows.
+
+------------------------------
+
+\section download Downloading the source code
+ The source may be obtained via git:
+ \verbatim
+ git clone git://software.crsim.utah.edu/PoKiTT.git [destination path]
+ \endverbatim
+ Alternatively, if you have proper access, you can check out via ssh which
+ will allow you to push changes back to the origin:
+ \verbatim
+ git clone ssh://[yourUNID]@software.crsim.utah.edu/uufs/crsim.utah.edu/host/home/git_repos/PoKiTT.git [destination]
+ \endverbatim
+
+ 
+
+\section building Building PoKiTT
+
+\subsection simple-build A simple CPU-Only Build
+
+\verbatim
+git clone git://software.crsim.utah.edu/PoKiTT.git
+cd PoKiTT; mkdir build; cd build
+cmake .. \
+  -DBUILD_UPSTREAM_LIBS=ON
+  -DCantera_DIR=[path to cantera install] \
+  -DENABLE_TESTS=ON
+\endverbatim
+
+
+\subsection gpu-build A GPU Build
+
+This assumes that you are building in a directory defined by the variable
+`BUILD_DIR` and that the source is in a directory defined by the variable `SRC_DIR`
+\verbatim
+cd $SRC_DIR
+git clone git://software.crsim.utah.edu/PoKiTT.git .
+
+cd $BUILD_DIR
+
+mkdir tpl; cd tpl;
+git clone --depth=1 git://software.crsim.utah.edu/SpatialOps.git src/SpatialOps
+git clone --depth=1 git://software.crsim.utah.edu/ExprLib.git src/ExprLib
+ 
+mkdir so; cd so;
+cmake $BUILD_DIR/tpl/src/SpatialOps -DENABLE_CUDA=ON -DENABLE_TESTS=OFF -DENABLE_THREADS=OFF -DENABLE_EXAMPLES=OFF -DCMAKE_INSTALL_PREFIX=${BUILD_DIR}/tpl
+make -j4 install
+
+cd $BUILD_DIR/tpl
+mkdir expr; cd expr;
+cmake $BUILD_DIR/tpl/src/ExprLib -DENABLE_TESTS=OFF -DCMAKE_INSTALL_PREFIX=$BUILD_DIR/tpl -DSpatialOps_DIR=$BUILD_DIR/tpl/share
+make -j4 install
+
+cd $BUILD_DIR
+cmake $SRC_DIR -DExprLib_DIR=$BUILD_DIR/tpl/share -DCantera_DIR=[path to Cantera]
+make -j4 install
+\endverbatim
+
+*/
