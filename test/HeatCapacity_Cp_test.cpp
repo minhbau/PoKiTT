@@ -5,6 +5,8 @@
  *      Author: Nathan Yonkee
  */
 
+//#define MIX
+
 #include <iostream>
 #include <stdio.h>
 #include <fstream>
@@ -32,19 +34,19 @@ int main(){
   std::vector<double> hctimes;
   std::vector<double> hcdiff;
   std::vector<int> ptvec;
-//  ptvec.push_back(4);
-  ptvec.push_back(8*8*8);
-  ptvec.push_back(16*16*16);
-  ptvec.push_back(32*32*32);
-  ptvec.push_back(64*64*64);
+  ptvec.push_back(10);
+//  ptvec.push_back(8*8*8);
+//  ptvec.push_back(16*16*16);
+//  ptvec.push_back(32*32*32);
+//  ptvec.push_back(64*64*64);
 #ifdef ENABLE_CUDA
   ptvec.push_back(128*128*128);
 #endif
 
-  const CanteraObjects::Setup setup( "Mix", "ethanol_mech.xml", "gas" );
+//  const CanteraObjects::Setup setup( "Mix", "ethanol_mech.xml", "gas" );
 //  const CanteraObjects::Setup setup =CanteraObjects::Setup("Mix","gri30.xml","gri30_mix");
 //  const CanteraObjects::Setup setup =CanteraObjects::Setup("Mix","h2o2.xml","ohmech");
-//  const CanteraObjects::Setup setup =CanteraObjects::Setup("Mix","cp_tester.xml","const_cp");
+  const CanteraObjects::Setup setup =CanteraObjects::Setup("Mix","thermo_tester.xml","const_cp");
 //  const CanteraObjects::Setup setup =CanteraObjects::Setup("Mix","cp_tester.xml","shomate_cp");
   CanteraObjects::setup_cantera(setup);
   Cantera_CXX::IdealGasMix* const gasMix=CanteraObjects::get_gasmix();
@@ -62,23 +64,31 @@ int main(){
       const int nSpec=gasMix->nSpecies();
 
       const double refPressure=gasMix->pressure();
-      std::vector<double> molecularWeights(nSpec);
-      gasMix->getMolecularWeights(&molecularWeights[0]);
+      const std::vector<double>& molecularWeights = gasMix->molecularWeights();
       std::vector< double > concentrations(nSpec,1.0);
 
       SS::IntVec npts(*ptit,1,1);
 
       std::vector<double> length(3,1.0);
 
-      typedef Expr::PlaceHolder <CellField > Temp;
-      typedef Expr::PlaceHolder <CellField > MassFracs;
-      typedef HeatCapacity_Cp < CellField > HeatCapacity;
+      typedef Expr::PlaceHolder < CellField > Temp;
+      typedef TemperaturePowers < CellField > TemperaturePowers;
+      typedef Expr::PlaceHolder < CellField > MassFracs;
 
       Expr::ExpressionFactory exprFactory;
 
       const Expr::Tag tTag ( "Temperature", Expr::STATE_NONE );
 
+      Expr::TagList tPowTags;
+      tPowTags.push_back(Expr::Tag("t2",Expr::STATE_NONE));
+      tPowTags.push_back(Expr::Tag("t3",Expr::STATE_NONE));
+      tPowTags.push_back(Expr::Tag("t4",Expr::STATE_NONE));
+      tPowTags.push_back(Expr::Tag("t5",Expr::STATE_NONE));
+      tPowTags.push_back(Expr::Tag("tRecip",Expr::STATE_NONE));
+      tPowTags.push_back(Expr::Tag("tRecipRecip",Expr::STATE_NONE));
+
 #ifdef MIX
+      typedef HeatCapacity_Cp   < CellField > HeatCapacity;
       const Expr::Tag yiTag ( "yi", Expr::STATE_NONE );
       Expr::TagList yiTags;
       for( size_t n=0; n<nSpec; ++n ){
@@ -87,27 +97,21 @@ int main(){
         yiTags.push_back( Expr::Tag(name.str(),yiTag.context()) );
       }
       Expr::Tag hcMixTag ("hc mix", Expr::STATE_NONE);
-      Expr::TagList tPowTags;
-        tPowTags.push_back(Expr::Tag("t2",Expr::STATE_NONE));
-        tPowTags.push_back(Expr::Tag("t3",Expr::STATE_NONE));
-        tPowTags.push_back(Expr::Tag("t4",Expr::STATE_NONE));
-        tPowTags.push_back(Expr::Tag("t5",Expr::STATE_NONE));
-        tPowTags.push_back(Expr::Tag("tRecip",Expr::STATE_NONE));
-        tPowTags.push_back(Expr::Tag("tRecipRecip",Expr::STATE_NONE));
-
-        typedef TemperaturePowers <CellField> TemperaturePowers;
-        exprFactory.register_expression( new TemperaturePowers::Builder( tPowTags,
-                                                                                                         tTag));
       exprFactory.register_expression( new Temp::Builder(tTag) );
+      exprFactory.register_expression( new TemperaturePowers::Builder( tPowTags, tTag));
       for( size_t n=0; n<nSpec; ++n)
         exprFactory.register_expression( new MassFracs::Builder (yiTags[n]) );
       const Expr::ExpressionID hc_id = exprFactory.register_expression( new HeatCapacity::Builder( hcMixTag, tTag, tPowTags, yiTag ));
 #else
+      typedef SpeciesHeatCapacity_Cp < CellField > HeatCapacity;
       Expr::TagList hcTags;
       for( n=0; n<nSpec; ++n )
         hcTags.push_back( Expr::Tag( "hc" + boost::lexical_cast<std::string>(n), Expr::STATE_NONE ) );
       exprFactory.register_expression( new Temp::Builder(tTag) );
-      const Expr::ExpressionID hc_id   = exprFactory.register_expression( new HeatCapacity   ::Builder(hcTags,tTag) );
+      exprFactory.register_expression( new TemperaturePowers::Builder( tPowTags, tTag));
+      std::set< Expr::ExpressionID > hc_id;
+      for( n=0; n<nSpec; ++n )
+        hc_id.insert(exprFactory.register_expression( new HeatCapacity::Builder(hcTags[n], tTag, tPowTags, n) ));
 #endif
 
       const SS::BoundaryCellInfo cellBCInfo = SS::BoundaryCellInfo::build<CellField>(false,false,false);
@@ -127,17 +131,10 @@ int main(){
 # endif
 
       Expr::ExpressionTree tree( hc_id, exprFactory, 0 );
-#ifdef MIX
-      {
-        std::ofstream fout( "HeatCapacity_mix.dot" );
-        tree.write_tree(fout);
-      }
-#else
       {
         std::ofstream fout( "HeatCapacity.dot" );
         tree.write_tree(fout);
       }
-#endif
 
       Expr::FieldManagerList fml;
 
@@ -243,9 +240,6 @@ int main(){
       for( itemp = tVec.begin(); itemp!=itend; ++itemp,++i){
         gasMix->setState_TPX(*itemp,refPressure,&concentrations[0]);
         gasMix->getPartialMolarCp(&hc_result[0]);
-#ifdef CONSTVOLUME
-        for( std::vector<double>::iterator dit = hc_result.begin(); dit!= hc_result.end(); ++dit) *dit-=GASCONSTANT;
-#endif
         hc_results[i]=hc_result;
       }
       hctimes.push_back(hctime.elapsed());
@@ -257,6 +251,7 @@ int main(){
         i=0;
         itemp = tVec.begin();
         for( CellField::const_iterator ihc=hc.begin(); ihc!=hc.end(); ++ihc, ++i, ++itemp){
+          hc_results[i][n] = hc_results[i][n] / molecularWeights[n];
           const double diff=(*ihc-hc_results[i][n])/hc_results[i][n];
           if( fabs(diff) > hc_maxerror ) hc_maxerror = fabs(diff);
           if( fabs(diff) >= 1.0e-8){
