@@ -1,6 +1,8 @@
 #ifndef HeatCapacity_Cv_Expr_h
 #define HeatCapacity_Cv_Expr_h
 
+//#define TIMINGS
+
 #include <expression/Expression.h>
 
 #ifdef TIMINGS

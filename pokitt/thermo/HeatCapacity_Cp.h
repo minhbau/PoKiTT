@@ -1,9 +1,12 @@
 #ifndef HeatCapacity_Cp_Expr_h
 #define HeatCapacity_Cp_Expr_h
 
-#include <expression/Expression.h>
+//#define TIMINGS
 
+#include <expression/Expression.h>
+#ifdef TIMINGS
 #include <boost/timer.hpp>
+#endif
 
 #include <pokitt/CanteraObjects.h> //include cantera wrapper
 
@@ -149,7 +152,7 @@ HeatCapacity_Cp<FieldT>::
 evaluate()
 {
 #ifdef TIMINGS
-  boost::timer time;
+  boost::timer timer;
 #endif
   using namespace SpatialOps;
   using namespace Cantera;

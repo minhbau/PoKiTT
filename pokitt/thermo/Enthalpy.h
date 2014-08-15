@@ -1,7 +1,7 @@
 #ifndef SpeciesEnthalpy_Expr_h
 #define SpeciesEnthalpy_Expr_h
 
-#define TIMINGS
+//#define TIMINGS
 
 #include <expression/Expression.h>
 #ifdef TIMINGS
