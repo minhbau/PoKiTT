@@ -2,7 +2,7 @@ add_subdirectory( kinetics )
 add_subdirectory( thermo )
 add_subdirectory( transport )
 
-nebo_add_library( pokitt CanteraObjects.cpp )
+add_library( pokitt CanteraObjects.cpp )
 target_link_libraries( pokitt ${TPL_LIBRARIES} )
 
 install( FILES

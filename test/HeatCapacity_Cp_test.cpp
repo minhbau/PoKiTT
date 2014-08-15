@@ -27,8 +27,8 @@ typedef So::SVolField   CellField;
 
 namespace Cantera_CXX{ class IdealGasMix; } //location of polynomial
 
-int main(){
-
+int main()
+{
   std::vector<double> hctimes;
   std::vector<double> hcdiff;
   std::vector<int> ptvec;
@@ -203,7 +203,7 @@ int main(){
 
       CellField& hc = fml.field_manager<CellField>().field_ref(hcMixTag);
 #ifdef ENABLE_CUDA
-      hc.add_device_sync(CPU_INDEX);
+      hc.add_device(CPU_INDEX);
 #endif
 
       double hc_maxerror = 0.0;
