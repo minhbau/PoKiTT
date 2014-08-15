@@ -234,6 +234,8 @@ bind_fields( const Expr::FieldManagerList& fml )
   t_ = &fm.field_ref( tTag_ );
   for (size_t i=0; i<6; ++i) tPowers_.push_back(&fm.field_ref( tPowerTags_[i] ));
   for (size_t n=0; n<nSpec_; ++n) massFracs_.push_back(&fm.field_ref( massFracTags_[n] ));
+  tPowers_.clear();
+  massFracs_.clear();
 }
 
 //--------------------------------------------------------------------
@@ -369,6 +371,7 @@ bind_fields( const Expr::FieldManagerList& fml )
   const typename Expr::FieldMgrSelector<FieldT>::type& fm = fml.field_manager<FieldT>();
   t_ = &fm.field_ref( tTag_ );
   for (size_t i=0; i<6; ++i) tPowers_.push_back(&fm.field_ref( tPowerTags_[i] ));
+  tPowers_.clear();
 }
 
 //--------------------------------------------------------------------
