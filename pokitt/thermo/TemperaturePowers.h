@@ -22,19 +22,20 @@ class TemperaturePowers
   bool nasaFlag_; // flag to specify if any NASA polynomials are present
   bool shomateFlag_; // flag to specify if any Shomate polynomials are present
 
-  /* declare operators associated with this expression here */
+  TemperaturePowers( const Expr::Tag& tTag );
 
-    TemperaturePowers( const Expr::Tag& tTag );
 public:
+
+  static const Expr::TagList& temperature_powers_tags();
+
   class Builder : public Expr::ExpressionBuilder
   {
   public:
     /**
      *  @brief Build a TemperaturePowers expression
-     *  @param resultTag the tag for the value that this expression computes
+     *  @param tTag the temperature
      */
-    Builder( const Expr::TagList& resultTags,
-             const Expr::Tag& tTag );
+    Builder( const Expr::Tag& tTag );
 
     Expr::ExpressionBase* build() const;
 
@@ -56,6 +57,20 @@ public:
 //
 // ###################################################################
 
+
+template< typename FieldT >
+const Expr::TagList&
+TemperaturePowers<FieldT>::temperature_powers_tags()
+{
+  using namespace Expr;
+  static TagList tags = tag_list( Tag("T^2"  ,STATE_NONE),
+                                  Tag("T^3"  ,STATE_NONE),
+                                  Tag("T^4"  ,STATE_NONE),
+                                  Tag("T^5"  ,STATE_NONE),
+                                  Tag("1/T"  ,STATE_NONE),
+                                  Tag("1/T^2",STATE_NONE) );
+  return tags;
+}
 
 
 template< typename FieldT >
@@ -124,7 +139,7 @@ evaluate()
 {
   SpecT& powers = this->get_value_vec();
 
-  if( nasaFlag_ == true || shomateFlag_ == true){
+  if( nasaFlag_ == true || shomateFlag_ == true ){
     *powers[0] <<= *t_ * *t_; // t^2
     *powers[1] <<= *t_ * *powers[0]; // t^3
     *powers[2] <<= *t_ * *powers[1]; // t^4
@@ -135,16 +150,14 @@ evaluate()
       *powers[5] <<= 1 / *powers[0]; // t^-2
     }
   }
-
 }
 
 //--------------------------------------------------------------------
 
 template< typename FieldT >
 TemperaturePowers<FieldT>::
-Builder::Builder( const Expr::TagList& resultTags,
-                  const Expr::Tag& tTag )
-  : ExpressionBuilder( resultTags ),
+Builder::Builder( const Expr::Tag& tTag )
+  : ExpressionBuilder( TemperaturePowers<FieldT>::temperature_powers_tags() ),
     tTag_( tTag )
 {}
 

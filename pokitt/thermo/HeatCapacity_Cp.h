@@ -9,6 +9,7 @@
 #endif
 
 #include <pokitt/CanteraObjects.h> //include cantera wrapper
+#include <pokitt/thermo/TemperaturePowers.h>
 
 #include <cantera/kernel/ct_defs.h> // contains value of Cantera::GasConstant
 #include <cantera/kernel/speciesThermoTypes.h> // contains definitions for which polynomial is being used
@@ -65,7 +66,6 @@ class HeatCapacity_Cp
   const int nSpec_; // number of species
 
   HeatCapacity_Cp( const Expr::Tag& tTag,
-                   const Expr::TagList& tPowerTags,
                    const Expr::Tag& massFracTag );
 
 public:
@@ -81,14 +81,12 @@ public:
      */
     Builder( const Expr::Tag& resultTag,
              const Expr::Tag& tTag,
-             const Expr::TagList& tPowerTags,
              const Expr::Tag& massFracTag );
 
     Expr::ExpressionBase* build() const;
 
   private:
     const Expr::Tag tTag_;
-    const Expr::TagList tPowerTags_;
     const Expr::Tag massFracTag_;
   };
 
@@ -138,9 +136,8 @@ class SpeciesHeatCapacity_Cp
   Cantera_CXX::IdealGasMix* const gasMix_;
   const int n_; //index of species to be evaluated
 
-  SpeciesHeatCapacity_Cp ( const Expr::Tag& tTag,
-                           const Expr::TagList& tPowerTags,
-                           const int n);
+  SpeciesHeatCapacity_Cp( const Expr::Tag& tTag,
+                          const int n );
 public:
   class Builder : public Expr::ExpressionBuilder
   {
@@ -149,19 +146,16 @@ public:
      *  @brief Build a HeatCapacity expression
      *  @param resultTag tag for the pure species heat capacity
      *  @param tTag tag for temperature
-     *  @param tPowerTags tags for powers of temperature for use in polynomial
      *  @param n species index
      */
     Builder( const Expr::Tag& resultTag,
              const Expr::Tag& tTag,
-             const Expr::TagList& tPowerTags,
              const int n);
 
     Expr::ExpressionBase* build() const;
 
   private:
     const Expr::Tag tTag_;
-    const Expr::TagList tPowerTags_;
     const int n_;
   };
 
@@ -183,11 +177,10 @@ public:
 template< typename FieldT >
 HeatCapacity_Cp<FieldT>::
 HeatCapacity_Cp( const Expr::Tag& tTag,
-    const Expr::TagList& tPowerTags,
-    const Expr::Tag& massFracTag )
+                 const Expr::Tag& massFracTag )
   : Expr::Expression<FieldT>(),
     tTag_( tTag ),
-    tPowerTags_( tPowerTags ),
+    tPowerTags_( TemperaturePowers<FieldT>::temperature_powers_tags() ),
     gasMix_( CanteraObjects::get_gasmix() ),
     nSpec_( gasMix_->nSpecies() )
 {
@@ -231,11 +224,18 @@ HeatCapacity_Cp<FieldT>::
 bind_fields( const Expr::FieldManagerList& fml )
 {
   const typename Expr::FieldMgrSelector<FieldT>::type& fm = fml.field_manager<FieldT>();
+
   t_ = &fm.field_ref( tTag_ );
-  for (size_t i=0; i<6; ++i) tPowers_.push_back(&fm.field_ref( tPowerTags_[i] ));
-  for (size_t n=0; n<nSpec_; ++n) massFracs_.push_back(&fm.field_ref( massFracTags_[n] ));
+
   tPowers_.clear();
+  BOOST_FOREACH( const Expr::Tag& tag, tPowerTags_ ){
+    tPowers_.push_back( &fm.field_ref(tag) );
+  }
+
   massFracs_.clear();
+  BOOST_FOREACH( const Expr::Tag& tag, massFracTags_ ){
+    massFracs_.push_back( &fm.field_ref(tag) );
+  }
 }
 
 //--------------------------------------------------------------------
@@ -307,11 +307,9 @@ template< typename FieldT >
 HeatCapacity_Cp<FieldT>::
 Builder::Builder( const Expr::Tag& resultTag,
                   const Expr::Tag& tTag,
-                  const Expr::TagList& tPowerTags,
                   const Expr::Tag& massFracTag )
 : ExpressionBuilder( resultTag ),
   tTag_( tTag ),
-  tPowerTags_( tPowerTags ),
   massFracTag_( massFracTag )
 {}
 
@@ -322,7 +320,7 @@ Expr::ExpressionBase*
 HeatCapacity_Cp<FieldT>::
 Builder::build() const
 {
-  return new HeatCapacity_Cp<FieldT>( tTag_, tPowerTags_, massFracTag_ );
+  return new HeatCapacity_Cp<FieldT>( tTag_, massFracTag_ );
 }
 
 //--------------------------------------------------------------------
@@ -330,11 +328,10 @@ Builder::build() const
 template< typename FieldT >
 SpeciesHeatCapacity_Cp<FieldT>::
 SpeciesHeatCapacity_Cp( const Expr::Tag& tTag,
-                 const Expr::TagList& tPowerTags,
-                 const int n )
+                        const int n )
   : Expr::Expression<FieldT>(),
     tTag_( tTag ),
-    tPowerTags_( tPowerTags ),
+    tPowerTags_( TemperaturePowers<FieldT>::temperature_powers_tags() ),
     gasMix_( CanteraObjects::get_gasmix() ),
     n_ ( n )
 {
@@ -369,9 +366,13 @@ SpeciesHeatCapacity_Cp<FieldT>::
 bind_fields( const Expr::FieldManagerList& fml )
 {
   const typename Expr::FieldMgrSelector<FieldT>::type& fm = fml.field_manager<FieldT>();
+
   t_ = &fm.field_ref( tTag_ );
-  for (size_t i=0; i<6; ++i) tPowers_.push_back(&fm.field_ref( tPowerTags_[i] ));
+
   tPowers_.clear();
+  BOOST_FOREACH( const Expr::Tag& tag, tPowerTags_ ){
+    tPowers_.push_back( &fm.field_ref(tag) );
+  }
 }
 
 //--------------------------------------------------------------------
@@ -381,9 +382,10 @@ void
 SpeciesHeatCapacity_Cp<FieldT>::
 evaluate()
 {
-#ifdef TIMINGS
+# ifdef TIMINGS
   boost::timer timer;
-#endif
+# endif
+
   using namespace Cantera;
   using namespace SpatialOps;
   FieldT& cp = this->value();
@@ -393,43 +395,44 @@ evaluate()
   const FieldT& t4 = *tPowers_[2]; // t^4
   const FieldT& recipRecipT = *tPowers_[5]; // t^-2
 
-  std::vector<double> c(15,0); //vector of Cantera's coefficients
+  std::vector<double> c(15,0); // vector of Cantera's coefficients
   int polyType; // type of polynomial
-  double minT; // minimum temperature where polynomial is valid
-  double maxT; // maximum temperature where polynomial is valid
+  double minT;  // minimum temperature where polynomial is valid
+  double maxT;  // maximum temperature where polynomial is valid
   double refPressure;
-  const Cantera::SpeciesThermo& spThermo = gasMix_->speciesThermo();
+  gasMix_->speciesThermo().reportParams( n_, polyType, &c[0], minT, maxT, refPressure );
   const std::vector<double>& molecularWeights = gasMix_->molecularWeights();
 
-  spThermo.reportParams(n_, polyType, &c[0], minT, maxT, refPressure);
   switch (polyType) {
-  case SIMPLE:
-    cp <<= c[3] / molecularWeights[n_];
-    break;
-  case NASA2:
-    for( std::vector<double>::iterator ic = c.begin() + 1; ic!=c.end(); ++ic)
-      *ic *= GasConstant / molecularWeights[n_]; // dimensionalize coefficients
-    cp <<= cond( *t_ <= c[0] && *t_ >= minT, c[1] + c[2] * *t_ + c[ 3] * t2 + c[ 4] * t3 + c[ 5] * t4 ) // if low temp
-               ( *t_ >  c[0] && *t_ <= maxT, c[8] + c[9] * *t_ + c[10] * t2 + c[11] * t3 + c[12] * t4 )  // else if high temp
-               ( *t_ < minT, c[1] + c[2] * minT + c[ 3] * minT * minT + c[ 4] * pow(minT,3) + c[ 5] * pow(minT,4) )  // else if out of bounds - low
-               (             c[8] + c[9] * maxT + c[10] * maxT * maxT + c[11] * pow(maxT,3) + c[12] * pow(maxT,4) ); // else out of bounds - high
+    case SIMPLE:
+      cp <<= c[3] / molecularWeights[n_];
+      break;
+    case NASA2:
+      for( std::vector<double>::iterator ic = c.begin() + 1; ic!=c.end(); ++ic){
+        *ic *= GasConstant / molecularWeights[n_]; // dimensionalize coefficients
+      }
+      cp <<= cond( *t_ <= c[0] && *t_ >= minT, c[1] + c[2] * *t_ + c[ 3] * t2 + c[ 4] * t3 + c[ 5] * t4 ) // if low temp
+                 ( *t_ >  c[0] && *t_ <= maxT, c[8] + c[9] * *t_ + c[10] * t2 + c[11] * t3 + c[12] * t4 )  // else if high temp
+                 ( *t_ < minT, c[1] + c[2] * minT + c[ 3] * minT * minT + c[ 4] * pow(minT,3) + c[ 5] * pow(minT,4) )  // else if out of bounds - low
+                 (             c[8] + c[9] * maxT + c[10] * maxT * maxT + c[11] * pow(maxT,3) + c[12] * pow(maxT,4) ); // else out of bounds - high
 
-    break;
-  case SHOMATE2:
-    double minTScaled = minT/1000;
-    double maxTScaled = maxT/1000;
-    for( std::vector<double>::iterator ic = c.begin() + 1; ic!=c.end(); ++ic )
-      *ic *= 1e3 / molecularWeights[n_]; // scale the coefficients to keep units consistent
-    cp <<= cond( *t_ <= c[0] && *t_ >= minT, c[1] + c[2] * *t_*1e-3 + c[ 3] * t2*1e-6 + c[ 4] * t3*1e-9 + c[ 5] * recipRecipT*1e6 ) // if low temp
-               ( *t_ >  c[0] && *t_ <= maxT, c[8] + c[9] * *t_*1e-3 + c[10] * t2*1e-6 + c[11] * t3*1e-9 + c[12] * recipRecipT*1e6 )  // else if high temp
-               ( *t_ < minT, c[1] + c[2] * minTScaled + c[ 3] * minTScaled * minTScaled + c[ 4] * pow(minTScaled,3) + c[ 5] * pow(minTScaled,-2) )  // else if out of bounds - low
-               (             c[8] + c[9] * maxTScaled + c[10] * maxTScaled * maxTScaled + c[11] * pow(maxTScaled,3) + c[12] * pow(maxTScaled,-2) ); // else out of bounds - high
+      break;
+    case SHOMATE2:
+      double minTScaled = minT/1000;
+      double maxTScaled = maxT/1000;
+      for( std::vector<double>::iterator ic = c.begin() + 1; ic!=c.end(); ++ic ){
+        *ic *= 1e3 / molecularWeights[n_]; // scale the coefficients to keep units consistent
+      }
+      cp <<= cond( *t_ <= c[0] && *t_ >= minT, c[1] + c[2] * *t_*1e-3 + c[ 3] * t2*1e-6 + c[ 4] * t3*1e-9 + c[ 5] * recipRecipT*1e6 ) // if low temp
+                 ( *t_ >  c[0] && *t_ <= maxT, c[8] + c[9] * *t_*1e-3 + c[10] * t2*1e-6 + c[11] * t3*1e-9 + c[12] * recipRecipT*1e6 )  // else if high temp
+                 ( *t_ < minT, c[1] + c[2] * minTScaled + c[ 3] * minTScaled * minTScaled + c[ 4] * pow(minTScaled,3) + c[ 5] * pow(minTScaled,-2) )  // else if out of bounds - low
+                 (             c[8] + c[9] * maxTScaled + c[10] * maxTScaled * maxTScaled + c[11] * pow(maxTScaled,3) + c[12] * pow(maxTScaled,-2) ); // else out of bounds - high
 
-    break;
+      break;
   }
-#ifdef TIMINGS
-  std::cout<<"SpeciesHeatCapacity_Cp time "<<timer.elapsed()<<std::endl;
-#endif
+# ifdef TIMINGS
+  std::cout << "SpeciesHeatCapacity_Cp time " << timer.elapsed() << std::endl;
+# endif
 }
 
 //--------------------------------------------------------------------
@@ -438,11 +441,9 @@ template< typename FieldT >
 SpeciesHeatCapacity_Cp<FieldT>::
 Builder::Builder( const Expr::Tag& resultTag,
                   const Expr::Tag& tTag,
-                  const Expr::TagList& tPowerTags,
-                  const int n)
+                  const int n )
   : ExpressionBuilder( resultTag ),
     tTag_( tTag ),
-    tPowerTags_( tPowerTags ),
     n_( n )
 {}
 
@@ -453,7 +454,7 @@ Expr::ExpressionBase*
 SpeciesHeatCapacity_Cp<FieldT>::
 Builder::build() const
 {
-  return new SpeciesHeatCapacity_Cp<FieldT>( tTag_, tPowerTags_, n_ );
+  return new SpeciesHeatCapacity_Cp<FieldT>( tTag_, n_ );
 }
 
 #endif // HeatCapacity_Cp_Expr_h

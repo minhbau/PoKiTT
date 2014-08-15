@@ -81,16 +81,8 @@ int main()
 
       const Expr::Tag tTag ( "Temperature", Expr::STATE_NONE );
 
-      Expr::TagList tPowTags;
-      tPowTags.push_back(Expr::Tag("t2",Expr::STATE_NONE));
-      tPowTags.push_back(Expr::Tag("t3",Expr::STATE_NONE));
-      tPowTags.push_back(Expr::Tag("t4",Expr::STATE_NONE));
-      tPowTags.push_back(Expr::Tag("t5",Expr::STATE_NONE));
-      tPowTags.push_back(Expr::Tag("tRecip",Expr::STATE_NONE));
-      tPowTags.push_back(Expr::Tag("tRecipRecip",Expr::STATE_NONE));
-
       exprFactory.register_expression( new Temp::Builder(tTag) );
-      exprFactory.register_expression( new TemperaturePowers::Builder( tPowTags, tTag));
+      exprFactory.register_expression( new TemperaturePowers::Builder(tTag) );
 
 #ifdef MIX
       typedef HeatCapacity_Cp   < CellField > HeatCapacity;
@@ -104,7 +96,7 @@ int main()
       Expr::Tag hcMixTag ("hc mix", Expr::STATE_NONE);
       for( size_t n=0; n<nSpec; ++n)
         exprFactory.register_expression( new MassFracs::Builder (yiTags[n]) );
-      const Expr::ExpressionID hc_id = exprFactory.register_expression( new HeatCapacity::Builder( hcMixTag, tTag, tPowTags, yiTag ));
+      const Expr::ExpressionID hc_id = exprFactory.register_expression( new HeatCapacity::Builder( hcMixTag, tTag, yiTag ));
 #else
       typedef SpeciesHeatCapacity_Cp < CellField > HeatCapacity;
       Expr::TagList hcTags;
