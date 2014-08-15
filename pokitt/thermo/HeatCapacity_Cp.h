@@ -63,8 +63,6 @@ class HeatCapacity_Cp
   std::vector<const FieldT*> massFracs_;
   Cantera_CXX::IdealGasMix* const gasMix_;
   const int nSpec_; // number of species
-  bool nasaFlag_; // flag to specify if any NASA polynomials are present
-  bool shomateFlag_; // flag to specify if any Shomate polynomials are present
 
   HeatCapacity_Cp( const Expr::Tag& tTag,
                    const Expr::TagList& tPowerTags,
@@ -139,8 +137,6 @@ class SpeciesHeatCapacity_Cp
   std::vector<const FieldT*> tPowers_;
   Cantera_CXX::IdealGasMix* const gasMix_;
   const int n_; //index of species to be evaluated
-  bool nasaFlag_; // flag to specify if any NASA polynomials are present
-  bool shomateFlag_; // flag to specify if any Shomate polynomials are present
 
   SpeciesHeatCapacity_Cp ( const Expr::Tag& tTag,
                            const Expr::TagList& tPowerTags,
@@ -193,9 +189,7 @@ HeatCapacity_Cp( const Expr::Tag& tTag,
     tTag_( tTag ),
     tPowerTags_( tPowerTags ),
     gasMix_( CanteraObjects::get_gasmix() ),
-    nSpec_( gasMix_->nSpecies() ),
-    nasaFlag_( false ),
-    shomateFlag_( false )
+    nSpec_( gasMix_->nSpecies() )
 {
   this->set_gpu_runnable( true );
 
@@ -204,23 +198,6 @@ HeatCapacity_Cp( const Expr::Tag& tTag,
     std::ostringstream name;
     name << massFracTag.name() << "_" << n;
     massFracTags_.push_back( Expr::Tag(name.str(),massFracTag.context()) );
-  }
-
-  const Cantera::SpeciesThermo& spThermo = gasMix_->speciesThermo();
-  for( size_t n=0; n<nSpec_; ++n ){
-    const int type = spThermo.reportType(n);
-    switch( type ){
-    case NASA2   : nasaFlag_    = true; break;
-    case SHOMATE2: shomateFlag_ = true; break;
-    case SIMPLE  :                      break;
-    default:{
-      std::ostringstream msg;
-      msg << __FILE__ << " : " << __LINE__
-          << "\nThermo type not supported,\n Type = " << type
-          << ", species # " << n << std::endl;
-      throw std::invalid_argument( msg.str() );
-    }
-    }
   }
 
 }
@@ -360,21 +337,6 @@ SpeciesHeatCapacity_Cp( const Expr::Tag& tTag,
     n_ ( n )
 {
   this->set_gpu_runnable( true );
-
-  const Cantera::SpeciesThermo& spThermo = gasMix_->speciesThermo();
-  const int type = spThermo.reportType(n_);
-  switch( type ){
-  case NASA2   : nasaFlag_    = true; break;
-  case SHOMATE2: shomateFlag_ = true; break;
-  case SIMPLE  :                      break;
-  default:{
-    std::ostringstream msg;
-    msg << __FILE__ << " : " << __LINE__
-        << "\nThermo type not supported,\n Type = " << type
-        << ", species # " << n_ << std::endl;
-    throw std::invalid_argument( msg.str() );
-  }
-  }
 }
 
 //--------------------------------------------------------------------
