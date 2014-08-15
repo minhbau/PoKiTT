@@ -1,6 +1,6 @@
 nebo_cuda_prep_dir()
 
-file( GLOB XML_FILES ${CMAKE_CURRENT_SOURCE_DIR} *.xml )
+file( GLOB XML_FILES ${CMAKE_CURRENT_SOURCE_DIR}/*.xml )
 file( COPY ${XML_FILES} DESTINATION ${CMAKE_CURRENT_BINARY_DIR} )
 
 #-------------------------------------------------------------------------------
