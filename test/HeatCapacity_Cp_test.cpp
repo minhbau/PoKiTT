@@ -119,16 +119,10 @@ int main()
       const So::GhostData cellGhosts(1);
       const So::MemoryWindow vwindow( So::get_window_with_ghost(npts,cellGhosts,cellBCInfo) );
       CellField xcoord( vwindow, cellBCInfo, cellGhosts, NULL );
-      CellField ycoord( vwindow, cellBCInfo, cellGhosts, NULL );
-      CellField zcoord( vwindow, cellBCInfo, cellGhosts, NULL );
       So::Grid grid( npts, length );
       grid.set_coord<SpatialOps::XDIR>( xcoord );
-      grid.set_coord<SpatialOps::YDIR>( ycoord );
-      grid.set_coord<SpatialOps::ZDIR>( zcoord );
 # ifdef ENABLE_CUDA
       xcoord.add_device( GPU_INDEX );
-      ycoord.add_device( GPU_INDEX );
-      zcoord.add_device( GPU_INDEX );
 # endif
 
       Expr::ExpressionTree tree( hc_id, exprFactory, 0 );
