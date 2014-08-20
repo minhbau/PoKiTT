@@ -1,12 +1,7 @@
 #ifndef HeatCapacity_Cp_Expr_h
 #define HeatCapacity_Cp_Expr_h
 
-//#define TIMINGS
-
 #include <expression/Expression.h>
-#ifdef TIMINGS
-#include <boost/timer.hpp>
-#endif
 
 #include <pokitt/CanteraObjects.h> //include cantera wrapper
 #include <pokitt/thermo/TemperaturePowers.h>
@@ -245,9 +240,6 @@ void
 HeatCapacity_Cp<FieldT>::
 evaluate()
 {
-#ifdef TIMINGS
-  boost::timer timer;
-#endif
   using namespace SpatialOps;
   using namespace Cantera;
   FieldT& cp = this->value();
@@ -296,9 +288,6 @@ evaluate()
       break;
     }
   }
-# ifdef TIMINGS
-  std::cout << "HeatCapacity_Cp time " << timer.elapsed() << std::endl;
-# endif
 }
 
 //--------------------------------------------------------------------
@@ -382,10 +371,6 @@ void
 SpeciesHeatCapacity_Cp<FieldT>::
 evaluate()
 {
-# ifdef TIMINGS
-  boost::timer timer;
-# endif
-
   using namespace Cantera;
   using namespace SpatialOps;
   FieldT& cp = this->value();
@@ -430,9 +415,6 @@ evaluate()
 
       break;
   }
-# ifdef TIMINGS
-  std::cout << "SpeciesHeatCapacity_Cp time " << timer.elapsed() << std::endl;
-# endif
 }
 
 //--------------------------------------------------------------------
