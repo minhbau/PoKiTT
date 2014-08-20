@@ -19,8 +19,9 @@ nebo_add_executable( cp_test HeatCapacity_Cp_test.cpp )
 target_link_libraries( cp_test pokitt )
 add_test( cp_test cp_test )
 
-#nebo_add_executable( cv_test HeatCapacity_Cv_test.cpp )
-#target_link_libraries( cv_test pokitt )
+nebo_add_executable( cv_test HeatCapacity_Cv_test.cpp )
+target_link_libraries( cv_test pokitt )
+add_test( cv_test cv_test )
 
 #nebo_add_executable( rxn_test ReactionRates_test.cpp )
 #target_link_libraries( rxn_test pokitt )
