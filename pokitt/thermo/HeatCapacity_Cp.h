@@ -71,7 +71,6 @@ public:
      *  @brief Build a HeatCapacity_Cp expression
      *  @param resultTag the mixture heat capacity
      *  @param tTag tag for temperature
-     *  @param tPowerTags tags for powers of temperature for use in polynomial
      *  @param massFracTag tag for mass fractions of each species, ordering is consistent with Cantera input
      */
     Builder( const Expr::Tag& resultTag,

@@ -423,7 +423,7 @@ public:
      *  @brief Build a TemperatureFromE0 expression
      *  @param resultTag the tag for the temperature of the mixture
      *  @param massFracTag tag for the mass fraction of each species, ordering is consistent with Cantera input file
-     *  @param e0 tag for the total energy of the mixture
+     *  @param e0Tag tag for the total energy of the mixture
      *  @param keTag tag for kinetic energy of the mixture
      */
     Builder( const Expr::Tag& resultTag,

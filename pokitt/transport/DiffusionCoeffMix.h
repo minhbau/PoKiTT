@@ -29,7 +29,7 @@
  * \f]
  *
  * Where \f$ D_kj \f$ is the binary diffusion coefficient of species k and j,
- * \bar{M} is the mixture average molecular weight, \f$ x_k \f$ is the mole
+ * \f$ \bar{M} \f$ is the mixture average molecular weight, \f$ x_k \f$ is the mole
  * fraction of species k, and \f$ M_k \f$ is the molecular weight of species k.
  *
  * Units are m^2/s.
@@ -69,7 +69,8 @@ public:
      *  @param resultTags the tags for the diffusion coefficient of each species, ordering is consistent with Cantera input file
      *  @param temperatureTag temperature
      *  @param pTag pressure
-     *  @param moleFracTags tags for the mole fractions of each species
+     *  @param massFracTag tag for mass fractions of each species, ordering is consistent with Cantera input
+     *  @param mmwTag tag for mixture molecular weight
      */
     Builder( const Expr::TagList& resultTags,
              const Expr::Tag& temperatureTag,

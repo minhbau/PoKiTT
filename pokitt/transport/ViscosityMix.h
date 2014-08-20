@@ -83,7 +83,66 @@ public:
   void evaluate();
 };
 
+/**
+ *  @class SutherlandViscosity
+ *  @date  October, 2008
+ *  @author James C. Sutherland
+ *
+ *  Calculates the viscosity using Sutherland's law,
+ *  \f[
+ *     \mu = \mu_0 \frac{T_0 + C}{T+C} \left( \frac{T}{T_0} \right)^{3/2}
+ *  \f]
+ *  where:
+ *  <ul>
+ *   <li> \f$C\f$ is a constant with units Kelvin
+ *   <li> \f$\mu_0\f$ is the reference viscosity with units \f$\mathrm{Pa\cdot s}\f$,
+ *   <li> \f$T_0\f$ is the reference temperature with units Kelvin.
+ *  </ul>
+ */
+template<typename FieldT>
+class SutherlandViscosity
+  : public Expr::Expression<FieldT>
+{
+  const double c_, refVisc_, refTemp_;
+  const Expr::Tag tTag_;
+  const FieldT* temp_;
 
+  SutherlandViscosity( const double c,
+                       const double refVisc,
+                       const double refTemp,
+                       const Expr::Tag& temperatureTag );
+
+  void evaluate();
+  void advertise_dependents( Expr::ExprDeps& exprDeps );
+  void bind_fields( const Expr::FieldManagerList& fml );
+
+public:
+
+  class Builder : public Expr::ExpressionBuilder
+  {
+    const double c_, mu0_, t0_;
+    const Expr::Tag tTag_;
+  public:
+    /**
+     *  @brief Build a SutherlandViscosity expression
+     *  @param result tag for the viscosity
+     *  @param temperatureTag temperature
+     *  @param suthConstant Constant for use in the viscosity correlation (K)
+     *  @param refVisc reference viscosity (Pa s)
+     *  @param refTemp reference temperature (K)
+     */
+    Builder( const Expr::Tag& result,
+             const Expr::Tag& temperatureTag,
+             const double suthConstant, ///< Constant for use in the viscosity correlation (K)
+             const double refVisc,      ///< reference viscosity (Pa s)
+             const double refTemp );    ///< reference temperature (K)
+    Builder( const Expr::Tag& result,
+             const Expr::Tag& temperatureTag );
+
+    Expr::ExpressionBase* build() const;
+  };
+
+};
 
 // ###################################################################
 //
@@ -300,66 +359,6 @@ Builder::build() const
 }
 
 //====================================================================
-
-/**
- *  @class SutherlandViscosity
- *  @date  October, 2008
- *  @author James C. Sutherland
- *
- *  Calculates the viscosity using Sutherland's law,
- *  \f[
- *     \mu = \mu_0 \frac{T_0 + C}{T+C} \left( \frac{T}{T_0} \right)^{3/2}
- *  \f]
- *  where:
- *  <ul>
- *   <li> \f$C\f$ is a constant with units Kelvin
- *   <li> \f$\mu_0\f$ is the reference viscosity with units \f$\mathrm{Pa\cdot s}\f$,
- *   <li> \f$T_0\f$ is the reference temperature with units Kelvin.
- *  </ul>
- */
-template<typename FieldT>
-class SutherlandViscosity
-  : public Expr::Expression<FieldT>
-{
-  const double c_, refVisc_, refTemp_;
-  const Expr::Tag tTag_;
-  const FieldT* temp_;
-
-  SutherlandViscosity( const double c,
-                       const double refVisc,
-                       const double refTemp,
-                       const Expr::Tag& temperatureTag );
-
-  void evaluate();
-  void advertise_dependents( Expr::ExprDeps& exprDeps );
-  void bind_fields( const Expr::FieldManagerList& fml );
-
-public:
-
-  class Builder : public Expr::ExpressionBuilder
-  {
-    const double c_, mu0_, t0_;
-    const Expr::Tag tTag_;
-  public:
-    Builder( const Expr::Tag& result,
-             const Expr::Tag& temperatureTag );
-    Builder( const Expr::Tag& result,
-             const Expr::Tag& temperatureTag,
-             const double suthConstant, ///< Constant for use in the viscosity correlation (K)
-             const double refVisc,      ///< reference viscosity (Pa s)
-             const double refTemp );    ///< reference temperature (K)
-    Expr::ExpressionBase* build() const;
-  };
-
-};
-
-// ###################################################################
-//
-//                          Implementation
-//
-// ###################################################################
-
-
 
 
 
