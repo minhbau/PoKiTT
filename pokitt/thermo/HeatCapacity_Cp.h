@@ -13,7 +13,7 @@
 namespace Cantera_CXX{ class IdealGasMix; } // location of polynomial coefficients
 
 /**
- *  \class  HeatCapacity
+ *  \class  HeatCapacity_Cp
  *  \author Nate Yonkee
  *  \date July, 2014
  *
@@ -97,7 +97,7 @@ public:
  *
  *  \brief Calculates the constant pressure heat capacity of a single species
  *  using either NASA7 or Shomate polynomials with 2 temperature ranges.
- *  Units of J/kmole/K
+ *  Units of J/kg/K
  *
  *  Five coefficients \f$(a_0,\dots,a_4)\f$ are used to represent
  * \f$ c_p^0(T)\f$ as a polynomial in \f$ T \f$

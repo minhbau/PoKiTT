@@ -27,7 +27,7 @@ namespace Cantera_CXX{ class IdealGasMix; } // location of polynomial coefficien
  *
  *  \brief Calculates the constant volume heat capacity of each species
  *  using either NASA7 or Shomate polynomials with 2 temperature ranges.
- *  Units of J/kmole/K
+ *  Units of J/kg/K
  *
  *  Five coefficients \f$(a_0,\dots,a_4)\f$ are used to represent
  * \f$ c_v^0(T)\f$ as a polynomial in \f$ T \f$
