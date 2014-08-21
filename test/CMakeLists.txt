@@ -12,8 +12,9 @@ include_directories( ${CMAKE_SOURCE_DIR} )
 #nebo_add_executable( diff_coef_test DiffusionCoeff_test.cpp )
 #target_link_libraries( diff_coef_test pokitt )
 
-#nebo_add_executable( enthalpy_test Enthalpy_test.cpp )
-#target_link_libraries( enthalpy_test pokitt )
+nebo_add_executable( enthalpy_test Enthalpy_test.cpp )
+target_link_libraries( enthalpy_test pokitt )
+add_test( enthalpy_test enthalpy_test )
 
 nebo_add_executable( cp_test HeatCapacity_Cp_test.cpp )
 target_link_libraries( cp_test pokitt )
