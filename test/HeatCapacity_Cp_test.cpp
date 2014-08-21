@@ -114,9 +114,9 @@ int main()
 
       CellField xcoord( vwindow, cellBCInfo, cellGhosts, NULL );
       grid.set_coord<SpatialOps::XDIR>( xcoord );
-# ifdef ENABLE_CUDA
+#     ifdef ENABLE_CUDA
       xcoord.add_device( GPU_INDEX );
-# endif
+#     endif
 
       Expr::FieldManagerList fml;
 
@@ -155,21 +155,21 @@ int main()
       mixtureTree.lock_fields( fml );  // prevent fields from being deallocated so that we can get them after graph execution.
       speciesTree.lock_fields( fml );
 
-#ifdef TIMINGS
+#     ifdef TIMINGS
       std::cout << std::endl << setup.inputFile << " - " << *ptit << std::endl;
-#endif
+#     endif
 
       boost::timer mixTimer;
       mixtureTree.execute_tree();
-#ifdef TIMINGS
+#     ifdef TIMINGS
       std::cout << "PoKiTT mixture cp time  " << mixTimer.elapsed() << std::endl;
-#endif
+#     endif
 
       boost::timer specTimer;
       speciesTree.execute_tree();
-#ifdef TIMINGS
+#     ifdef TIMINGS
       std::cout << "PoKiTT species cp time  " << specTimer.elapsed() << std::endl;
-#endif
+#     endif
 
       std::vector<double> tVec;
       for( i=0; i<*ptit+2; ++i)
@@ -197,14 +197,14 @@ int main()
         gasMix->setState_TPY(*itemp,refPressure,&massfracs[i][0]);
         hcMix_result[i]=gasMix->cp_mass();
       }
-#ifdef TIMINGS
+#     ifdef TIMINGS
       std::cout << "Cantera mixture cp time " << hcMixtimer.elapsed() << std::endl;
-#endif
+#     endif
 
       CellField& hc = fml.field_manager<CellField>().field_ref(hcMixTag);
-#ifdef ENABLE_CUDA
+#     ifdef ENABLE_CUDA
       hc.add_device(CPU_INDEX);
-#endif
+#     endif
 
       i=0;
       for( CellField::const_iterator ihc=hc.begin(); ihc!=hc.end(); ++ihc, ++i){
@@ -223,16 +223,16 @@ int main()
         gasMix->getPartialMolarCp(&hc_result[0]);
         hc_results[i]=hc_result;
       }
-#ifdef TIMINGS
+#     ifdef TIMINGS
       std::cout << "Cantera species cp time " << hctime.elapsed() << std::endl;
-#endif
+#     endif
 
       n=0;
       for(Expr::TagList::iterator ihcs=hcTags.begin(); ihcs<hcTags.end(); ++ihcs, ++n){
-        const CellField& hc = fml.field_manager<CellField>().field_ref(*ihcs);
-#ifdef ENABLE_CUDA
+        CellField& hc = fml.field_manager<CellField>().field_ref(*ihcs);
+#       ifdef ENABLE_CUDA
         hc.add_device(CPU_INDEX);
-#endif
+#       endif
         i=0;
         for( CellField::const_iterator ihc=hc.begin(); ihc!=hc.end(); ++ihc, ++i){
           hc_results[i][n] = hc_results[i][n] / molecularWeights[n];
