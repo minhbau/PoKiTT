@@ -262,6 +262,9 @@ evaluate()
       cp <<= cp + *massFracs_[n] * c[3]
                                  / molecularWeights[n];
       break;
+      /* polynomials are applicable in two temperature ranges - high and low
+       * If the temperature is out of range, the value is set to the value at the min or max temp
+       */
     case NASA2:
       for( std::vector<double>::iterator ic = c.begin() + 1; ic!=c.end(); ++ic)
         *ic *= GasConstant / molecularWeights[n]; // dimensionalize coefficients
