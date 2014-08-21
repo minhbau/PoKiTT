@@ -7,7 +7,7 @@ target_link_libraries( pokitt ${TPL_LIBRARIES} )
 
 install( FILES
   CanteraObjects.h
-  MixtureMoleWeightExpr.h
+  MixtureMolWeight.h
   DESTINATION ${CMAKE_INSTALL_PREFIX}/include/pokitt
   PERMISSIONS OWNER_READ GROUP_READ WORLD_READ
  )
