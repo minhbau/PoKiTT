@@ -1,17 +1,12 @@
 #ifndef ReactionRates_Expr_h
 #define ReactionRates_Expr_h
 
-//#define TIMINGS
-
 #include <expression/Expression.h>
-#ifdef TIMINGS
-#include <boost/timer.hpp>
-#endif
 
 #include <pokitt/CanteraObjects.h> // include cantera wrapper
 
 #include <cantera/kernel/ct_defs.h> // contains value of gas constant
-#include <cantera/kernel/reaction_defs.h>
+#include <cantera/kernel/reaction_defs.h> // reaction type definitions
 #include <cantera/kernel/speciesThermoTypes.h> // contains definitions for which polynomial is being used
 #include <cantera/IdealGasMix.h>
 
@@ -19,7 +14,7 @@ namespace Cantera_CXX{ class IdealGasMix; } // location of polynomial coefficien
 
 /**
  *  \class  ReactionRates
- *  \author Nate Yonkee
+ *  \author Nathan Yonkee
  *  \date July, 2014
  *
  *  \brief Calculates net production rates for each species based on
@@ -259,7 +254,10 @@ bind_fields( const Expr::FieldManagerList& fml )
   t_ = &fm.field_ref( tTag_ );
   p_ = &fm.field_ref( pTag_ );
   mmw_ = &fm.field_ref( mmwTag_ );
-  for (size_t n=0; n<nSpec_; ++n) massFracs_.push_back(&fm.field_ref( massFracTags_[n] ));
+  massFracs_.clear();
+  BOOST_FOREACH( const Expr::Tag& tag, massFracTags_ ){
+    massFracs_.push_back( &fm.field_ref(tag) );
+  }
 }
 
 //--------------------------------------------------------------------
@@ -269,9 +267,6 @@ void
 ReactionRates<FieldT>::
 evaluate()
 {
-#ifdef TIMINGS
-  boost::timer timer;
-#endif
   using namespace SpatialOps;
   using namespace Cantera;
 
