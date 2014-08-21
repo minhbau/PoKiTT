@@ -29,9 +29,9 @@ int main(){
   bool isFailed = false;
 
   try {
-    //const CanteraObjects::Setup setup( "Mix", "h2o2.xml",          "ohmech"    );
+    const CanteraObjects::Setup setup( "Mix", "h2o2.xml",          "ohmech"    );
     //const CanteraObjects::Setup setup( "Mix", "gri30.xml",         "gri30_mix" );
-    const CanteraObjects::Setup setup( "Mix", "ethanol_mech.xml",  "gas"       );
+    //const CanteraObjects::Setup setup( "Mix", "ethanol_mech.xml",  "gas"       );
     CanteraObjects::setup_cantera(setup);
 
     Cantera::Transport* transport = CanteraObjects::get_transport();
