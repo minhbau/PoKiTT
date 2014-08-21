@@ -10,11 +10,12 @@ template< typename FieldT >
 class MixtureMolWeight
  : public Expr::Expression<FieldT>
 {
-  const Expr::Tag yiTag_;
-  const FieldT* yi_;
+  Expr::TagList massFracTags_;
+  std::vector<const FieldT*> massFracs_;
   const std::vector<double> specMW_;
+  const int nSpec_;
 
-    MixtureMolWeight( const Expr::Tag& yiTag,
+    MixtureMolWeight( const Expr::Tag& massFracTag,
                       const std::vector<double>& specMw  );
 public:
   class Builder : public Expr::ExpressionBuilder
@@ -23,17 +24,17 @@ public:
     /**
      *  @brief Build a MixtureMolWeight expression
      *  @param resultTag the tag for mixture molecular weight
-     *  @param yiTag tag for mass fractions
+     *  @param massFracTag tag for mass fractions of each species, ordering is consistent with specMW
      *  @param specMW vector of species molecular weights
      */
     Builder( const Expr::Tag& resultTag,
-             const Expr::Tag& yiTag,
+             const Expr::Tag& massFracTag,
              const std::vector<double>& specMW );
 
     Expr::ExpressionBase* build() const;
 
   private:
-    const Expr::Tag yiTag_;
+    const Expr::Tag massFracTag_;
     const std::vector<double> specMW_;
   };
 
@@ -55,17 +56,17 @@ public:
 
 template< typename FieldT >
 MixtureMolWeight<FieldT>::
-MixtureMolWeight( const Expr::Tag& yiTag,
+MixtureMolWeight( const Expr::Tag& massFracTag,
                   const std::vector<double>& specMW )
   : Expr::Expression<FieldT>(),
-    yiTag_( yiTag ),
-    specMW_(specMW)
+    specMW_(specMW),
+    nSpec_( specMW.size() )
 {
-  specTags_.clear();
-  for( int i=0; i<nspec_; ++i ){
+  massFracTags_.clear();
+  for( size_t n=0; n<nSpec_; ++n ){
     std::ostringstream name;
-    name << yiTag.name() << "_" << i;
-    specTags_.push_back( Expr::Tag(name.str(),yiTag.context()) );
+    name << massFracTag.name() << "_" << n;
+    massFracTags_.push_back( Expr::Tag(name.str(),massFracTag.context()) );
   }
 }
 
@@ -83,9 +84,7 @@ void
 MixtureMolWeight<FieldT>::
 advertise_dependents( Expr::ExprDeps& exprDeps )
 {
-  for( Expr::TagList::const_iterator itag=specTags_.begin(); itag!=specTags_.end(); ++itag ){
-    exprDeps.requires_expression( *itag );
-  }
+  exprDeps.requires_expression( massFracTags_ );
 }
 
 //--------------------------------------------------------------------
@@ -95,11 +94,10 @@ void
 MixtureMolWeight<FieldT>::
 bind_fields( const Expr::FieldManagerList& fml )
 {
-  const Expr::FieldMgrSelector<VolField>::type& fm = fml.field_manager<VolField>();
-
-  yi_.clear();
-  for( Expr::TagList::const_iterator itag=specTags_.begin(); itag!=specTags_.end(); ++itag ){
-    yi_.push_back( &fm.field_ref( *itag ) );
+  const typename Expr::FieldMgrSelector<FieldT>::type& fm = fml.field_manager<FieldT>();
+  massFracs_.clear();
+  BOOST_FOREACH( const Expr::Tag& tag, massFracTags_ ){
+    massFracs_.push_back( &fm.field_ref(tag) );
   }
 }
 
@@ -113,11 +111,11 @@ evaluate()
   using namespace SpatialOps;
   FieldT& mixMW = this->value();
 
-  result <<= 0.0;
-    for( size_t n=0; n<nspec_; ++n ){
-      result <<= result + *yi_[n] / specMW_[n];
+  mixMW <<= 0.0;
+    for( size_t n=0; n<nSpec_; ++n ){
+      mixMW <<= mixMW + *massFracs_[n] / specMW_[n];
     }
-    result <<= 1.0 / result;
+    mixMW <<= 1.0 / mixMW;
 }
 
 //--------------------------------------------------------------------
@@ -125,10 +123,10 @@ evaluate()
 template< typename FieldT >
 MixtureMolWeight<FieldT>::
 Builder::Builder( const Expr::Tag& resultTag,
-                  const Expr::Tag& yiTag,
+                  const Expr::Tag& massFracTag,
                   const std::vector<double>& specMW )
   : ExpressionBuilder( resultTag ),
-    yiTag_( yiTag ),
+    massFracTag_( massFracTag ),
     specMW_( specMW )
 {}
 
@@ -139,7 +137,7 @@ Expr::ExpressionBase*
 MixtureMolWeight<FieldT>::
 Builder::build() const
 {
-  return new MixtureMolWeight<FieldT>( yiTag_, specMW_ );
+  return new MixtureMolWeight<FieldT>( massFracTag_, specMW_ );
 }
 
 

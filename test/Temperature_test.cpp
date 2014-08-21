@@ -12,9 +12,8 @@
 #include <fstream>
 
 #include <pokitt/thermo/Temperature.h>
-//#include <pokitt/thermo/myTemperatureMass.h>
 #include <pokitt/thermo/TemperaturePowers.h>
-#include <pokitt/MixtureMolWeightExpr.h>
+#include <pokitt/MixtureMolWeight.h>
 
 #include <expression/ExprLib.h>
 
