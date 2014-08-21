@@ -12,7 +12,7 @@
 #include <boost/timer.hpp>
 
 #include <pokitt/transport/ThermalCondMix.h>
-#include <pokitt/MixtureMolWeightExpr.h>
+#include <pokitt/MixtureMolWeight.h>
 
 #include <expression/ExprLib.h>
 
@@ -22,7 +22,25 @@ namespace SS = SpatialOps;
 typedef SS::SVolField   CellField;
 
 int main(){
+  bool isFailed = false;
+      const CanteraObjects::Setup setup( "Mix", "h2o2.xml",          "ohmech"    );
+      //const CanteraObjects::Setup setup( "Mix", "gri30.xml",         "gri30_mix" );
+      //const CanteraObjects::Setup setup( "Mix", "ethanol_mech.xml",  "gas"       );
 
+      CanteraObjects::setup_cantera(setup);
+      Cantera::Transport* transport = CanteraObjects::get_transport();
+      Cantera::MixTransport* mixTrans;
+
+      if( transport->model() ==210 | transport->model()==211)
+        mixTrans = dynamic_cast<Cantera::MixTransport*>( transport );
+      else {
+        std::cout<<"error, transport not mixture\ntransport model is " << transport->model() << std::endl;
+      return -1;}
+
+      const int nSpec=mixTrans->thermo().nSpecies();
+      size_t n;
+      const double refPressure=mixTrans->thermo().pressure();
+      const std::vector<double>& molecularWeights = mixTrans->thermo().molecularWeights();
   std::vector<double> tctime;
   std::vector<double> tcdiff;
   std::vector<int> ptvec;
@@ -35,35 +53,8 @@ int main(){
   ptvec.push_back(128*128*128);
 #endif
 
-  std::ofstream myfile ("../timings.txt", std::ios::app);
-  myfile<<"\nTC times\n";
-  myfile<<"ExprLib\n";
-  myfile.close();
-
   for( std::vector<int>::iterator ptit = ptvec.begin(); ptit!= ptvec.end(); ++ptit){
     try{
-
-      //      const CanteraObjects::Setup setup =CanteraObjects::Setup("None","cp_tester.xml","shomate_cp");
-      //      const CanteraObjects::Setup setup =CanteraObjects::Setup("None","cp_tester.xml","const_cp");
-                const CanteraObjects::Setup setup =CanteraObjects::Setup("Mix","gri30.xml","gri30_mix");
-      //      const CanteraObjects::Setup setup =CanteraObjects::Setup("Mix","air.xml","air");
-//                const CanteraObjects::Setup setup =CanteraObjects::Setup("Mix","h2o2.xml","ohmech");
-//      const CanteraObjects::Setup setup =CanteraObjects::Setup("Mix","ethanol_mech.xml","gas");
-
-
-      CanteraObjects& cantera = CanteraObjects::self();
-      cantera.setup_cantera(setup);
-
-      Cantera::Transport* transport = cantera.get_transport();
-      Cantera::MixTransport* mixTrans;
-
-      if( transport->model() ==210 | transport->model()==211)
-        mixTrans = dynamic_cast<Cantera::MixTransport*>( transport );
-      else {print("error, transport not mixture\ntransport model is ",transport->model()); return -1;}
-      const int nSpec=mixTrans->thermo().nSpecies();
-      const double pressure = mixTrans->thermo().pressure();
-      std::vector<double> molecularWeights(nSpec);
-      mixTrans->thermo().getMolecularWeights(&molecularWeights[0]);
 
       size_t i;
       size_t n;
@@ -75,6 +66,7 @@ int main(){
       typedef Expr::PlaceHolder <CellField> Temp;
       typedef Expr::PlaceHolder <CellField> MassFracs;
       typedef ThermalConductivity <CellField> ThermalConductivityMix;
+      typedef MixtureMolWeight <CellField> MixtureMolWeight;
 
       Expr::ExpressionFactory exprFactory;
 
@@ -92,7 +84,7 @@ int main(){
       exprFactory.register_expression( new Temp ::Builder (tTag                 ) );
       for( n=0; n<nSpec; ++n)
         exprFactory.register_expression( new MassFracs::Builder (yiTags[n]) );
-      exprFactory.register_expression( new MixtureMolWeightExpr::Builder( mmwTag, yiTag, molecularWeights));
+      exprFactory.register_expression( new MixtureMolWeight::Builder( mmwTag, yiTag, molecularWeights));
       const Expr::ExpressionID tCondMix_id = exprFactory.register_expression( new ThermalConductivityMix::Builder (tCondMixTag ,tTag ,yiTag, mmwTag) );
 
       const SS::BoundaryCellInfo cellBCInfo = SS::BoundaryCellInfo::build<CellField>(false,false,false);
@@ -157,7 +149,6 @@ int main(){
       std::cout<<setup.inputFile<<" - "<<*ptit<<std::endl;
       boost::timer treetime;
       tree.execute_tree();
-      //      print("tree time",treetime.elapsed());
       CellField& tCondMix = cellFM.field_ref(tCondMixTag);
 #ifdef ENABLE_CUDA
       tCondMix.add_device(CPU_INDEX);
@@ -184,33 +175,24 @@ int main(){
       std::vector<double>::const_iterator itend = tVec.end();
       std::vector<double>::const_iterator itemp;
       boost::timer cTimer;
-      //      boost::timer setStateTime;
       for(itemp = tVec.begin(); itemp!=itend; ++itemp, ++i){
-        //        t=0.0;
-        //        t=setStateTime.elapsed();
-        mixTrans->thermo().setState_TPY( *itemp, pressure, &concentrations[i][0]);
-        //        totalt+=setStateTime.elapsed()-t;
+        mixTrans->thermo().setState_TPY( *itemp, refPressure, &concentrations[i][0]);
         results[i]=mixTrans->thermalConductivity();
       }
-      //      print("cantera time",cTimer.elapsed());
       tctime.push_back(cTimer.elapsed());
-      //      print("setstatetime",totalt);
 
       std::vector<double>::iterator rit = results.begin();
       itemp = tVec.begin();
       double maxerror = 0.0;
       for ( CellField::const_iterator itc= tCondMix.begin(); itc!= tCondMix.end(); ++rit, ++itc, ++itemp){
         const double err = (*rit-*itc)/ *rit;
-        if( std::abs(err) > maxerror) maxerror = std::abs(err);
-        if(std::abs(err) >= 1e-4) {
-          print("test failed @ T",*itemp);
-          print("Cantera's value",*rit);
-          print("my value",*itc);
-          print("err",err);
+        if( fabs(err) > maxerror) maxerror = fabs(err);
+        if(fabs(err) >= 1e-12) {
+          std::cout<< "error = " << err << std::endl;
+          isFailed = true;
         }
       }
       tcdiff.push_back(maxerror);
-      //      print("maxerror",maxerror);
       std::cout<<std::endl;
 
     }
@@ -219,12 +201,6 @@ int main(){
     }
 
   }
-  std::ofstream myfileapp ("../timings.txt", std::ios::app);
-  myfileapp<<"\nCantera\n";
-  for( std::vector<double>::iterator itime = tctime.begin(); itime!=tctime.end(); ++itime)
-    myfileapp<<*itime<<",";
-  myfileapp.close();
-  print("cantera time",tctime);
-  print("max diff",tcdiff);
+if( isFailed ) return -1;
   return 0;
 }

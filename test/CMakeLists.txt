@@ -32,8 +32,9 @@ nebo_add_executable( temperature_test Temperature_test.cpp )
 target_link_libraries( temperature_test pokitt )
 add_test( temperature_test temperature_test )
 
-#nebo_add_executable( therm_cond_test ThermalCondMix_test.cpp )
-#target_link_libraries( therm_cond_test pokitt )
+nebo_add_executable( therm_cond_test ThermalCondMix_test.cpp )
+target_link_libraries( therm_cond_test pokitt )
+add_test( therm_cond_test therm_cond_test )
 
 #nebo_add_executable( viscosity_test ViscosityMix_test.cpp )
 #target_link_libraries( viscosity_test pokitt )
