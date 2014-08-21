@@ -27,8 +27,9 @@ add_test( cv_test cv_test )
 #nebo_add_executable( rxn_test ReactionRates_test.cpp )
 #target_link_libraries( rxn_test pokitt )
 
-#nebo_add_executable( temperature_test Temperature_test.cpp )
-#target_link_libraries( temperature_test pokitt )
+nebo_add_executable( temperature_test Temperature_test.cpp )
+target_link_libraries( temperature_test pokitt )
+add_test( temperature_test temperature_test )
 
 #nebo_add_executable( therm_cond_test ThermalCondMix_test.cpp )
 #target_link_libraries( therm_cond_test pokitt )

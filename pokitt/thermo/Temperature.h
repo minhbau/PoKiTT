@@ -1,13 +1,7 @@
 #ifndef Temperature_Expr_h
 #define Temperature_Expr_h
 
-//#define TIMINGS
-
-#include <spatialops/structured/SpatialFieldStore.h>
 #include <expression/Expression.h>
-#ifdef TIMINGS
-#include <boost/timer.hpp>
-#endif
 
 #include <cantera/kernel/ct_defs.h> // contains value of gas constant
 #include <cantera/kernel/speciesThermoTypes.h> // contains definitions for which polynomial is being used
@@ -92,7 +86,85 @@ public:
   void evaluate();
 };
 
+/**
+ *  \class  TemperatureFromE0
+ *  \author Nate Yonkee
+ *  \date July, 2014
+ *
+ *  \brief Calculates the temperature of a mixture from
+ *  total energy (internal and kinetic energy) and mass fractions.
+ *
+ *  This class uses Newton's method to solve for the temperature of
+ *  a mixture. The internal energy of a mixture is a nonlinear
+ *  function of temperature. Typically, this is represented by
+ *  a six coefficient polynomial e.g. NASA7,
+ *
+ * \f[
+ * \frac{e(T)}{R} = (a_0 - 1) T + a_1 T^2/2 + a_2 T^3/3 + a_3 T^4/4 + a_4 T^5/5 + a_5
+ * \f]
+ *
+ * Newton's method is used to solve this non-linear equation. For a
+ * given e_0 and an initial guess \f$ T_i \f$ Newton's method calculates
+ * a new guess,
+ *
+ * \f[
+ * T_{i+1} = T_{i} + \frac{e_0-e(T_i)}{c_v(T_i)}
+ * \f]
+ *
+ * This iteration continues until a convergence criteria is met:
+ *
+ * \f[
+ * \mid T_{i+1} - T_{i} \mid < 10^{-3}
+ * \f]
+ */
 
+template< typename FieldT >
+class TemperatureFromE0
+    : public Expr::Expression<FieldT>
+{
+  const Expr::Tag e0Tag_;
+  const Expr::Tag keTag_;
+  Expr::TagList massFracTags_;
+  const FieldT* e0_;
+  const FieldT* ke_;
+  std::vector<const FieldT*> massFracs_;
+  Cantera_CXX::IdealGasMix* const gasMix_; // gas mixture to be evaluated
+  const int nSpec_; // number of species to iterate over
+  bool nasaFlag_; // flag if NASA polynomial is present
+  bool shomateFlag_; // flag if Shomate polynomial is present
+
+  TemperatureFromE0( const Expr::Tag& massFracTag,
+                     const Expr::Tag& e0Tag,
+                     const Expr::Tag& keTag );
+public:
+  class Builder : public Expr::ExpressionBuilder
+  {
+  public:
+    /**
+     *  @brief Build a TemperatureFromE0 expression
+     *  @param resultTag the tag for the temperature of the mixture
+     *  @param massFracTag tag for the mass fraction of each species, ordering is consistent with Cantera input file
+     *  @param e0Tag tag for the total energy of the mixture
+     *  @param keTag tag for kinetic energy of the mixture
+     */
+    Builder( const Expr::Tag& resultTag,
+             const Expr::Tag& massFracTag,
+             const Expr::Tag& e0Tag,
+             const Expr::Tag& keTag );
+
+    Expr::ExpressionBase* build() const;
+
+  private:
+    const Expr::Tag e0Tag_;
+    const Expr::Tag massFracTag_;
+    const Expr::Tag keTag_;
+  };
+
+  ~TemperatureFromE0();
+  void advertise_dependents( Expr::ExprDeps& exprDeps );
+  void bind_fields( const Expr::FieldManagerList& fml );
+  void evaluate();
+};
 
 // ###################################################################
 //
@@ -114,6 +186,8 @@ Temperature( const Expr::Tag& massFracTag,
       shomateFlag_ ( false )
       {
 
+  this->set_gpu_runnable( true );
+
   massFracTags_.clear();
   for( size_t n=0; n<nSpec_; ++n ){
     std::ostringstream name;
@@ -121,23 +195,23 @@ Temperature( const Expr::Tag& massFracTag,
     massFracTags_.push_back( Expr::Tag(name.str(),massFracTag.context()) );
   }
 
-  this->set_gpu_runnable( true );
-  int polyType; // type of correlation used, NASA7, Shomate, and constant cp are supported
-  double minT;
-  double maxT;
   const Cantera::SpeciesThermo& spThermo = gasMix_->speciesThermo();
-  for(size_t n=0; n<nSpec_; ++n){
-    polyType = spThermo.reportType(n);
-    if( polyType == NASA2 )  nasaFlag_=true;
-    else if( polyType == SHOMATE2 ) shomateFlag_=true;
-    else if( polyType != SIMPLE ){
-      std::cout << "Error in Temperature" << std::endl
-          <<" Thermo type not supported, type = " << polyType << std::endl
-          <<" See <cantera/kernel/SpeciesThermoInterpType.h> for type definition" << std::endl;
-      throw std::runtime_error("Problems in Temperature expression.");
+  const int nSpec = gasMix_->nSpecies();
+  for( size_t n=0; n<nSpec; ++n ){
+    const int type = spThermo.reportType(n);
+    switch( type ){
+    case NASA2   : nasaFlag_    = true; break;
+    case SHOMATE2: shomateFlag_ = true; break;
+    case SIMPLE  :                      break;
+    default:{
+      std::ostringstream msg;
+      msg << __FILE__ << " : " << __LINE__
+          << "\nThermo type not supported,\n Type = " << type
+          << ", species # " << n << std::endl;
+      throw std::invalid_argument( msg.str() );
+    }
     }
   }
-
       }
 
 //--------------------------------------------------------------------
@@ -168,7 +242,10 @@ Temperature<FieldT>::
 bind_fields( const Expr::FieldManagerList& fml )
 {
   const typename Expr::FieldMgrSelector<FieldT>::type& fm = fml.field_manager<FieldT>();
-  for (size_t n=0; n<nSpec_; ++n) massFracs_.push_back(&fm.field_ref( massFracTags_[n] ));
+  massFracs_.clear();
+  BOOST_FOREACH( const Expr::Tag& tag, massFracTags_ ){
+    massFracs_.push_back( &fm.field_ref(tag) );
+  }
   enth_ = &fm.field_ref( enthTag_ );
 }
 
@@ -179,9 +256,6 @@ void
 Temperature<FieldT>::
 evaluate()
 {
-#ifdef TIMINGS
-boost::timer timer;
-#endif
   using namespace SpatialOps;
   using namespace Cantera;
   FieldT& temp = this->value();
@@ -192,6 +266,7 @@ boost::timer timer;
   FieldT& delH = *delHPtr;
   FieldT& res = *resPtr;
   FieldT& dhdT = *dhdTPtr;
+
   SpatFldPtr<FieldT> t2; // t^2
   SpatFldPtr<FieldT> t3; // t^3
   SpatFldPtr<FieldT> t4; // t^4
@@ -338,9 +413,6 @@ boost::timer timer;
     temp <<= temp + res;
     isConverged = nebo_max( abs(res) ) < 1e-3;// Converged when the temperature has changed by less than 1e-3
   }
-#ifdef TIMINGS
-    std::cout<<"T time "<<timer.elapsed()<<std::endl;
-#endif
 }
 
 
@@ -366,94 +438,7 @@ Builder::build() const
   return new Temperature<FieldT>( massFracTag_, enthTag_ );
 }
 
-/**
- *  \class  TemperatureFromE0
- *  \author Nate Yonkee
- *  \date July, 2014
- *
- *  \brief Calculates the temperature of a mixture from
- *  total energy (internal and kinetic energy) and mass fractions.
- *
- *  This class uses Newton's method to solve for the temperature of
- *  a mixture. The internal energy of a mixture is a nonlinear
- *  function of temperature. Typically, this is represented by
- *  a six coefficient polynomial e.g. NASA7,
- *
- * \f[
- * \frac{e(T)}{R} = (a_0 - 1) T + a_1 T^2/2 + a_2 T^3/3 + a_3 T^4/4 + a_4 T^5/5 + a_5
- * \f]
- *
- * Newton's method is used to solve this non-linear equation. For a
- * given e_0 and an initial guess \f$ T_i \f$ Newton's method calculates
- * a new guess,
- *
- * \f[
- * T_{i+1} = T_{i} + \frac{e_0-e(T_i)}{c_v(T_i)}
- * \f]
- *
- * This iteration continues until a convergence criteria is met:
- *
- * \f[
- * \mid T_{i+1} - T_{i} \mid < 10^{-3}
- * \f]
- */
-template< typename FieldT >
-class TemperatureFromE0
-    : public Expr::Expression<FieldT>
-{
-  const Expr::Tag e0Tag_;
-  const Expr::Tag keTag_;
-  Expr::TagList massFracTags_;
-  const FieldT* e0_;
-  const FieldT* ke_;
-  std::vector<const FieldT*> massFracs_;
-  Cantera_CXX::IdealGasMix* const gasMix_; // gas mixture to be evaluated
-  const int nSpec_; // number of species to iterate over
-  bool nasaFlag_; // flag if NASA polynomial is present
-  bool shomateFlag_; // flag if Shomate polynomial is present
-
-  TemperatureFromE0( const Expr::Tag& massFracTag,
-                     const Expr::Tag& e0Tag,
-                     const Expr::Tag& keTag );
-public:
-  class Builder : public Expr::ExpressionBuilder
-  {
-  public:
-    /**
-     *  @brief Build a TemperatureFromE0 expression
-     *  @param resultTag the tag for the temperature of the mixture
-     *  @param massFracTag tag for the mass fraction of each species, ordering is consistent with Cantera input file
-     *  @param e0Tag tag for the total energy of the mixture
-     *  @param keTag tag for kinetic energy of the mixture
-     */
-    Builder( const Expr::Tag& resultTag,
-             const Expr::Tag& massFracTag,
-             const Expr::Tag& e0Tag,
-             const Expr::Tag& keTag );
-
-    Expr::ExpressionBase* build() const;
-
-  private:
-    const Expr::Tag e0Tag_;
-    const Expr::Tag massFracTag_;
-    const Expr::Tag keTag_;
-  };
-
-  ~TemperatureFromE0();
-  void advertise_dependents( Expr::ExprDeps& exprDeps );
-  void bind_fields( const Expr::FieldManagerList& fml );
-  void evaluate();
-};
-
-
-
-// ###################################################################
-//
-//                          Implementation
-//
-// ###################################################################
-
-
+//--------------------------------------------------------------------
 
 template< typename FieldT >
 TemperatureFromE0<FieldT>::
@@ -477,23 +462,23 @@ TemperatureFromE0( const Expr::Tag& massFracTag,
     massFracTags_.push_back( Expr::Tag(name.str(),massFracTag.context()) );
   }
 
-  int polyType; // type of correlation used, NASA7, Shomate, and constant cv supported
-  double minT;
-  double maxT;
   const Cantera::SpeciesThermo& spThermo = gasMix_->speciesThermo();
-
-  for(size_t n=0; n<nSpec_; ++n){
-    polyType = spThermo.reportType(n);
-    if( polyType == NASA2 )  nasaFlag_=true;
-    else if( polyType == SHOMATE2 ) shomateFlag_=true;
-    else if( polyType != SIMPLE ){
-      std::cout << "Error in TemperatureFromE0" << std::endl
-          <<" Thermo type not supported, type = " << polyType << std::endl
-          <<" See <cantera/kernel/SpeciesThermoInterpType.h> for type definition" << std::endl;
-      throw std::runtime_error("Problems in TemperatureFromE0 expression.");
+  const int nSpec = gasMix_->nSpecies();
+  for( size_t n=0; n<nSpec; ++n ){
+    const int type = spThermo.reportType(n);
+    switch( type ){
+    case NASA2   : nasaFlag_    = true; break;
+    case SHOMATE2: shomateFlag_ = true; break;
+    case SIMPLE  :                      break;
+    default:{
+      std::ostringstream msg;
+      msg << __FILE__ << " : " << __LINE__
+          << "\nThermo type not supported,\n Type = " << type
+          << ", species # " << n << std::endl;
+      throw std::invalid_argument( msg.str() );
+    }
     }
   }
-
       }
 
 //--------------------------------------------------------------------
@@ -525,7 +510,10 @@ TemperatureFromE0<FieldT>::
 bind_fields( const Expr::FieldManagerList& fml )
 {
   const typename Expr::FieldMgrSelector<FieldT>::type& fm = fml.field_manager<FieldT>();
-  for (size_t n=0; n<nSpec_; ++n) massFracs_.push_back(&fm.field_ref( massFracTags_[n] ));
+  massFracs_.clear();
+  BOOST_FOREACH( const Expr::Tag& tag, massFracTags_ ){
+    massFracs_.push_back( &fm.field_ref(tag) );
+  }
   e0_ = &fm.field_ref( e0Tag_ );
   ke_ = &fm.field_ref( keTag_ );
 }
@@ -537,9 +525,6 @@ void
 TemperatureFromE0<FieldT>::
 evaluate()
 {
-#ifdef TIMINGS
-  boost::timer timer;
-#endif
   using namespace SpatialOps;
   using namespace Cantera;
   FieldT& temp = this->value();
@@ -577,7 +562,6 @@ evaluate()
   double maxT; // maximum temperature where polynomial is valid
   double refPressure;
   const Cantera::SpeciesThermo& spThermo = gasMix_->speciesThermo();
-
   const std::vector<double>& molecularWeights = gasMix_->molecularWeights();
 
   bool isConverged = false;
@@ -699,9 +683,6 @@ evaluate()
     temp <<= temp + res;
     isConverged = nebo_max( abs(res) ) < 1e-3; // Converged when the temperature has changed by less than 1e-3
   }
-#ifdef TIMINGS
-  std::cout<<"TE0 time "<<timer.elapsed()<<std::endl;
-#endif
 }
 
 
