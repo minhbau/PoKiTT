@@ -306,7 +306,6 @@ evaluate()
   conc <<= trecip * p / GasConstant; // molar concentration
   logConc <<= log(conc);
   conc <<= conc * *mmw_; // mass concentration
-  conc2 <<= conc * conc;
 
   { // add scope resolution so that fields of powers of t go out of scope after evaluation of gibbs energy polynomial
     // pre-compute powers of t used in gibbs energy polynomial for each species
@@ -470,13 +469,10 @@ evaluate()
       for( rit=reactants.begin(); rit!=reactants.end(); ++rit, ++sit){
         switch (*sit){
         case 1:
-//          k <<= k * *massFracs_[*rit] * conc / molecularWeights[*rit];
           k <<= k * *massFracs_[*rit] * conc * molecularWeightsInv[*rit];
           break;
         case 2:
-//          k <<= k * *massFracs_[*rit] * *massFracs_[*rit] * conc / molecularWeights[*rit] * conc / molecularWeights[*rit];
           k <<= k * *massFracs_[*rit] * *massFracs_[*rit] * conc * molecularWeightsInv[*rit] * conc * molecularWeightsInv[*rit];
-//          k <<= k * *massFracs_[*rit] * *massFracs_[*rit] * conc2 *  molecularWeightsInv2[*rit];
           break;
         case 3:
           k <<= k * *massFracs_[*rit] * conc * molecularWeightsInv[*rit] * *massFracs_[*rit] * conc * molecularWeightsInv[*rit] * *massFracs_[*rit] * conc * molecularWeightsInv[*rit];
@@ -495,13 +491,10 @@ evaluate()
           for( rit=products.begin(); rit!=products.end(); ++rit, ++sit){
             switch (*sit){
             case 1:
-//              kr <<= kr * *massFracs_[*rit] * conc / molecularWeights[*rit];
               kr <<= kr * *massFracs_[*rit] * conc * molecularWeightsInv[*rit];
               break;
             case 2:
-//              kr <<= kr * *massFracs_[*rit] * *massFracs_[*rit] * conc / molecularWeights[*rit] * conc / molecularWeights[*rit];
               kr <<= kr * *massFracs_[*rit] * *massFracs_[*rit] * conc * molecularWeightsInv[*rit] * conc * molecularWeightsInv[*rit];
-//              kr <<= kr * *massFracs_[*rit] * *massFracs_[*rit] * conc2 *  molecularWeightsInv2[*rit];
               break;
             case 3:
               kr <<= kr * *massFracs_[*rit] * conc * molecularWeightsInv[*rit] * *massFracs_[*rit] * conc * molecularWeightsInv[*rit] * *massFracs_[*rit] * conc * molecularWeightsInv[*rit];
@@ -526,9 +519,6 @@ evaluate()
       *rRates[*rit] <<= *rRates[*rit] + *sit * (k - kr) * molecularWeights[*rit];
 
   }
-#ifdef TIMINGS
-    std::cout<<"rr time "<<timer.elapsed()<<std::endl;
-#endif
 }
 
 //--------------------------------------------------------------------
