@@ -20,18 +20,41 @@ namespace SS = SpatialOps;
 typedef SS::SVolField   CellField;
 
 int main(){
+  bool isFailed = false;
+
+  try {
+    //const CanteraObjects::Setup setup( "Mix", "h2o2.xml",          "ohmech"    );
+    //const CanteraObjects::Setup setup( "Mix", "gri30.xml",         "gri30_mix" );
+    const CanteraObjects::Setup setup( "Mix", "ethanol_mech.xml",  "gas"       );
+    CanteraObjects::setup_cantera(setup);
+
+    Cantera::Transport* transport = CanteraObjects::get_transport();
+    Cantera::MixTransport* mixTrans;
+
+    if( transport->model() ==210 || transport->model()==211)
+      mixTrans = dynamic_cast<Cantera::MixTransport*>( transport );
+    else {
+      std::cout<<"error, transport not mixture\ntransport model is " << transport->model() << std::endl;
+      return -1;}
+
+    const int nSpec=mixTrans->thermo().nSpecies();
+    size_t n;
+    const double refPressure=mixTrans->thermo().pressure();
+    const std::vector<double>& molecularWeights = mixTrans->thermo().molecularWeights();
 
   std::vector<double> vtime;
   std::vector<double> vdiff;
   std::vector<int> ptvec;
-  ptvec.push_back(8*8*8);
-  ptvec.push_back(16*16*16);
-  ptvec.push_back(32*32*32);
-  ptvec.push_back(64*64*64);
-#ifdef NFIELDS
+#ifdef TIMINGS
+    ptvec.push_back(8*8*8);
+    ptvec.push_back(16*16*16);
+    ptvec.push_back(32*32*32);
+    ptvec.push_back(64*64*64);
 #ifdef ENABLE_CUDA
-  ptvec.push_back(128*128*128);
+    ptvec.push_back(128*128*128);
 #endif
+#else
+    ptvec.push_back(10);
 #endif
 
   std::ofstream myfile ("../timings.txt", std::ios::app);
@@ -39,27 +62,7 @@ int main(){
   myfile<<"ExprLib\n";
   myfile.close();
   for( std::vector<int>::iterator ptit = ptvec.begin(); ptit!= ptvec.end(); ++ptit){
-    try{
 
-//          const CanteraObjects::Setup setup =CanteraObjects::Setup("Mix","gri30.xml","gri30_mix");
-      //        const CanteraObjects::Setup setup =CanteraObjects::Setup("Mix","air.xml","air");
-//          const CanteraObjects::Setup setup =CanteraObjects::Setup("Mix","h2o2.xml","ohmech");
-      const CanteraObjects::Setup setup =CanteraObjects::Setup("Mix","ethanol_mech.xml","gas");
-
-      CanteraObjects& cantera = CanteraObjects::self();
-      cantera.setup_cantera(setup);
-
-      Cantera::Transport* transport = cantera.get_transport();
-      Cantera::MixTransport* mixTrans;
-
-      if( transport->model() ==210 | transport->model()==211)
-        mixTrans = dynamic_cast<Cantera::MixTransport*>( transport );
-      else {print("error, transport not mixture\ntransport model is ",transport->model()); return -1;}
-      const int nSpec=mixTrans->thermo().nSpecies();
-      //    print("nspecies",nSpec);
-      const double pressure = mixTrans->thermo().pressure();
-      std::vector<double> molecularWeights(nSpec);
-      mixTrans->thermo().getMolecularWeights(&molecularWeights[0]);
 
       size_t i;
       size_t n;
@@ -179,52 +182,31 @@ int main(){
       i=0;
       std::vector<double>::const_iterator itend = tVec.end();
       std::vector<double>::const_iterator itemp;
-      //    boost::timer stateTimer;
-      //    double stateTime = 0.0;
-      //    double t;
       boost::timer cTimer;
       for(itemp = tVec.begin(); itemp!=itend; ++itemp, ++i){
-        //      t = stateTimer.elapsed();
-        mixTrans->thermo().setState_TPY( *itemp, pressure, &concentrations[i][0]);
-        //      stateTime+=stateTimer.elapsed()-t;
+        mixTrans->thermo().setState_TPY( *itemp, refPressure, &concentrations[i][0]);
         results[i]=mixTrans->viscosity();
       }
       vtime.push_back(cTimer.elapsed());
-      //    print("cantera time",cTimer.elapsed());
-      //    print("state time",stateTime);
 
       std::vector<double>::iterator rit = results.begin();
       itemp = tVec.begin();
       double maxerror = 0.0;
       for ( CellField::const_iterator ivis= visMix.begin(); ivis!= visMix.end(); ++rit, ++ivis, ++itemp){
         const double err = (*rit-*ivis)/ *rit;
-        if( fabs(err) > maxerror) maxerror = fabs(err);
-//        if(std::abs(err) >= 1e-4) {
-//          print("test failed @ T",*itemp);
-//          print("Cantera's value",*rit);
-//          print("my value",*ivis);
-//          print("err",err);
-//        }
+        if(fabs(err) >= 1e-12) {
+          std::cout << "error " << err << std::endl;
+          isFailed = true;
+        }
       }
 
-      vdiff.push_back(maxerror);
-      //    print("max error",maxerror);
-
       std::cout<<std::endl;
-
+  }
     }
     catch( Cantera::CanteraError& ){
       Cantera::showErrors();
     }
 
-  }
-
-  std::ofstream myfileapp ("../timings.txt", std::ios::app);
-  myfileapp<<"\nCantera\n";
-  for( std::vector<double>::iterator itime = vtime.begin(); itime!=vtime.end(); ++itime)
-    myfileapp<<*itime<<",";
-  myfileapp.close();
-  print("cantera time",vtime);
-  print("max diff",vdiff);
-  return 0;
+    if( isFailed ) return -1;
+    return 0;
 }
