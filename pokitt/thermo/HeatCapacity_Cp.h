@@ -49,8 +49,6 @@ template< typename FieldT >
 class HeatCapacity_Cp
  : public Expr::Expression<FieldT>
 {
-  typedef std::vector<FieldT*> SpecT;
-  typedef std::vector<double>  SpecCoefs;
   const Expr::Tag tTag_;
   const Expr::TagList tPowerTags_;
   Expr::TagList massFracTags_;
@@ -122,7 +120,6 @@ template< typename FieldT >
 class SpeciesHeatCapacity_Cp
  : public Expr::Expression<FieldT>
 {
-  typedef std::vector<FieldT*> SpecT;
   const Expr::Tag tTag_;
   const Expr::TagList tPowerTags_;
   const FieldT* t_;
