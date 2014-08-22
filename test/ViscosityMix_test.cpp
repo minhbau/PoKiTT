@@ -143,7 +143,6 @@ int main(){
 
 #ifdef ENABLE_CUDA
       visMix.add_device(CPU_INDEX);
-      visMix.set_field_loc_active(CPU_INDEX);
 #endif
 
       std::vector< std::vector<double> > massfracs;

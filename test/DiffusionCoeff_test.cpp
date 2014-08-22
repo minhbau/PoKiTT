@@ -172,7 +172,6 @@ int main(){
         CellField& d = fml.field_manager<CellField>().field_ref(diffusionCoeffMixTags[n]);
 
         d.add_device(CPU_INDEX);
-        d.set_field_loc_active(CPU_INDEX);
       }
 #endif
 

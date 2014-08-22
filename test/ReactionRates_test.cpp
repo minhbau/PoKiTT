@@ -184,7 +184,6 @@ int main(){
         CellField& r = fml.field_manager<CellField>().field_ref(rTags[n]);
 
         r.add_device(CPU_INDEX);
-        r.set_field_loc_active(CPU_INDEX);
       }
 #endif
 
