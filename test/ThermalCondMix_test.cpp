@@ -145,7 +145,6 @@ int main(){
       CellField& tCondMix = cellFM.field_ref(tCondMixTag);
 #ifdef ENABLE_CUDA
       tCondMix.add_device(CPU_INDEX);
-      tCondMix.set_device_as_active(CPU_INDEX);
 #endif
 
       std::vector< std::vector<double> > massfracs;
