@@ -9,9 +9,9 @@ file( COPY ${XML_FILES} DESTINATION ${CMAKE_CURRENT_BINARY_DIR} )
 
 include_directories( ${CMAKE_SOURCE_DIR} )
 
-#nebo_add_executable( diff_coef_test DiffusionCoeff_test.cpp )
-#target_link_libraries( diff_coef_test pokitt )
-#add_test( diff_coef_test diff_coef_test )
+nebo_add_executable( diff_coef_test DiffusionCoeff_test.cpp )
+target_link_libraries( diff_coef_test pokitt )
+add_test( diff_coef_test diff_coef_test )
 
 nebo_add_executable( enthalpy_test Enthalpy_test.cpp )
 target_link_libraries( enthalpy_test pokitt )
