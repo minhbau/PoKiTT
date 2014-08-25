@@ -15,6 +15,7 @@
 #include <expression/ExprLib.h>
 
 #include <spatialops/structured/Grid.h>
+#include <spatialops/structured/FieldComparisons.h>
 
 #include <boost/lexical_cast.hpp>
 #include <boost/timer.hpp>
@@ -176,30 +177,27 @@ int main(){
       for( i=0; i<*ptit+2; ++i)
         tVec.push_back( 500.0 + 1000.0 * (i-0.5)/ *ptit);
 
-      std::vector< std::vector<double> > d_results(*ptit+2);
+      std::vector< SpatFldPtr<CellField> > canteraResults;
+      for( n=0; n < nSpec; ++n){
+        canteraResults.push_back(SpatialFieldStore::get<CellField>(temp));
+      }
       i=0;
-      std::vector<double>::const_iterator itemp;
-      std::vector<double>::const_iterator itend = tVec.end();
+      std::vector<double>::const_iterator itemp = tVec.begin();
+      std::vector< vector<double> >::iterator imass = massfracs.begin();
       std::vector<double> d_result(nSpec,0.0);
       boost::timer cTimer;
-      for(itemp = tVec.begin(); itemp!=itend; ++itemp, ++i){
-        mixTrans->thermo().setState_TPY( *itemp, refPressure, &massfracs[i][0]);
+      for( i=0; i<*ptit+2; ++itemp, ++imass, ++i){
+        mixTrans->thermo().setState_TPY( *itemp, refPressure, &(*imass)[0]);
         mixTrans->getMixDiffCoeffsMass(&d_result[0]);
-        d_results[i]=d_result;
-      }
-
-      n=0;
-      for(Expr::TagList::iterator itag=diffusionCoeffMixTags.begin(); itag!=diffusionCoeffMixTags.end(); ++itag, ++n){
-        const CellField& d = fml.field_manager<CellField>().field_ref(*itag);
-        i=0;
-        for( CellField::const_iterator idiff=d.begin(); idiff!=d.end(); ++idiff, ++i){
-          const double diff=(*idiff-d_results[i][n])/d_results[i][n];
-          if( fabs(diff) > 1e-12 ) {
-            std::cout << "diff coeff failed " << std::endl;
-            isFailed = true;
-          }
+        for( n=0; n<nSpec; ++n){
+          (*canteraResults[n])[i] = d_result[n];
         }
       }
+
+      for( n=0; n<nSpec; ++n){
+        isFailed = field_not_equal(cellFM.field_ref(diffusionCoeffMixTags[n]), *canteraResults[n], 1e-12);
+      }
+
     }
   }
   catch( Cantera::CanteraError& ){
