@@ -21,8 +21,6 @@
 #include <boost/timer.hpp>
 #include <boost/foreach.hpp>
 
-#include <cantera/kernel/ct_defs.h> // contains value of Cantera::GasConstant
-#include <cantera/kernel/speciesThermoTypes.h> // contains definitions for which polynomial is being used
 #include <cantera/IdealGasMix.h>
 
 namespace Cantera_CXX{ class IdealGasMix; }
