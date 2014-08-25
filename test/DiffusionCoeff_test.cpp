@@ -74,8 +74,9 @@ int main(){
 
     exprFactory.register_expression( new Temperature::Builder (tTag) );
     exprFactory.register_expression( new Pressure ::Builder (pTag                 ) );
-    for( n=0; n<nSpec; ++n)
-      exprFactory.register_expression( new MassFracs::Builder (yiTags[n]) );
+    BOOST_FOREACH( Expr::Tag yiTag, yiTags){
+      exprFactory.register_expression( new MassFracs::Builder (yiTag) );
+    }
     exprFactory.register_expression( new MixtureMolWeight::Builder( mmwTag, yiTag, molecularWeights));
     const Expr::ExpressionID diffCoeffMix_id = exprFactory.register_expression( new DiffusionCoeffMix::Builder (diffusionCoeffMixTags, tTag, pTag ,yiTag, mmwTag) );
 
@@ -136,8 +137,8 @@ int main(){
         yi <<= n + 1 + xcoord;
         *sum <<= *sum + yi;
       }
-      for( n=0; n<nSpec; ++n){
-        CellField& yi = cellFM.field_ref(yiTags[n]);
+      BOOST_FOREACH( Expr::Tag yiTag, yiTags){
+        CellField& yi = cellFM.field_ref(yiTag);
         yi <<= yi / *sum;
       }
 

@@ -66,8 +66,9 @@ int main(){
     const Expr::Tag visMixTag ( "Viscosity Mix", Expr::STATE_NONE);
 
     exprFactory.register_expression( new Temp ::Builder (tTag                 ) );
-    for( n=0; n<nSpec; ++n)
-      exprFactory.register_expression( new MassFracs::Builder (yiTags[n]) );
+    BOOST_FOREACH( Expr::Tag yiTag, yiTags){
+      exprFactory.register_expression( new MassFracs::Builder (yiTag) );
+    }
     const Expr::ExpressionID visMix_id = exprFactory.register_expression( new ViscosityMix::Builder (visMixTag ,tTag ,yiTag) );
 
     Expr::ExpressionTree tree( visMix_id, exprFactory, 0 );
@@ -125,8 +126,8 @@ int main(){
         yi <<= n + 1 + xcoord;
         *sum <<= *sum + yi;
       }
-      for( n=0; n<nSpec; ++n){
-        CellField& yi = cellFM.field_ref(yiTags[n]);
+      BOOST_FOREACH( Expr::Tag yiTag, yiTags){
+        CellField& yi = cellFM.field_ref(yiTag);
         yi <<= yi / *sum;
       }
 

@@ -145,8 +145,8 @@ int main()
         yi <<= n + 1 + xcoord;
         *sum <<= *sum + yi;
       }
-      for( n=0; n<nSpec; ++n){
-        CellField& yi = cellFM.field_ref(yiTags[n]);
+      BOOST_FOREACH( Expr::Tag yiTag, yiTags){
+        CellField& yi = cellFM.field_ref(yiTag);
         yi <<= yi / *sum;
       }
 

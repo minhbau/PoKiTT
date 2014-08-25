@@ -69,8 +69,9 @@ int main(){
     const Expr::Tag tCondMixTag ( "Thermal Conductivity Mix", Expr::STATE_NONE);
 
     exprFactory.register_expression( new Temp ::Builder (tTag                 ) );
-    for( n=0; n<nSpec; ++n)
-      exprFactory.register_expression( new MassFracs::Builder (yiTags[n]) );
+    BOOST_FOREACH( Expr::Tag yiTag, yiTags){
+      exprFactory.register_expression( new MassFracs::Builder (yiTag) );
+    }
     exprFactory.register_expression( new MixtureMolWeight::Builder( mmwTag, yiTag, molecularWeights));
     const Expr::ExpressionID tCondMix_id = exprFactory.register_expression( new ThermalConductivityMix::Builder (tCondMixTag ,tTag ,yiTag, mmwTag) );
 
@@ -128,8 +129,8 @@ int main(){
         yi <<= n + 1 + xcoord;
         *sum <<= *sum + yi;
       }
-      for( n=0; n<nSpec; ++n){
-        CellField& yi = cellFM.field_ref(yiTags[n]);
+      BOOST_FOREACH( Expr::Tag yiTag, yiTags){
+        CellField& yi = cellFM.field_ref(yiTag);
         yi <<= yi / *sum;
       }
 

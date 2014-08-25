@@ -131,17 +131,17 @@ int main()
     CellField& temp = cellFM.field_ref(tTag);
     temp <<= 500.0 + 1000.0*xcoord;
 
-    SpatFldPtr<CellField> sum  = SpatialFieldStore::get<CellField>(temp);
-    *sum<<=0.0;
-    for( n=0; n<nSpec; ++n ){
-      CellField& yi = cellFM.field_ref(yiTags[n]);
-      yi <<= n + 1 + xcoord;
-      *sum <<= *sum + yi;
-    }
-    for( n=0; n<nSpec; ++n){
-      CellField& yi = cellFM.field_ref(yiTags[n]);
-      yi <<= yi / *sum;
-    }
+      SpatFldPtr<CellField> sum  = SpatialFieldStore::get<CellField>(temp);
+      *sum<<=0.0;
+      for( n=0; n<nSpec; ++n ){
+        CellField& yi = cellFM.field_ref(yiTags[n]);
+        yi <<= n + 1 + xcoord;
+        *sum <<= *sum + yi;
+      }
+      BOOST_FOREACH( Expr::Tag yiTag, yiTags){
+        CellField& yi = cellFM.field_ref(yiTag);
+        yi <<= yi / *sum;
+      }
 
     mixtureTree.lock_fields( fml );  // prevent fields from being deallocated so that we can get them after graph execution.
     speciesTree.lock_fields( fml );
