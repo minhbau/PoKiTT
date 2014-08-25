@@ -14,6 +14,7 @@
 #include <expression/ExprLib.h>
 
 #include <spatialops/structured/Grid.h>
+#include <spatialops/structured/FieldComparisons.h>
 
 #include <boost/lexical_cast.hpp>
 #include <boost/timer.hpp>
@@ -140,48 +141,40 @@ int main(){
       std::cout << "tree time " << treetimer.elapsed() << std::endl;
 
       CellField& visMix = cellFM.field_ref(visMixTag);
-
 #ifdef ENABLE_CUDA
       visMix.add_device(CPU_INDEX);
 #endif
 
       std::vector< std::vector<double> > massfracs;
-       for( i=0; i<*ptit+2; ++i){
-         std::vector<double> massfrac;
-         double sum = 0.0;
-         for( n=0; n<nSpec; ++n){
-           massfrac.push_back(1 + n + (i-0.5)/ *ptit);
-           sum+=massfrac[n];
-         }
-         for( n=0; n<nSpec; ++n)
-           massfrac[n] = massfrac[n]/sum;
-         massfracs.push_back(massfrac);
-       }
-
-       std::vector<double> tVec;
-       for( i=0; i<*ptit+2; ++i)
-         tVec.push_back( 500.0 + 1000.0 * (i-0.5)/ *ptit);
-
-       std::vector<double> results(*ptit+2);
-       i=0;
-       std::vector<double>::const_iterator itend = tVec.end();
-       std::vector<double>::const_iterator itemp;
-       for(itemp = tVec.begin(); itemp!=itend; ++itemp, ++i){
-         mixTrans->thermo().setState_TPY( *itemp, refPressure, &massfracs[i][0]);
-        results[i]=mixTrans->viscosity();
-      }
-
-      std::vector<double>::iterator rit = results.begin();
-      itemp = tVec.begin();
-      for ( CellField::const_iterator ivis= visMix.begin(); ivis!= visMix.end(); ++rit, ++ivis, ++itemp){
-        const double err = (*rit-*ivis)/ *rit;
-        if(fabs(err) >= 1e-12) {
-          std::cout << "error " << err << std::endl;
-          isFailed = true;
+      for( i=0; i<*ptit+2; ++i){
+        std::vector<double> massfrac;
+        double sum = 0.0;
+        for( n=0; n<nSpec; ++n){
+          massfrac.push_back(1 + n + (i-0.5)/ *ptit);
+          sum+=massfrac[n];
         }
+        for( n=0; n<nSpec; ++n)
+          massfrac[n] = massfrac[n]/sum;
+        massfracs.push_back(massfrac);
       }
-    }
-  }
+
+      std::vector<double> tVec;
+      for( i=0; i<*ptit+2; ++i)
+        tVec.push_back( 500.0 + 1000.0 * (i-0.5)/ *ptit);
+
+      std::vector< vector<double> >::iterator imass = massfracs.begin();
+      std::vector<double>::const_iterator itemp = tVec.begin();
+      SpatFldPtr<CellField> canteraResult  = SpatialFieldStore::get<CellField>(visMix);
+      for(CellField::iterator icant = canteraResult->begin(); icant!=canteraResult->end(); ++itemp, ++imass, ++icant){
+        mixTrans->thermo().setState_TPY( *itemp, refPressure, &(*imass)[0]);
+        *icant=mixTrans->viscosity();
+      }
+
+      isFailed = field_not_equal(visMix, *canteraResult, 1e-12);
+
+    } // number of points
+
+  } // try
   catch( Cantera::CanteraError& ){
     Cantera::showErrors();
   }
