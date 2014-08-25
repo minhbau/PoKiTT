@@ -15,6 +15,7 @@
 #include <expression/ExprLib.h>
 
 #include <spatialops/structured/Grid.h>
+#include <spatialops/structured/FieldComparisons.h>
 
 #include <boost/lexical_cast.hpp>
 #include <boost/timer.hpp>
@@ -164,26 +165,19 @@ int main(){
       for( i=0; i<*ptit+2; ++i)
         tVec.push_back( 500.0 + 1000.0 * (i-0.5)/ *ptit);
 
-      std::vector<double> results(*ptit+2);
-      i=0;
-      std::vector<double>::const_iterator itend = tVec.end();
-      std::vector<double>::const_iterator itemp;
-      for(itemp = tVec.begin(); itemp!=itend; ++itemp, ++i){
-        mixTrans->thermo().setState_TPY( *itemp, refPressure, &massfracs[i][0]);
-        results[i]=mixTrans->thermalConductivity();
-      }
+      std::vector< vector<double> >::iterator imass = massfracs.begin();
+      std::vector<double>::const_iterator itemp = tVec.begin();
+      SpatFldPtr<CellField> canteraResult  = SpatialFieldStore::get<CellField>(tCondMix);
 
-      std::vector<double>::iterator rit = results.begin();
-      itemp = tVec.begin();
-      for ( CellField::const_iterator itc= tCondMix.begin(); itc!= tCondMix.end(); ++rit, ++itc, ++itemp){
-        const double err = (*rit-*itc)/ *rit;
-        if(fabs(err) >= 1e-12) {
-          std::cout<< "error = " << err << std::endl;
-          isFailed = true;
-        }
+      for(CellField::iterator icant = canteraResult->begin(); icant!=canteraResult->end(); ++itemp, ++imass, ++icant){
+        mixTrans->thermo().setState_TPY( *itemp, refPressure, &(*imass)[0]);
+        *icant=mixTrans->thermalConductivity();
       }
-    }
-  }
+      isFailed = field_not_equal(tCondMix, *canteraResult, 1e-12);
+
+    } // number of points
+
+  } // try
   catch( Cantera::CanteraError& ){
     Cantera::showErrors();
   }
