@@ -162,7 +162,7 @@ int main(){
         massfracs.push_back(massfrac);
       }
 
-      std::vector< vector<double> >::iterator imass = massfracs.begin();
+      std::vector< std::vector<double> >::iterator imass = massfracs.begin();
       std::vector<double>::const_iterator itemp = tVec.begin();
       SpatFldPtr<CellField> canteraResult  = SpatialFieldStore::get<CellField>(tCondMix);
 
