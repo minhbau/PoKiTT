@@ -42,7 +42,8 @@ int main(){
       mixTrans = dynamic_cast<Cantera::MixTransport*>( transport );
     else {
       std::cout<<"error, transport not mixture\ntransport model is " << transport->model() << std::endl;
-      return -1;}
+      return -1;
+    }
 
     const int nSpec=mixTrans->thermo().nSpecies();
     size_t n;
@@ -52,12 +53,9 @@ int main(){
     typedef Expr::PlaceHolder <CellField > Temperature;
     typedef Expr::PlaceHolder <CellField> Pressure;
     typedef Expr::PlaceHolder <CellField> MassFracs;
-    typedef DiffusionCoeff <CellField> DiffusionCoeffMix;
     typedef MixtureMolWeight <CellField> MixtureMolWeight;
+    typedef DiffusionCoeff <CellField> DiffusionCoeffMix;
 
-    Expr::TagList diffusionCoeffMixTags;
-    for( n=0; n<nSpec; ++n )
-      diffusionCoeffMixTags.push_back( Expr::Tag( "Di" + boost::lexical_cast<std::string>(n), Expr::STATE_NONE ) );
     const Expr::Tag tTag ( "Temperature"   , Expr::STATE_NONE);
     const Expr::Tag pTag ( "Pressure"   , Expr::STATE_NONE);
     const Expr::Tag yiTag ( "yi", Expr::STATE_NONE );
@@ -68,6 +66,9 @@ int main(){
       yiTags.push_back( Expr::Tag(name.str(),yiTag.context()) );
     }
     const Expr::Tag mmwTag( "mmw", Expr::STATE_NONE);
+    Expr::TagList diffusionCoeffMixTags;
+    for( n=0; n<nSpec; ++n )
+      diffusionCoeffMixTags.push_back( Expr::Tag( "Di" + boost::lexical_cast<std::string>(n), Expr::STATE_NONE ) );
 
     Expr::ExpressionFactory exprFactory;
 
@@ -86,7 +87,6 @@ int main(){
     }
 
     std::vector<int> ptvec;
-
 #ifdef TIMINGS
     ptvec.push_back(8*8*8);
     ptvec.push_back(16*16*16);
@@ -100,18 +100,16 @@ int main(){
 #endif
 
     for( std::vector<int>::iterator ptit = ptvec.begin(); ptit!= ptvec.end(); ++ptit){
-
       size_t i;
 
       So::IntVec npts(*ptit,1,1);
-      std::vector<double> length(3,1.0);
-      So::Grid grid( npts, length );
-
       const So::BoundaryCellInfo cellBCInfo = So::BoundaryCellInfo::build<CellField>(false,false,false);
       const So::GhostData cellGhosts(1);
       const So::MemoryWindow vwindow( So::get_window_with_ghost(npts,cellGhosts,cellBCInfo) );
-
       CellField xcoord( vwindow, cellBCInfo, cellGhosts, NULL );
+
+      std::vector<double> length(3,1.0);
+      So::Grid grid( npts, length );
       grid.set_coord<SpatialOps::XDIR>( xcoord );
 #     ifdef ENABLE_CUDA
       xcoord.add_device( GPU_INDEX );
@@ -119,31 +117,29 @@ int main(){
 
       Expr::FieldManagerList fml;
       tree.register_fields( fml );
-
       fml.allocate_fields( Expr::FieldAllocInfo( npts, 0, 0, false, false, false ) );
-
       tree.bind_fields( fml );
 
       using namespace SpatialOps;
       Expr::FieldMgrSelector<CellField>::type& cellFM = fml.field_manager< CellField>();
+
       CellField& temp = cellFM.field_ref(tTag);
-      SpatFldPtr<CellField> sum  = SpatialFieldStore::get<CellField>(temp);
-
-      *sum<<=0.0;
-      for( n=0; n<nSpec; ++n ){
-        CellField& xi = cellFM.field_ref(yiTags[n]);
-        xi <<= n + 1 + xcoord;
-        *sum <<= *sum + xi;
-      }
-      for( n=0; n<nSpec; ++n){
-        CellField& xi = cellFM.field_ref(yiTags[n]);
-        xi <<= xi / *sum;
-      }
-
       temp <<= 500.0 + 1000.0*xcoord;
 
       CellField& p = cellFM.field_ref(pTag);
       p <<= refPressure;
+
+      SpatFldPtr<CellField> sum  = SpatialFieldStore::get<CellField>(temp);
+      *sum<<=0.0;
+      for( n=0; n<nSpec; ++n ){
+        CellField& yi = cellFM.field_ref(yiTags[n]);
+        yi <<= n + 1 + xcoord;
+        *sum <<= *sum + yi;
+      }
+      for( n=0; n<nSpec; ++n){
+        CellField& yi = cellFM.field_ref(yiTags[n]);
+        yi <<= yi / *sum;
+      }
 
       tree.lock_fields(fml);  // prevent fields from being deallocated so that we can get them after graph execution.
 
@@ -154,8 +150,7 @@ int main(){
 
 #ifdef ENABLE_CUDA
       for( n=0; n<nSpec; ++n){
-        CellField& d = fml.field_manager<CellField>().field_ref(diffusionCoeffMixTags[n]);
-
+        CellField& d = cellFM.field_ref(diffusionCoeffMixTags[n]);
         d.add_device(CPU_INDEX);
       }
 #endif
@@ -198,8 +193,9 @@ int main(){
         isFailed = field_not_equal(cellFM.field_ref(diffusionCoeffMixTags[n]), *canteraResults[n], 1e-12);
       }
 
-    }
-  }
+    } // number of points
+
+  } // try
   catch( Cantera::CanteraError& ){
     Cantera::showErrors();
   }

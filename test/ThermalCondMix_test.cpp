@@ -42,21 +42,22 @@ int main(){
       mixTrans = dynamic_cast<Cantera::MixTransport*>( transport );
     else {
       std::cout<<"error, transport not mixture\ntransport model is " << transport->model() << std::endl;
-      return -1;}
+      return -1;
+    }
 
     const int nSpec=mixTrans->thermo().nSpecies();
     size_t n;
     const double refPressure=mixTrans->thermo().pressure();
     const std::vector<double>& molecularWeights = mixTrans->thermo().molecularWeights();
 
-    typedef Expr::PlaceHolder <CellField> Temp;
-    typedef Expr::PlaceHolder <CellField> MassFracs;
+    typedef Expr::PlaceHolder   <CellField> Temp;
+    typedef Expr::PlaceHolder   <CellField> MassFracs;
+    typedef MixtureMolWeight    <CellField> MixtureMolWeight;
     typedef ThermalConductivity <CellField> ThermalConductivityMix;
-    typedef MixtureMolWeight <CellField> MixtureMolWeight;
 
     Expr::ExpressionFactory exprFactory;
 
-    const Expr::Tag tCondMixTag ( "Thermal Conductivity Mix", Expr::STATE_NONE);
+    const Expr::Tag tTag ( "Temperature"   , Expr::STATE_NONE);
     const Expr::Tag yiTag ( "yi", Expr::STATE_NONE );
     Expr::TagList yiTags;
     for( n=0; n<nSpec; ++n ){
@@ -64,8 +65,8 @@ int main(){
       name << yiTag.name() << "_" << n;
       yiTags.push_back( Expr::Tag(name.str(),yiTag.context()) );
     }
-    const Expr::Tag tTag ( "Temperature"   , Expr::STATE_NONE);
     const Expr::Tag mmwTag( "mmw", Expr::STATE_NONE);
+    const Expr::Tag tCondMixTag ( "Thermal Conductivity Mix", Expr::STATE_NONE);
 
     exprFactory.register_expression( new Temp ::Builder (tTag                 ) );
     for( n=0; n<nSpec; ++n)
@@ -79,8 +80,8 @@ int main(){
       std::ofstream fout( "ThermalConductivity.dot" );
       tree.write_tree(fout);
     }
-    std::vector<int> ptvec;
 
+    std::vector<int> ptvec;
 #ifdef TIMINGS
     ptvec.push_back(8*8*8);
     ptvec.push_back(16*16*16);
@@ -94,18 +95,16 @@ int main(){
 #endif
 
     for( std::vector<int>::iterator ptit = ptvec.begin(); ptit!= ptvec.end(); ++ptit){
-
       size_t i;
 
       So::IntVec npts(*ptit,1,1);
-      std::vector<double> length(3,1.0);
-      So::Grid grid( npts, length );
-
       const So::BoundaryCellInfo cellBCInfo = So::BoundaryCellInfo::build<CellField>(false,false,false);
       const So::GhostData cellGhosts(1);
       const So::MemoryWindow vwindow( So::get_window_with_ghost(npts,cellGhosts,cellBCInfo) );
-
       CellField xcoord( vwindow, cellBCInfo, cellGhosts, NULL );
+
+      std::vector<double> length(3,1.0);
+      So::Grid grid( npts, length );
       grid.set_coord<SpatialOps::XDIR>( xcoord );
 #     ifdef ENABLE_CUDA
       xcoord.add_device( GPU_INDEX );
@@ -113,16 +112,16 @@ int main(){
 
       Expr::FieldManagerList fml;
       tree.register_fields( fml );
-
       fml.allocate_fields( Expr::FieldAllocInfo( npts, 0, 0, false, false, false ) );
-
       tree.bind_fields( fml );
 
       using namespace SpatialOps;
       Expr::FieldMgrSelector<CellField>::type& cellFM = fml.field_manager< CellField>();
-      CellField& temp = cellFM.field_ref(tTag);
-      SpatFldPtr<CellField> sum  = SpatialFieldStore::get<CellField>(temp);
 
+      CellField& temp = cellFM.field_ref(tTag);
+      temp <<= 500.0 + 1000.0*xcoord;
+
+      SpatFldPtr<CellField> sum  = SpatialFieldStore::get<CellField>(temp);
       *sum<<=0.0;
       for( n=0; n<nSpec; ++n ){
         CellField& yi = cellFM.field_ref(yiTags[n]);
@@ -133,8 +132,6 @@ int main(){
         CellField& yi = cellFM.field_ref(yiTags[n]);
         yi <<= yi / *sum;
       }
-
-      temp <<= 500.0 + 1000.0*xcoord;
 
       tree.lock_fields(fml);  // prevent fields from being deallocated so that we can get them after graph execution.
 
