@@ -63,10 +63,10 @@ int main()
       name << "yi_" << n;
       yiTags.push_back( Expr::Tag( name.str(), Expr::STATE_NONE ) );
     }
-    Expr::Tag hcMixTag ("hc mix", Expr::STATE_NONE);
-    Expr::TagList hcTags;
+    Expr::Tag cpMixTag ("cp mix", Expr::STATE_NONE);
+    Expr::TagList cpTags;
     for( n=0; n<nSpec; ++n ){
-      hcTags.push_back( Expr::Tag( "hc" + boost::lexical_cast<std::string>(n), Expr::STATE_NONE ) );
+      cpTags.push_back( Expr::Tag( "cp" + boost::lexical_cast<std::string>(n), Expr::STATE_NONE ) );
     }
 
     Expr::ExpressionFactory exprFactory;
@@ -76,14 +76,14 @@ int main()
     BOOST_FOREACH( Expr::Tag yiTag, yiTags){
       exprFactory.register_expression( new MassFracs::Builder (yiTag) );
     }
-    const Expr::ExpressionID hcMixture_id = exprFactory.register_expression( new HeatCapacity::Builder( hcMixTag, tTag, yiTag ));
-    std::set< Expr::ExpressionID > hcSpecies_id;
+    const Expr::ExpressionID cpMixture_id = exprFactory.register_expression( new HeatCapacity::Builder( cpMixTag, tTag, yiTag ));
+    std::set< Expr::ExpressionID > cpSpecies_id;
     for( n=0; n<nSpec; ++n ){
-      hcSpecies_id.insert(exprFactory.register_expression( new SpeciesHeatCapacity::Builder(hcTags[n], tTag, n) ));
+      cpSpecies_id.insert(exprFactory.register_expression( new SpeciesHeatCapacity::Builder(cpTags[n], tTag, n) ));
     }
 
-    Expr::ExpressionTree mixtureTree( hcMixture_id, exprFactory, 0 );
-    Expr::ExpressionTree speciesTree( hcSpecies_id, exprFactory, 0 );
+    Expr::ExpressionTree mixtureTree( cpMixture_id, exprFactory, 0 );
+    Expr::ExpressionTree speciesTree( cpSpecies_id, exprFactory, 0 );
 
     {
       std::ofstream mixture( "EnthalpyMixture.dot" );
@@ -161,9 +161,9 @@ int main()
 #     ifdef TIMINGS
       std::cout << "PoKiTT mixture cp time  " << mixTimer.elapsed() << std::endl;
 #     endif
-      CellField& hc = fml.field_manager<CellField>().field_ref(hcMixTag);
+      CellField& cp = fml.field_manager<CellField>().field_ref(cpMixTag);
 #     ifdef ENABLE_CUDA
-      hc.add_device(CPU_INDEX);
+      cp.add_device(CPU_INDEX);
 #     endif
 
       boost::timer specTimer;
@@ -200,7 +200,7 @@ int main()
 #     ifdef TIMINGS
       std::cout << "Cantera mixture cp time " << hMixtimer.elapsed() << std::endl;
 #     endif
-      isFailed = field_not_equal(hc, *canteraResult, 1e-14);
+      isFailed = field_not_equal(cp, *canteraResult, 1e-14);
 
       std::vector< SpatFldPtr<CellField> > canteraResults;
       for( n=0; n < nSpec; ++n){
@@ -221,7 +221,7 @@ int main()
 
       for( n=0; n<nSpec; ++n){
         *canteraResults[n] <<= *canteraResults[n] / molecularWeights[n];
-        isFailed = field_not_equal(cellFM.field_ref(hcTags[n]), *canteraResults[n], 1e-14);
+        isFailed = field_not_equal(cellFM.field_ref(cpTags[n]), *canteraResults[n], 1e-14);
       }
 
     } // number of points
