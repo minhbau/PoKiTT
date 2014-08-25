@@ -82,17 +82,17 @@ int main(){
     }
 
     std::vector<int> ptvec;
-#ifdef TIMINGS
+#   ifdef TIMINGS
     ptvec.push_back(8*8*8);
     ptvec.push_back(16*16*16);
     ptvec.push_back(32*32*32);
     ptvec.push_back(64*64*64);
-#ifdef ENABLE_CUDA
+#   ifdef ENABLE_CUDA
     ptvec.push_back(128*128*128);
-#endif
-#else
+#   endif
+#   else
     ptvec.push_back(10);
-#endif
+#   endif
 
     for( std::vector<int>::iterator ptit = ptvec.begin(); ptit!= ptvec.end(); ++ptit){
       size_t i;
@@ -141,9 +141,13 @@ int main(){
       std::cout << "tree time " << treetimer.elapsed() << std::endl;
 
       CellField& tCondMix = cellFM.field_ref(tCondMixTag);
-#ifdef ENABLE_CUDA
+#     ifdef ENABLE_CUDA
       tCondMix.add_device(CPU_INDEX);
-#endif
+#     endif
+
+      std::vector<double> tVec;
+      for( i=0; i<*ptit+2; ++i)
+        tVec.push_back( 500.0 + 1000.0 * (i-0.5)/ *ptit);
 
       std::vector< std::vector<double> > massfracs;
       for( i=0; i<*ptit+2; ++i){
@@ -157,10 +161,6 @@ int main(){
           massfrac[n] = massfrac[n]/sum;
         massfracs.push_back(massfrac);
       }
-
-      std::vector<double> tVec;
-      for( i=0; i<*ptit+2; ++i)
-        tVec.push_back( 500.0 + 1000.0 * (i-0.5)/ *ptit);
 
       std::vector< vector<double> >::iterator imass = massfracs.begin();
       std::vector<double>::const_iterator itemp = tVec.begin();

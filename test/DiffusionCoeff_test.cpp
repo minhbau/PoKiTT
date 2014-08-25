@@ -87,17 +87,17 @@ int main(){
     }
 
     std::vector<int> ptvec;
-#ifdef TIMINGS
+#   ifdef TIMINGS
     ptvec.push_back(8*8*8);
     ptvec.push_back(16*16*16);
     ptvec.push_back(32*32*32);
     ptvec.push_back(64*64*64);
-#ifdef ENABLE_CUDA
+#   ifdef ENABLE_CUDA
     ptvec.push_back(128*128*128);
-#endif
-#else
+#   endif
+#   else
     ptvec.push_back(10);
-#endif
+#   endif
 
     for( std::vector<int>::iterator ptit = ptvec.begin(); ptit!= ptvec.end(); ++ptit){
       size_t i;
@@ -155,6 +155,10 @@ int main(){
       }
 #endif
 
+      std::vector<double> tVec;
+      for( i=0; i<*ptit+2; ++i)
+        tVec.push_back( 500.0 + 1000.0 * (i-0.5)/ *ptit);
+
       std::vector< std::vector<double> > massfracs;
       for( i=0; i<*ptit+2; ++i){
         std::vector<double> massfrac;
@@ -168,17 +172,13 @@ int main(){
         massfracs.push_back(massfrac);
       }
 
-      std::vector<double> tVec;
-      for( i=0; i<*ptit+2; ++i)
-        tVec.push_back( 500.0 + 1000.0 * (i-0.5)/ *ptit);
-
       std::vector< SpatFldPtr<CellField> > canteraResults;
       for( n=0; n < nSpec; ++n){
         canteraResults.push_back(SpatialFieldStore::get<CellField>(temp));
       }
       i=0;
       std::vector<double>::const_iterator itemp = tVec.begin();
-      std::vector< vector<double> >::iterator imass = massfracs.begin();
+      std::vector< std::vector<double> >::iterator imass = massfracs.begin();
       std::vector<double> d_result(nSpec,0.0);
       boost::timer cTimer;
       for( i=0; i<*ptit+2; ++itemp, ++imass, ++i){
