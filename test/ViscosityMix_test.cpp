@@ -121,13 +121,13 @@ int main(){
 
       *sum<<=0.0;
       for( n=0; n<nSpec; ++n ){
-        CellField& xi = cellFM.field_ref(yiTags[n]);
-        xi <<= n + 1 + xcoord;
-        *sum <<= *sum + xi;
+        CellField& yi = cellFM.field_ref(yiTags[n]);
+        yi <<= n + 1 + xcoord;
+        *sum <<= *sum + yi;
       }
       for( n=0; n<nSpec; ++n){
-        CellField& xi = cellFM.field_ref(yiTags[n]);
-        xi <<= xi / *sum;
+        CellField& yi = cellFM.field_ref(yiTags[n]);
+        yi <<= yi / *sum;
       }
 
       temp <<= 500.0 + 1000.0*xcoord;

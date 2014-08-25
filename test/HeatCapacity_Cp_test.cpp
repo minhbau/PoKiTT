@@ -143,13 +143,13 @@ int main()
       SpatFldPtr<CellField> sum  = SpatialFieldStore::get<CellField>(temp);
       *sum<<=0.0;
       for( n=0; n<nSpec; ++n ){
-        CellField& xi = fml.field_manager<CellField>().field_ref(yiTags[n]);
-        xi <<= n + 1 + xcoord;
-        *sum <<= *sum + xi;
+        CellField& yi = fml.field_manager<CellField>().field_ref(yiTags[n]);
+        yi <<= n + 1 + xcoord;
+        *sum <<= *sum + yi;
       }
       for( n=0; n<nSpec; ++n){
-        CellField& xi = fml.field_manager<CellField>().field_ref(yiTags[n]);
-        xi <<= xi / *sum;
+        CellField& yi = fml.field_manager<CellField>().field_ref(yiTags[n]);
+        yi <<= yi / *sum;
       }
 
       mixtureTree.lock_fields( fml );  // prevent fields from being deallocated so that we can get them after graph execution.
