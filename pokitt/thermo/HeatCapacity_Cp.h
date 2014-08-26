@@ -141,7 +141,7 @@ public:
      */
     Builder( const Expr::Tag& resultTag,
              const Expr::Tag& tTag,
-             const int n);
+             const int n );
 
     Expr::ExpressionBase* build() const;
 
@@ -183,7 +183,6 @@ HeatCapacity_Cp( const Expr::Tag& tTag,
     name << massFracTag.name() << "_" << n;
     massFracTags_.push_back( Expr::Tag(name.str(),massFracTag.context()) );
   }
-
 }
 
 //--------------------------------------------------------------------
@@ -258,33 +257,32 @@ evaluate()
   for( size_t n=0; n<nSpec_; ++n ){
     spThermo.reportParams(n, polyType, &c[0], minT, maxT, refPressure);
     switch (polyType) {
-    case SIMPLE:
-      cp <<= cp + *massFracs_[n] * c[3]
-                                 / molecularWeights[n];
-      break;
-      /* polynomials are applicable in two temperature ranges - high and low
-       * If the temperature is out of range, the value is set to the value at the min or max temp
-       */
-    case NASA2:
-      for( std::vector<double>::iterator ic = c.begin() + 1; ic!=c.end(); ++ic)
-        *ic *= GasConstant / molecularWeights[n]; // dimensionalize coefficients
-      cp <<= cp + *massFracs_[n] * cond( *t_ <= c[0] && *t_ >= minT, c[1] + c[2] * *t_ + c[ 3] * t2 + c[ 4] * t3 + c[ 5] * t4 ) // if low temp
-                                       ( *t_ >  c[0] && *t_ <= maxT, c[8] + c[9] * *t_ + c[10] * t2 + c[11] * t3 + c[12] * t4 )  // else if high temp
-                                       ( *t_ < minT, c[1] + c[2] * minT + c[ 3] * minT * minT + c[ 4] * pow(minT,3) + c[ 5] * pow(minT,4) )  // else if out of bounds - low
-                                       (             c[8] + c[9] * maxT + c[10] * maxT * maxT + c[11] * pow(maxT,3) + c[12] * pow(maxT,4) ); // else out of bounds - high
+      case SIMPLE:
+        cp <<= cp + *massFracs_[n] * c[3] / molecularWeights[n];
+        break;
+        /* polynomials are applicable in two temperature ranges - high and low
+         * If the temperature is out of range, the value is set to the value at the min or max temp
+         */
+      case NASA2:
+        for( std::vector<double>::iterator ic = c.begin() + 1; ic!=c.end(); ++ic)
+          *ic *= GasConstant / molecularWeights[n]; // dimensionalize coefficients
+        cp <<= cp + *massFracs_[n] * cond( *t_ <= c[0] && *t_ >= minT, c[1] + c[2] * *t_ + c[ 3] * t2 + c[ 4] * t3 + c[ 5] * t4 ) // if low temp
+                                         ( *t_ >  c[0] && *t_ <= maxT, c[8] + c[9] * *t_ + c[10] * t2 + c[11] * t3 + c[12] * t4 )  // else if high temp
+                                         ( *t_ < minT, c[1] + c[2] * minT + c[ 3] * minT * minT + c[ 4] * pow(minT,3) + c[ 5] * pow(minT,4) )  // else if out of bounds - low
+                                         (             c[8] + c[9] * maxT + c[10] * maxT * maxT + c[11] * pow(maxT,3) + c[12] * pow(maxT,4) ); // else out of bounds - high
 
-      break;
-    case SHOMATE2:
-      double minTScaled = minT/1000;
-      double maxTScaled = maxT/1000;
-      for( std::vector<double>::iterator ic = c.begin() + 1; ic!=c.end(); ++ic )
-        *ic *= 1e3 / molecularWeights[n]; // scale the coefficients to keep units consistent
-      cp <<= cp + *massFracs_[n] * cond( *t_ <= c[0] && *t_ >= minT, c[1] + c[2] * *t_*1e-3 + c[ 3] * t2*1e-6 + c[ 4] * t3*1e-9 + c[ 5] * recipRecipT*1e6 ) // if low temp
-                                       ( *t_ >  c[0] && *t_ <= maxT, c[8] + c[9] * *t_*1e-3 + c[10] * t2*1e-6 + c[11] * t3*1e-9 + c[12] * recipRecipT*1e6 )  // else if high temp
-                                       ( *t_ < minT, c[1] + c[2] * minTScaled + c[ 3] * minTScaled * minTScaled + c[ 4] * pow(minTScaled,3) + c[ 5] * pow(minTScaled,-2) )  // else if out of bounds - low
-                                       (             c[8] + c[9] * maxTScaled + c[10] * maxTScaled * maxTScaled + c[11] * pow(maxTScaled,3) + c[12] * pow(maxTScaled,-2) ); // else out of bounds - high
+        break;
+      case SHOMATE2:
+        double minTScaled = minT/1000;
+        double maxTScaled = maxT/1000;
+        for( std::vector<double>::iterator ic = c.begin() + 1; ic!=c.end(); ++ic )
+          *ic *= 1e3 / molecularWeights[n]; // scale the coefficients to keep units consistent
+        cp <<= cp + *massFracs_[n] * cond( *t_ <= c[0] && *t_ >= minT, c[1] + c[2] * *t_*1e-3 + c[ 3] * t2*1e-6 + c[ 4] * t3*1e-9 + c[ 5] * recipRecipT*1e6 ) // if low temp
+                                         ( *t_ >  c[0] && *t_ <= maxT, c[8] + c[9] * *t_*1e-3 + c[10] * t2*1e-6 + c[11] * t3*1e-9 + c[12] * recipRecipT*1e6 )  // else if high temp
+                                         ( *t_ < minT, c[1] + c[2] * minTScaled + c[ 3] * minTScaled * minTScaled + c[ 4] * pow(minTScaled,3) + c[ 5] * pow(minTScaled,-2) )  // else if out of bounds - low
+                                         (             c[8] + c[9] * maxTScaled + c[10] * maxTScaled * maxTScaled + c[11] * pow(maxTScaled,3) + c[12] * pow(maxTScaled,-2) ); // else out of bounds - high
 
-      break;
+        break;
     }
   }
 }
@@ -317,11 +315,11 @@ template< typename FieldT >
 SpeciesHeatCapacity_Cp<FieldT>::
 SpeciesHeatCapacity_Cp( const Expr::Tag& tTag,
                         const int n )
-  : Expr::Expression<FieldT>(),
-    tTag_( tTag ),
-    tPowerTags_( TemperaturePowers<FieldT>::temperature_powers_tags() ),
-    gasMix_( CanteraObjects::get_gasmix() ),
-    n_ ( n )
+ : Expr::Expression<FieldT>(),
+   tTag_( tTag ),
+   tPowerTags_( TemperaturePowers<FieldT>::temperature_powers_tags() ),
+   gasMix_( CanteraObjects::get_gasmix() ),
+   n_ ( n )
 {
   this->set_gpu_runnable( true );
 }

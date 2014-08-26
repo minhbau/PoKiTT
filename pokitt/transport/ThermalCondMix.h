@@ -93,14 +93,14 @@ public:
 template< typename FieldT >
 ThermalConductivity<FieldT>::
 ThermalConductivity( const Expr::Tag& temperatureTag,
-    const Expr::Tag& massFracTag,
-    const Expr::Tag& mmwTag )
-    : Expr::Expression<FieldT>(),
-      temperatureTag_( temperatureTag ),
-      mmwTag_( mmwTag ),
-      trans_( dynamic_cast<Cantera::MixTransport*>( CanteraObjects::get_transport() )),
-      nSpec_( trans_->thermo().nSpecies() )
-      {
+                     const Expr::Tag& massFracTag,
+                     const Expr::Tag& mmwTag )
+  : Expr::Expression<FieldT>(),
+    temperatureTag_( temperatureTag ),
+    mmwTag_( mmwTag ),
+    trans_( dynamic_cast<Cantera::MixTransport*>( CanteraObjects::get_transport() )),
+    nSpec_( trans_->thermo().nSpecies() )
+{
   this->set_gpu_runnable( true );
 
   massFracTags_.clear();
@@ -109,7 +109,7 @@ ThermalConductivity( const Expr::Tag& temperatureTag,
     name << massFracTag.name() << "_" << n;
     massFracTags_.push_back( Expr::Tag(name.str(),massFracTag.context()) );
   }
-      }
+}
 
 //--------------------------------------------------------------------
 
@@ -155,22 +155,22 @@ void
 ThermalConductivity<FieldT>::
 evaluate()
 {
-#ifdef TIMINGS
-boost::timer timer;
-#endif
+# ifdef TIMINGS
+  boost::timer timer;
+# endif
   using namespace SpatialOps;
 
   FieldT& result = this->value();
 
   // pre-compute powers of temperature used in polynomial evaluations
-  SpatFldPtr<FieldT> logtPtr  = SpatialFieldStore::get<FieldT>(*temperature_); // log(t)
+  SpatFldPtr<FieldT> logtPtr   = SpatialFieldStore::get<FieldT>(*temperature_); // log(t)
   SpatFldPtr<FieldT> logttPtr  = SpatialFieldStore::get<FieldT>(*temperature_); // log(t)*log(t)
-  SpatFldPtr<FieldT> logtttPtr  = SpatialFieldStore::get<FieldT>(*temperature_); // log(t)*log(t)*log(t)
+  SpatFldPtr<FieldT> logtttPtr = SpatialFieldStore::get<FieldT>(*temperature_); // log(t)*log(t)*log(t)
   SpatFldPtr<FieldT> sqrtTPtr; // sqrt(t)
   SpatFldPtr<FieldT> logt4Ptr; // pow( log(t),4 )
   if( trans_->model() == Cantera::cMixtureAveraged ) { // as opposed to CK mode
-    logt4Ptr  = SpatialFieldStore::get<FieldT>(*temperature_);
-    sqrtTPtr  = SpatialFieldStore::get<FieldT>(*temperature_);
+    logt4Ptr = SpatialFieldStore::get<FieldT>(*temperature_);
+    sqrtTPtr = SpatialFieldStore::get<FieldT>(*temperature_);
   }
 
   SpatFldPtr<FieldT> speciesTCondPtr  = SpatialFieldStore::get<FieldT>(*temperature_); // temporary to store the thermal conductivity for an individual species
@@ -180,17 +180,17 @@ boost::timer timer;
 
   FieldT& speciesTCond = *speciesTCondPtr;
 
-  FieldT& logt = *logtPtr;
-  FieldT& logtt = *logttPtr;
+  FieldT& logt   = *logtPtr;
+  FieldT& logtt  = *logttPtr;
   FieldT& logttt = *logtttPtr;
-  FieldT& logt4 = *logt4Ptr;
-  FieldT& sqrtT = *sqrtTPtr;
+  FieldT& logt4  = *logt4Ptr;
+  FieldT& sqrtT  = *sqrtTPtr;
 
   FieldT& sum = *sumPtr;
   FieldT& inverseSum = *inverseSumPtr;
 
-  logt <<= log( *temperature_ );
-  logtt <<= logt * logt;
+  logt   <<= log( *temperature_ );
+  logtt  <<= logt * logt;
   logttt <<= logtt * logt;
   if( trans_->model() == Cantera::cMixtureAveraged ) {
     logt4 <<= logttt * logt;
@@ -217,9 +217,9 @@ boost::timer timer;
   }
 
   result <<= 0.5 * ( sum * *mmw_ + 1 / (inverseSum * *mmw_) ); // mixing rule
-#ifdef TIMINGS
-    std::cout<<"tc time "<<timer.elapsed()<<std::endl;
-#endif
+# ifdef TIMINGS
+  std::cout<<"tc time "<<timer.elapsed()<<std::endl;
+# endif
 }
 
 //--------------------------------------------------------------------

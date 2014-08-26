@@ -10,13 +10,14 @@ template< typename FieldT >
 class MixtureMolWeight
  : public Expr::Expression<FieldT>
 {
-  Expr::TagList massFracTags_;
-  std::vector<const FieldT*> massFracs_;
   const std::vector<double> specMW_;
   const int nSpec_;
 
-    MixtureMolWeight( const Expr::Tag& massFracTag,
-                      const std::vector<double>& specMw  );
+  Expr::TagList massFracTags_;
+  std::vector<const FieldT*> massFracs_;
+
+  MixtureMolWeight( const Expr::Tag& massFracTag,
+                    const std::vector<double>& specMw  );
 public:
   class Builder : public Expr::ExpressionBuilder
   {
@@ -111,11 +112,11 @@ evaluate()
   using namespace SpatialOps;
   FieldT& mixMW = this->value();
 
-  mixMW <<= 0.0;
-    for( size_t n=0; n<nSpec_; ++n ){
-      mixMW <<= mixMW + *massFracs_[n] / specMW_[n];
-    }
-    mixMW <<= 1.0 / mixMW;
+  mixMW <<= *massFracs_[0] / specMW_[0];
+  for( size_t n=1; n<nSpec_; ++n ){
+    mixMW <<= mixMW + *massFracs_[n] / specMW_[n];
+  }
+  mixMW <<= 1.0 / mixMW;
 }
 
 //--------------------------------------------------------------------

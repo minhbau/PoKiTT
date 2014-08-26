@@ -58,8 +58,8 @@ class DiffusionCoeff
 
   DiffusionCoeff( const Expr::Tag& temperatureTag,
                   const Expr::Tag& pTag,
-                     const Expr::Tag& massFracTag,
-                     const Expr::Tag& mmwTag );
+                  const Expr::Tag& massFracTag,
+                  const Expr::Tag& mmwTag );
 public:
   class Builder : public Expr::ExpressionBuilder
   {
@@ -106,37 +106,37 @@ public:
 template< typename FieldT >
 DiffusionCoeff<FieldT>::
 DiffusionCoeff( const Expr::Tag& temperatureTag,
-    const Expr::Tag& pTag,
-    const Expr::Tag& massFracTag,
-    const Expr::Tag& mmwTag )
-    : Expr::Expression<FieldT>(),
-      temperatureTag_( temperatureTag ),
-      pTag_( pTag ),
-      mmwTag_( mmwTag ),
-      transport_( dynamic_cast<Cantera::MixTransport*>( CanteraObjects::get_transport() )),
-      nSpec_( transport_->thermo().nSpecies() ),
-      pressure_( transport_->thermo().pressure() )
-      {
+                const Expr::Tag& pTag,
+                const Expr::Tag& massFracTag,
+                const Expr::Tag& mmwTag )
+  : Expr::Expression<FieldT>(),
+    temperatureTag_( temperatureTag ),
+    pTag_( pTag ),
+    mmwTag_( mmwTag ),
+    transport_( dynamic_cast<Cantera::MixTransport*>( CanteraObjects::get_transport() )),
+    nSpec_( transport_->thermo().nSpecies() ),
+    pressure_( transport_->thermo().pressure() )
+{
   this->set_gpu_runnable( true );
 
   massFracTags_.clear();
-      for( size_t n=0; n<nSpec_; ++n ){
-        std::ostringstream name;
-        name << massFracTag.name() << "_" << n;
-        massFracTags_.push_back( Expr::Tag(name.str(),massFracTag.context()) );
-      }
+  for( size_t n=0; n<nSpec_; ++n ){
+    std::ostringstream name;
+    name << massFracTag.name() << "_" << n;
+    massFracTags_.push_back( Expr::Tag(name.str(),massFracTag.context()) );
+  }
 
   for( size_t n=0; n<nSpec_; ++n)
     indices_.push_back(std::vector<int>(nSpec_));
 
   size_t ij=0;
-  for( size_t i=0; i<nSpec_; ++i)
-    for( size_t j=i; j<nSpec_; ++j, ++ij){
+  for( size_t i=0; i<nSpec_; ++i ){
+    for( size_t j=i; j<nSpec_; ++j, ++ij ){
       indices_[i][j]=ij;
       indices_[j][i]=ij;
     }
-
-      }
+  }
+}
 
 //--------------------------------------------------------------------
 
@@ -194,28 +194,28 @@ boost::timer timer;
   const FieldT& p = *p_;
 
   //pre-compute powers of log(t) for polynomial evaluation of binary diffusion coefficients
-  SpatFldPtr<FieldT> logtPtr  = SpatialFieldStore::get<FieldT>(*temperature_);
+  SpatFldPtr<FieldT> logtPtr   = SpatialFieldStore::get<FieldT>(*temperature_);
   SpatFldPtr<FieldT> logttPtr  = SpatialFieldStore::get<FieldT>(*temperature_);
-  SpatFldPtr<FieldT> logtttPtr  = SpatialFieldStore::get<FieldT>(*temperature_);
+  SpatFldPtr<FieldT> logtttPtr = SpatialFieldStore::get<FieldT>(*temperature_);
   SpatFldPtr<FieldT> tThreeHalvesPtr;
   SpatFldPtr<FieldT> logt4Ptr;
 
   if( transport_->model() == Cantera::cMixtureAveraged ) { // as opposed to CK mode
-    logt4Ptr  = SpatialFieldStore::get<FieldT>(*temperature_);
-    tThreeHalvesPtr  = SpatialFieldStore::get<FieldT>(*temperature_);
+    logt4Ptr        = SpatialFieldStore::get<FieldT>(*temperature_);
+    tThreeHalvesPtr = SpatialFieldStore::get<FieldT>(*temperature_);
   }
 
-  FieldT& logt = *logtPtr; // log(t)
-  FieldT& logtt = *logttPtr; // log(t)*log(t)
+  FieldT& logt   = *logtPtr; // log(t)
+  FieldT& logtt  = *logttPtr; // log(t)*log(t)
   FieldT& logttt = *logtttPtr; // log(t)*log(t)*log(t)
-  FieldT& logt4 = *logt4Ptr; // pow( log(t), 4)
+  FieldT& logt4  = *logt4Ptr; // pow( log(t), 4)
   FieldT& tThreeHalves = *tThreeHalvesPtr; // t^(3/2)
 
-  logt <<= log( *temperature_ );
-  logtt <<= logt * logt;
+  logt   <<= log( *temperature_ );
+  logtt  <<= logt * logt;
   logttt <<= logtt * logt;
   if( transport_->model() == Cantera::cMixtureAveraged ) {
-    logt4 <<= logttt * logt;
+    logt4        <<= logttt * logt;
     tThreeHalves <<= pow( *temperature_, 1.5 );
   }
 
@@ -231,7 +231,7 @@ boost::timer timer;
   const std::vector<double>& molecularWeights = transport_->thermo().molecularWeights();
 
   std::vector<double> molecularWeightsInv(nSpec_);
-  for( size_t n=0; n<nSpec_; ++n)
+  for( size_t n=0; n<nSpec_; ++n )
     molecularWeightsInv[n] = 1 / molecularWeights[n];
 
 //  for( size_t i=0; i<nSpec_; ++i){
@@ -262,9 +262,9 @@ boost::timer timer;
     *results[i] <<= 1 / ( p * *mmw_ * ( sum1 + sum2 * *massFracs_[i] / ( molecularWeights[i] - molecularWeights[i] * *massFracs_[i] ) ) );
   }
 
-#ifdef TIMINGS
-    std::cout<<"D time "<<timer.elapsed()<<std::endl;
-#endif
+# ifdef TIMINGS
+  std::cout<<"D time "<<timer.elapsed()<<std::endl;
+# endif
 
 }
 

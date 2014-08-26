@@ -155,12 +155,12 @@ public:
 template< typename FieldT >
 Viscosity<FieldT>::
 Viscosity( const Expr::Tag& temperatureTag,
-    const Expr::Tag& massFracTag )
-    : Expr::Expression<FieldT>(),
-      temperatureTag_( temperatureTag ),
-      trans_( dynamic_cast<Cantera::MixTransport*>( CanteraObjects::get_transport() )), // cast gas transport object as mix transport
-      nSpec_( trans_->thermo().nSpecies() )
-      {
+           const Expr::Tag& massFracTag )
+  : Expr::Expression<FieldT>(),
+    temperatureTag_( temperatureTag ),
+    trans_( dynamic_cast<Cantera::MixTransport*>( CanteraObjects::get_transport() )), // cast gas transport object as mix transport
+    nSpec_( trans_->thermo().nSpecies() )
+{
   this->set_gpu_runnable( true );
 
   massFracTags_.clear();
@@ -176,7 +176,7 @@ Viscosity( const Expr::Tag& temperatureTag,
   }
   const std::vector<double>& molecularWeights = trans_->thermo().molecularWeights();
 
-#ifdef NFIELDS // evaluation requires nSpec_ temporary fields
+# ifdef NFIELDS // evaluation requires nSpec_ temporary fields
   for(  size_t k=0; k!=nSpec_; ++k){
     for( size_t j=0; j!=nSpec_; ++j){
       molecularWeightRatios_[k][j] = pow( molecularWeights[k]/molecularWeights[j], 0.25); // pre-compute value to reduce evaluation time
@@ -184,7 +184,7 @@ Viscosity( const Expr::Tag& temperatureTag,
       denominator_[j][k] = 1/ denominator_[j][k];
     }
   }
-#else // evaluation requires 2*nSpec_ temporary fields
+# else // evaluation requires 2*nSpec_ temporary fields
   for(  size_t k=0; k!=nSpec_; ++k){
     for( size_t j=0; j!=nSpec_; ++j){
       denominator_[j][k] = sqrt(8.0) * sqrt( 1 + molecularWeights[k] / molecularWeights[j] ) * molecularWeights[j];
@@ -197,9 +197,9 @@ Viscosity( const Expr::Tag& temperatureTag,
       molecularWeightRatios_[j][k] = pow( molecularWeights[j] / molecularWeights[k], 0.25);
     }
   }
-#endif
+# endif
 
-      }
+}
 
 //--------------------------------------------------------------------
 
@@ -243,9 +243,9 @@ void
 Viscosity<FieldT>::
 evaluate()
 {
-#ifdef TIMINGS
-boost::timer timer;
-#endif
+# ifdef TIMINGS
+  boost::timer timer;
+# endif
   using namespace SpatialOps;
 
   FieldT& result = this->value();
@@ -255,25 +255,25 @@ boost::timer timer;
     sqrtSpeciesVis.push_back(SpatialFieldStore::get<FieldT>(*temperature_));
 
   // pre-compute power of log(t) for the species viscosity polynomial
-  SpatFldPtr<FieldT> logtPtr  = SpatialFieldStore::get<FieldT>(*temperature_);
+  SpatFldPtr<FieldT> logtPtr   = SpatialFieldStore::get<FieldT>(*temperature_);
   SpatFldPtr<FieldT> logttPtr  = SpatialFieldStore::get<FieldT>(*temperature_);
-  SpatFldPtr<FieldT> logtttPtr  = SpatialFieldStore::get<FieldT>(*temperature_);
+  SpatFldPtr<FieldT> logtttPtr = SpatialFieldStore::get<FieldT>(*temperature_);
   SpatFldPtr<FieldT> logt4Ptr;
   SpatFldPtr<FieldT> tOneFourthPtr;
 
   if( trans_->model() == Cantera::cMixtureAveraged ) { // as opposed to CK mode
-    logt4Ptr  = SpatialFieldStore::get<FieldT>(*temperature_);
-    tOneFourthPtr  = SpatialFieldStore::get<FieldT>(*temperature_);
+    logt4Ptr      = SpatialFieldStore::get<FieldT>(*temperature_);
+    tOneFourthPtr = SpatialFieldStore::get<FieldT>(*temperature_);
   }
 
-  FieldT& logt = *logtPtr;
-  FieldT& logtt = *logttPtr;
+  FieldT& logt   = *logtPtr;
+  FieldT& logtt  = *logttPtr;
   FieldT& logttt = *logtttPtr;
-  FieldT& logt4 = *logt4Ptr;
+  FieldT& logt4  = *logt4Ptr;
   FieldT& tOneFourth = *tOneFourthPtr;
 
-  logt <<= log( *temperature_ );
-  logtt <<= logt * logt;
+  logt   <<= log( *temperature_ );
+  logtt  <<= logt * logt;
   logttt <<= logtt * logt;
 
   if( trans_->model() == Cantera::cMixtureAveraged ){
@@ -298,19 +298,19 @@ boost::timer timer;
 
   result <<= 0.0; // set result to 0 before summing species contributions
 
-#ifdef NFIELDS // requires nSpec_ temporary fields
+# ifdef NFIELDS // requires nSpec_ temporary fields
   SpatFldPtr<FieldT> phiPtr  = SpatialFieldStore::get<FieldT>(*temperature_);
   FieldT& phi = *phiPtr;
 
   for( size_t k=0; k!=nSpec_; ++k){ // start looping over species contributions
     phi <<= *massFracs_[k]; // begin sum with the k=j case when phi = y_k
     for( size_t j=0; j!=nSpec_; ++j){
-      if(j!=k)
+      if( j!=k )
         phi <<= phi + *massFracs_[j] * ( 1 + *sqrtSpeciesVis[k] / *sqrtSpeciesVis[j] * molecularWeightRatios_[j][k] ) * ( 1 + *sqrtSpeciesVis[k] / *sqrtSpeciesVis[j] * molecularWeightRatios_[j][k] ) * denominator_[j][k]; // mixing rule
     }
     result <<= result + *sqrtSpeciesVis[k] * *sqrtSpeciesVis[k] * *massFracs_[k] / phi; // mixing rule
   }
-#else // requires 2*nSpec_ temporary fields
+# else // requires 2*nSpec_ temporary fields
   SpatFldPtr<FieldT> temporary = SpatialFieldStore::get<FieldT>(*temperature_);
   std::vector< SpatFldPtr<FieldT> > phivec;
 
@@ -333,10 +333,11 @@ boost::timer timer;
   for( size_t k=0; k!=nSpec_; ++k){
     result<<=result + *massFracs_[k] * ( *sqrtSpeciesVis[k] * *sqrtSpeciesVis[k] ) / ( *phivec[k] * molecularWeights[k] ); // mixing rule
   }
-#endif
-#ifdef TIMINGS
-    std::cout<<"visc time "<<timer.elapsed()<<std::endl;
-#endif
+# endif
+
+# ifdef TIMINGS
+  std::cout<<"visc time "<<timer.elapsed()<<std::endl;
+# endif
 }
 
 //--------------------------------------------------------------------
@@ -373,11 +374,11 @@ SutherlandViscosity( const double c,
                      const double refVisc,
                      const double refTemp,
                      const Expr::Tag& temperatureTag )
-  : Expr::Expression<FieldT>(),
-    c_( c ),
-    refVisc_( refVisc ),
-    refTemp_( refTemp ),
-    tTag_( temperatureTag )
+ : Expr::Expression<FieldT>(),
+   c_( c ),
+   refVisc_( refVisc ),
+   refTemp_( refTemp ),
+   tTag_( temperatureTag )
 {
   this->set_gpu_runnable(true);
 }
@@ -439,7 +440,7 @@ Builder( const Expr::Tag& result,
   : ExpressionBuilder(result),
     c_( suthConstant ),
     mu0_( refVisc ), // ref visc for air (Pa s)
-    t0_( refTemp ), // ref temp for air (K)
+    t0_( refTemp ),  // ref temp for air (K)
     tTag_( temperatureTag )
 {}
 

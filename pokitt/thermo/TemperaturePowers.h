@@ -139,13 +139,13 @@ evaluate()
 {
   SpecT& powers = this->get_value_vec();
 
-  if( nasaFlag_ == true || shomateFlag_ == true ){
+  if( nasaFlag_ || shomateFlag_ ){
     *powers[0] <<= *t_ * *t_; // t^2
     *powers[1] <<= *t_ * *powers[0]; // t^3
     *powers[2] <<= *t_ * *powers[1]; // t^4
-    if( nasaFlag_ == true )
+    if( nasaFlag_ )
       *powers[3] <<= *t_ * *powers[2]; // t^5
-    if( shomateFlag_ == true ){
+    if( shomateFlag_ ){
       *powers[4] <<= 1 / *t_; // t^-1
       *powers[5] <<= 1 / *powers[0]; // t^-2
     }
