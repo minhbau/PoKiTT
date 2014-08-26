@@ -133,9 +133,14 @@ public:
      */
     Builder( const Expr::Tag& result,
              const Expr::Tag& temperatureTag,
-             const double suthConstant, ///< Constant for use in the viscosity correlation (K)
-             const double refVisc,      ///< reference viscosity (Pa s)
-             const double refTemp );    ///< reference temperature (K)
+             const double suthConstant,
+             const double refVisc,
+             const double refTemp );
+    /**
+     *  @brief Build a SutherlandViscosity expression
+     *  @param result tag for the viscosity
+     *  @param temperatureTag temperature
+     */
     Builder( const Expr::Tag& result,
              const Expr::Tag& temperatureTag );
 
