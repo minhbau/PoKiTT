@@ -8,6 +8,7 @@
 #include <iostream>
 #include <stdio.h>
 #include <fstream>
+#include "TestHelper.h"
 
 #include <pokitt/transport/ThermalCondMix.h>
 #include <pokitt/MixtureMolWeight.h>
@@ -27,8 +28,7 @@ namespace So = SpatialOps;
 typedef So::SVolField   CellField;
 
 int main(){
-  bool isFailed = false;
-
+  TestHelper status( true );
   try {
     const CanteraObjects::Setup setup( "Mix", "h2o2.xml",          "ohmech"    );
     //const CanteraObjects::Setup setup( "Mix", "gri30.xml",         "gri30_mix" );
@@ -171,7 +171,7 @@ int main(){
         mixTrans->thermo().setState_TPY( *itemp, refPressure, &(*imass)[0]);
         *icant=mixTrans->thermalConductivity();
       }
-      isFailed = field_not_equal(tCondMix, *canteraResult, 1e-12);
+      status( field_equal(tCondMix, *canteraResult, 1e-12), "thermal conductivity");
 
     } // number of points
 
@@ -180,6 +180,6 @@ int main(){
     Cantera::showErrors();
   }
 
-  if( isFailed ) return -1;
-  return 0;
+  if( status.ok() ) return 0;
+    return -1;
 }

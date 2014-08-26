@@ -8,6 +8,7 @@
 #include <iostream>
 #include <stdio.h>
 #include <fstream>
+#include "TestHelper.h"
 
 #include <pokitt/transport/ViscosityMix.h>
 
@@ -26,8 +27,7 @@ namespace So = SpatialOps;
 typedef So::SVolField   CellField;
 
 int main(){
-  bool isFailed = false;
-
+  TestHelper status( true );
   try {
     const CanteraObjects::Setup setup( "Mix", "h2o2.xml",          "ohmech"    );
     //const CanteraObjects::Setup setup( "Mix", "gri30.xml",         "gri30_mix" );
@@ -160,7 +160,7 @@ int main(){
         massfracs.push_back(massfrac);
       }
 
-      std::vector< vector<double> >::iterator imass = massfracs.begin();
+      std::vector< std::vector<double> >::iterator imass = massfracs.begin();
       std::vector<double>::const_iterator itemp = tVec.begin();
       SpatFldPtr<CellField> canteraResult  = SpatialFieldStore::get<CellField>(visMix);
       for(CellField::iterator icant = canteraResult->begin(); icant!=canteraResult->end(); ++itemp, ++imass, ++icant){
@@ -168,7 +168,7 @@ int main(){
         *icant=mixTrans->viscosity();
       }
 
-      isFailed = field_not_equal(visMix, *canteraResult, 1e-12);
+      status( field_equal(visMix, *canteraResult, 1e-12), "viscosity");
 
     } // number of points
 
@@ -177,6 +177,6 @@ int main(){
     Cantera::showErrors();
   }
 
-  if( isFailed ) return -1;
-  return 0;
+  if( status.ok() ) return 0;
+    return -1;
 }

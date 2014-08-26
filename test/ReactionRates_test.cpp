@@ -8,6 +8,7 @@
 #include <iostream>
 #include <stdio.h>
 #include <fstream>
+#include "TestHelper.h"
 
 #include <pokitt/thermo/TemperaturePowers.h>
 #include <pokitt/MixtureMolWeight.h>
@@ -30,8 +31,7 @@ namespace So = SpatialOps;
 typedef So::SVolField   CellField;
 
 int main(){
-  bool isFailed = false;
-
+  TestHelper status( true );
   try {
     //const CanteraObjects::Setup setup( "Mix", "h2o2.xml",          "ohmech"    );
     //const CanteraObjects::Setup setup( "Mix", "gri30.xml",         "gri30_mix" );
@@ -189,7 +189,8 @@ int main(){
 
       for( n=0; n<nSpec; ++n){
         *canteraResults[n] <<= *canteraResults[n] * molecularWeights[n];
-        isFailed = field_not_equal(cellFM.field_ref(rTags[n]), *canteraResults[n], 1e-10, 1e-8);
+        CellField& r = cellFM.field_ref(rTags[n]);
+        status( field_equal(r, *canteraResults[n], 1e-10, 1e-8), n);
       }
 
     } // number of points
@@ -199,6 +200,6 @@ int main(){
     Cantera::showErrors();
   }
 
-  if( isFailed ) return -1;
-  return 0;
+  if( status.ok() ) return 0;
+    return -1;
 }

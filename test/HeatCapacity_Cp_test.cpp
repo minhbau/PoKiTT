@@ -10,6 +10,7 @@
 #include <iostream>
 #include <stdio.h>
 #include <fstream>
+#include "TestHelper.h"
 
 #include <pokitt/thermo/TemperaturePowers.h>
 #include <pokitt/thermo/HeatCapacity_Cp.h>
@@ -32,7 +33,7 @@ namespace Cantera_CXX{ class IdealGasMix; } //location of polynomial
 
 int main()
 {
-  bool isFailed = false;
+  TestHelper status( true );
   try {
     const CanteraObjects::Setup setup( "Mix", "thermo_tester.xml", "const_cp"  );
     //const CanteraObjects::Setup setup( "Mix", "thermo_tester.xml", "shomate_cp");
@@ -200,7 +201,7 @@ int main()
 #     ifdef TIMINGS
       std::cout << "Cantera mixture cp time " << hMixtimer.elapsed() << std::endl;
 #     endif
-      isFailed = field_not_equal(cp, *canteraResult, 1e-14);
+      status( field_equal(cp, *canteraResult, 1e-14), "mix");
 
       std::vector< SpatFldPtr<CellField> > canteraResults;
       for( n=0; n < nSpec; ++n){
@@ -221,7 +222,8 @@ int main()
 
       for( n=0; n<nSpec; ++n){
         *canteraResults[n] <<= *canteraResults[n] / molecularWeights[n];
-        isFailed = field_not_equal(cellFM.field_ref(cpTags[n]), *canteraResults[n], 1e-14);
+        CellField& cp = cellFM.field_ref(cpTags[n]);
+        status(field_equal(cp, *canteraResults[n], 1e-14), n);
       }
 
     } // number of points
@@ -231,6 +233,6 @@ int main()
     Cantera::showErrors();
   }
 
-  if( isFailed ) return -1;
-  return 0;
+  if( status.ok() ) return 0;
+    return -1;
 }

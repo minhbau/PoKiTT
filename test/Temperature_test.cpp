@@ -10,6 +10,7 @@
 #include <iostream>
 #include <stdio.h>
 #include <fstream>
+#include "TestHelper.h"
 
 #include <pokitt/thermo/Temperature.h>
 #include <pokitt/thermo/TemperaturePowers.h>
@@ -46,7 +47,7 @@ void calculate_internal_energy( Expr::Tag e0Tag,
                                 Cantera_CXX::IdealGasMix* const gasMix);
 
 int main(){
-  bool isFailed = false;
+  TestHelper status( true );
   try {
     const CanteraObjects::Setup setup( "Mix", "thermo_tester.xml", "const_cp"  );
     //const CanteraObjects::Setup setup( "Mix", "thermo_tester.xml", "shomate_cp");
@@ -243,7 +244,7 @@ int main(){
         gasMix->setState_HP( enthalpy_massVec[i], refPressure);
         *icant=gasMix->temperature();
       }
-      isFailed = field_not_equal(temp, *canteraResult, 1e-6);
+      status( field_equal(temp, *canteraResult, 1e-6), "temperature from h");
 
       imass = massfracs.begin();
       itempd = tVecDiff.begin();
@@ -254,15 +255,16 @@ int main(){
         gasMix->setState_UV( e0_massVec[i], Cantera::GasConstant*tVec[i]*meanMW/refPressure);
         *icant=gasMix->temperature();
       }
-      isFailed = field_not_equal(temp, *canteraResult, 1e-6);
+      CellField& tempe0 = cellFM.field_ref(te0Tag);
+      status( field_equal(tempe0, *canteraResult, 1e-6), "temperature from e0");
     }
   }
   catch( Cantera::CanteraError& ){
     Cantera::showErrors();
   }
 
-  if( isFailed ) return -1;
-  return 0;
+  if( status.ok() ) return 0;
+    return -1;
 }
 
 void calculate_enthalpy( Expr::Tag hTag,

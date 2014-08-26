@@ -8,6 +8,7 @@
 #include <iostream>
 #include <stdio.h>
 #include <fstream>
+#include "TestHelper.h"
 
 #include <pokitt/transport/DiffusionCoeffMix.h>
 #include <pokitt/MixtureMolWeight.h>
@@ -27,8 +28,7 @@ namespace So = SpatialOps;
 typedef So::SVolField   CellField;
 
 int main(){
-  bool isFailed = false;
-
+  TestHelper status( true );
   try {
     const CanteraObjects::Setup setup( "Mix", "h2o2.xml",          "ohmech"    );
     //const CanteraObjects::Setup setup( "Mix", "gri30.xml",         "gri30_mix" );
@@ -191,7 +191,8 @@ int main(){
       }
 
       for( n=0; n<nSpec; ++n){
-        isFailed = field_not_equal(cellFM.field_ref(diffusionCoeffMixTags[n]), *canteraResults[n], 1e-12);
+        CellField& D = cellFM.field_ref(diffusionCoeffMixTags[n]);
+        status( field_equal(D, *canteraResults[n], 1e-12), n);
       }
 
     } // number of points
@@ -200,6 +201,6 @@ int main(){
   catch( Cantera::CanteraError& ){
     Cantera::showErrors();
   }
-  if( isFailed ) return -1;
-  return 0;
+  if( status.ok() ) return 0;
+    return -1;
 }
