@@ -10,6 +10,7 @@
 #include <iostream>
 #include <stdio.h>
 #include <fstream>
+#include "TestHelper.h"
 
 #include <pokitt/thermo/TemperaturePowers.h>
 #include <pokitt/thermo/Enthalpy.h>
@@ -32,7 +33,7 @@ namespace Cantera_CXX{ class IdealGasMix; } //location of polynomial
 
 int main()
 {
-  bool isFailed = false;
+  TestHelper status( true );
   try {
     const CanteraObjects::Setup setup( "Mix", "thermo_tester.xml", "const_cp"  );
     //const CanteraObjects::Setup setup( "Mix", "thermo_tester.xml", "shomate_cp");
@@ -55,7 +56,7 @@ int main()
     typedef SpeciesEnthalpy   < CellField > SpeciesEnthalpy;
 
 
-    const Expr::Tag tTag ( "Temperature", Expr::STATE_NONE );
+    const Expr::Tag tTag  ( "Temperature", Expr::STATE_NONE );
     const Expr::Tag yiTag ( "yi", Expr::STATE_NONE );
     Expr::TagList yiTags;
     for( n=0; n<nSpec; ++n ){
@@ -162,7 +163,7 @@ int main()
       std::cout << "PoKiTT mixture h time  " << mixTimer.elapsed() << std::endl;
 #     endif
 
-      CellField& hMix = fml.field_manager<CellField>().field_ref(hMixTag);
+      CellField& hMix = cellFM.field_ref(hMixTag);
 #     ifdef ENABLE_CUDA
       hMix.add_device(CPU_INDEX);
 #     endif
@@ -202,7 +203,7 @@ int main()
       std::cout << "Cantera mixture h time " << hMixtimer.elapsed() << std::endl;
 #     endif
 
-      isFailed = field_not_equal(hMix, *canteraResult, 1e-14);
+      status( field_equal(hMix, *canteraResult, 1e-14), "mix" );
 
       std::vector< SpatFldPtr<CellField> > canteraResults;
       for( n=0; n < nSpec; ++n){
@@ -223,7 +224,8 @@ int main()
 
       for( n=0; n<nSpec; ++n){
         *canteraResults[n] <<= *canteraResults[n] / molecularWeights[n];
-        isFailed = field_not_equal(cellFM.field_ref(hTags[n]), *canteraResults[n], 1e-14);
+        CellField& h = cellFM.field_ref(hTags[n]);
+        status( field_equal(h, *canteraResults[n], 1e-14), n );
       }
 
     } // number of points
@@ -233,6 +235,6 @@ int main()
     Cantera::showErrors();
   }
 
-  if( isFailed ) return -1;
-  return 0;
+  if( status.ok() ) return 0;
+  return -1;
 }
