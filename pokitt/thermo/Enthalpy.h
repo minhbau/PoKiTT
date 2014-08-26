@@ -30,7 +30,7 @@ namespace Cantera_CXX{ class IdealGasMix; } //location of polynomial
  * The enthalpy is a weighted average of the pure species \f$ h^0(T)\f$,
  *
  * \f[
- * h(T) = \sum_{n=0}^{nSpec} x_n h^0_n
+ * h(T) = \sum_{n=0}^{nSpec} y_n h^0_n
  * \f]
  */
 
@@ -106,6 +106,7 @@ class SpeciesEnthalpy
   const Expr::TagList tPowerTags_;
   const FieldT* t_;
   std::vector<const FieldT*> tPowers_;
+
   const int n_; //index of species to be evaluated
   double minT_; // minimum temperature for polynomial evaluation
   double maxT_; // maximum temperature for polynomial evaluation
@@ -268,7 +269,7 @@ evaluate()
 
   for( size_t n=0; n<nSpec_; ++n ){
     int polyType = polyTypeVec_[n];
-    std::vector<double >& c = cVec_[n];
+    std::vector<double>& c = cVec_[n];
     double minT = minTVec_[n];
     double maxT = maxTVec_[n];
     switch (polyType) {
@@ -337,8 +338,9 @@ SpeciesEnthalpy( const Expr::Tag& tTag,
     c_[3] /= molecularWeight; // convert to mass basis
     break;
   case NASA2:
-    for( std::vector<double>::iterator ic = c_.begin() + 1; ic!=c_.end(); ++ic)
+    for( std::vector<double>::iterator ic = c_.begin() + 1; ic!=c_.end(); ++ic){
       *ic *= Cantera::GasConstant / molecularWeight; // dimensionalize the coefficients to mass basis
+    }
     break;
   case SHOMATE2:
     for( std::vector<double>::iterator ic = c_.begin() + 1; ic!=c_.end(); ++ic ){

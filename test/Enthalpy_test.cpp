@@ -44,9 +44,9 @@ int main()
     CanteraObjects::setup_cantera(setup);
     Cantera_CXX::IdealGasMix* const gasMix = CanteraObjects::get_gasmix();
 
-    const int nSpec=gasMix->nSpecies();
+    const int nSpec = gasMix->nSpecies();
     size_t n;
-    const double refPressure=gasMix->pressure();
+    const double refPressure = gasMix->pressure();
     const std::vector<double>& molecularWeights = gasMix->molecularWeights();
 
     typedef Expr::PlaceHolder < CellField > Temp;
