@@ -347,7 +347,7 @@ evaluate()
           *gPtrvec[n] <<=        c[1] + c[3] * ( t - c[0]           ) // H
                          - t * ( c[2] + c[3] * ( logt - log(c[0]) ) ); // -TS
           break;
-        case NASA2:
+        case NASA2:{
           /* polynomials are applicable in two temperature ranges - high and low
            * If the temperature is out of range, the value is set to the value at the min or max temp
            */
@@ -358,12 +358,14 @@ evaluate()
           *gPtrvec[n] <<= cond( t <= c[0], c[ 6] + (c[1] - c[ 7]) * t - c[2]/2 * t2 - c[ 3]/6 * t3 - c[ 4]/12 * t4 - c[ 5]/20 * t5 - c[1] * tlogt ) // if low temp
                               (            c[13] + (c[8] - c[14]) * t - c[9]/2 * t2 - c[10]/6 * t3 - c[11]/12 * t4 - c[12]/20 * t5 - c[8] * tlogt ); // else if high temp
           break;
-        default:
+        }
+        default:{
           std::ostringstream msg;
           msg << "Error in " __FILE__ << " : " << __LINE__ << std::endl
               <<" Thermo type not supported, type = " << polyType << std::endl
               <<" See <cantera/kernel/SpeciesThermoInterpType.h> for type definition" << std::endl;
           throw std::runtime_error( msg.str() );
+        }
       }
     }
   } // powers of t now go out of scope and free the associated memory
@@ -426,7 +428,7 @@ evaluate()
 
           // Troe
           case TROE3_FALLOFF:  // fall through
-          case TROE4_FALLOFF:
+          case TROE4_FALLOFF:{
             const std::vector<double>& troe = rxnData.falloffParameters;
 
             if( fallType == TROE3_FALLOFF ) // Troe3 uses 3 parameters and has two terms
@@ -446,13 +448,14 @@ evaluate()
             k <<= fCent * k * pr / (1+pr);
 
             break;  // Troe
-
-          default:
+          }
+          default:{
             std::ostringstream msg;
             msg << "Error in " __FILE__ << " : " << __LINE__ << std::endl
                 <<" Falloff type not supported, type = " << fallType << std::endl
                 <<" See <cantera/kernel/reaction_defs.h> for type definition" << std::endl;
             throw std::runtime_error( msg.str() );
+          }
         } // switch (fallType)
       } // falloff
     } // third body
@@ -484,21 +487,22 @@ evaluate()
     sit = rstoich.begin();
       for( rit=reactants.begin(); rit!=reactants.end(); ++rit, ++sit){
         switch ( *sit ){
-        case 1:
-          k <<= k * *massFracs_[*rit] * conc * molecularWeightsInv[*rit];
-          break;
-        case 2:
-          k <<= k * *massFracs_[*rit] * *massFracs_[*rit] * conc * molecularWeightsInv[*rit] * conc * molecularWeightsInv[*rit];
-          break;
-        case 3:
-          k <<= k * *massFracs_[*rit] * conc * molecularWeightsInv[*rit] * *massFracs_[*rit] * conc * molecularWeightsInv[*rit] * *massFracs_[*rit] * conc * molecularWeightsInv[*rit];
-          break;
-        default:
-          std::ostringstream msg;
-          msg << "Error in " << __FILE__ << " : " << __LINE__ << std::endl
-              <<" Non-integer reactant stoichiometric coefficient" << std::endl
-              <<" Reaction # "<< r <<", stoichiometric coefficient = " << *sit << std::endl;
-          throw std::runtime_error( msg.str() );
+          case 1:
+            k <<= k * *massFracs_[*rit] * conc * molecularWeightsInv[*rit];
+            break;
+          case 2:
+            k <<= k * *massFracs_[*rit] * *massFracs_[*rit] * conc * molecularWeightsInv[*rit] * conc * molecularWeightsInv[*rit];
+            break;
+          case 3:
+            k <<= k * *massFracs_[*rit] * conc * molecularWeightsInv[*rit] * *massFracs_[*rit] * conc * molecularWeightsInv[*rit] * *massFracs_[*rit] * conc * molecularWeightsInv[*rit];
+            break;
+          default:{
+            std::ostringstream msg;
+            msg << "Error in " << __FILE__ << " : " << __LINE__ << std::endl
+                <<" Non-integer reactant stoichiometric coefficient" << std::endl
+                <<" Reaction # "<< r <<", stoichiometric coefficient = " << *sit << std::endl;
+            throw std::runtime_error( msg.str() );
+          }
         }
       }
 
@@ -506,21 +510,22 @@ evaluate()
         sit = pstoich.begin();
           for( rit=products.begin(); rit!=products.end(); ++rit, ++sit ){
             switch ( *sit ){
-            case 1:
-              kr <<= kr * *massFracs_[*rit] * conc * molecularWeightsInv[*rit];
-              break;
-            case 2:
-              kr <<= kr * *massFracs_[*rit] * *massFracs_[*rit] * conc * molecularWeightsInv[*rit] * conc * molecularWeightsInv[*rit];
-              break;
-            case 3:
-              kr <<= kr * *massFracs_[*rit] * conc * molecularWeightsInv[*rit] * *massFracs_[*rit] * conc * molecularWeightsInv[*rit] * *massFracs_[*rit] * conc * molecularWeightsInv[*rit];
-              break;
-            default:
-              std::ostringstream msg;
-              msg << "Error in " << __FILE__ << " : " << __LINE__ << std::endl
-                  <<" Non-integer product stoichiometric coefficient" << std::endl
-                  <<" Reaction # "<< r <<", stoichiometric coefficient = " << *sit << std::endl;
-              throw std::runtime_error( msg.str() );
+              case 1:
+                kr <<= kr * *massFracs_[*rit] * conc * molecularWeightsInv[*rit];
+                break;
+              case 2:
+                kr <<= kr * *massFracs_[*rit] * *massFracs_[*rit] * conc * molecularWeightsInv[*rit] * conc * molecularWeightsInv[*rit];
+                break;
+              case 3:
+                kr <<= kr * *massFracs_[*rit] * conc * molecularWeightsInv[*rit] * *massFracs_[*rit] * conc * molecularWeightsInv[*rit] * *massFracs_[*rit] * conc * molecularWeightsInv[*rit];
+                break;
+              default:{
+                std::ostringstream msg;
+                msg << "Error in " << __FILE__ << " : " << __LINE__ << std::endl
+                    <<" Non-integer product stoichiometric coefficient" << std::endl
+                    <<" Reaction # "<< r <<", stoichiometric coefficient = " << *sit << std::endl;
+                throw std::runtime_error( msg.str() );
+              }
             }
           }
       }
