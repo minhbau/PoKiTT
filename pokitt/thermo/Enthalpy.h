@@ -44,8 +44,12 @@ class Enthalpy
   const FieldT* t_;
   std::vector<const FieldT*> tPowers_;
   std::vector<const FieldT*> massFracs_;
-  Cantera_CXX::IdealGasMix* const gasMix_;
-  const int nSpec_; // number of species
+
+  int nSpec_; // number of species
+  std::vector<double> minTVec_; // vector of minimum temperatures for polynomial evaluations
+  std::vector<double> maxTVec_; // vector of maximum temperatures for polynomial evaluations
+  std::vector< std::vector<double> > cVec_; // vector of polynomial coefficients
+  std::vector<int> polyTypeVec_; // vector of polynomial types
 
   Enthalpy( const Expr::Tag& tTag,
             const Expr::Tag& massFracTag );
@@ -102,8 +106,12 @@ class SpeciesEnthalpy
   const Expr::TagList tPowerTags_;
   const FieldT* t_;
   std::vector<const FieldT*> tPowers_;
-  Cantera_CXX::IdealGasMix* const gasMix_;
   const int n_; //index of species to be evaluated
+  double minT_; // minimum temperature for polynomial evaluation
+  double maxT_; // maximum temperature for polynomial evaluation
+  std::vector<double> c_; // vector of polynomial coefficients
+  int polyType_; // polynomial type
+
 
   SpeciesEnthalpy( const Expr::Tag& tTag,
                    const int n );
@@ -148,18 +156,52 @@ Enthalpy( const Expr::Tag& tTag,
           const Expr::Tag& massFracTag )
   : Expr::Expression<FieldT>(),
     tTag_( tTag ),
-    tPowerTags_( TemperaturePowers<FieldT>::temperature_powers_tags() ),
-    gasMix_( CanteraObjects::get_gasmix() ),
-    nSpec_( gasMix_->nSpecies() )
+    tPowerTags_( TemperaturePowers<FieldT>::temperature_powers_tags() )
 {
   this->set_gpu_runnable( true );
 
+  Cantera_CXX::IdealGasMix* const gasMix = CanteraObjects::get_gasmix();
+  const Cantera::SpeciesThermo& spThermo = gasMix->speciesThermo();
+
+  nSpec_ = gasMix->nSpecies();
   massFracTags_.clear();
   for( size_t n=0; n<nSpec_; ++n ){
     std::ostringstream name;
     name << massFracTag.name() << "_" << n;
     massFracTags_.push_back( Expr::Tag(name.str(),massFracTag.context()) );
   }
+
+  const std::vector<double> molecularWeights = gasMix->molecularWeights();
+  std::vector<double> c(15,0); //vector of Cantera's coefficients
+  int polyType;
+  double minT;
+  double maxT;
+  double refPressure;
+
+  for( size_t n=0; n<nSpec_; ++n ){
+    spThermo.reportParams(n, polyType, &c[0], minT, maxT, refPressure);
+    polyTypeVec_.push_back(polyType); // vector of polynomial types
+    minTVec_.push_back(minT); // vector of minimum temperatures for polynomial evaluations
+    maxTVec_.push_back(maxT); // vector of maximum temperatures for polynomial evaluations
+    switch (polyType) {
+    case SIMPLE:
+      c[1] /= molecularWeights[n]; // convert to mass basis
+      c[3] /= molecularWeights[n]; // convert to mass basis
+      break;
+    case NASA2:
+      for( std::vector<double>::iterator ic = c.begin() + 1; ic!=c.end(); ++ic)
+        *ic *= Cantera::GasConstant / molecularWeights[n]; // dimensionalize the coefficients to mass basis
+      break;
+    case SHOMATE2:
+      for( std::vector<double>::iterator ic = c.begin() + 1; ic!=c.end(); ++ic ){
+        *ic *= 1e6 / molecularWeights[n]; // scale the coefficients to keep units consistent on mas basis
+      }
+      break;
+    }
+    cVec_.push_back(c); // vector of polynomial coefficients
+  }
+
+  CanteraObjects::restore_gasmix(gasMix);
 }
 
 //--------------------------------------------------------------------
@@ -168,7 +210,7 @@ template< typename FieldT >
 Enthalpy<FieldT>::
 ~Enthalpy()
 {
-  CanteraObjects::restore_gasmix(gasMix_);
+
 }
 
 //--------------------------------------------------------------------
@@ -222,40 +264,28 @@ evaluate()
   const FieldT& t5 = *tPowers_[3]; // t^5
   const FieldT& recipT = *tPowers_[4]; // t^-1
 
-  std::vector<double> c(15,0); //vector of Cantera's coefficients
-  int polyType;
-  double minT;
-  double maxT;
-  double refPressure;
-  const Cantera::SpeciesThermo& spThermo = gasMix_->speciesThermo();
-  const std::vector<double>& molecularWeights = gasMix_->molecularWeights();
-
   h <<= 0.0;
 
   for( size_t n=0; n<nSpec_; ++n ){
-    spThermo.reportParams(n, polyType, &c[0], minT, maxT, refPressure);
+    int polyType = polyTypeVec_[n];
+    std::vector<double >& c = cVec_[n];
+    double minT = minTVec_[n];
+    double maxT = maxTVec_[n];
     switch (polyType) {
       case SIMPLE: // constant heat capacity
-        h <<= h + *massFracs_[n] * ( c[1] + c[3] * (*t_-c[0]) )
-        / molecularWeights[n];
+        h <<= h + *massFracs_[n] * ( c[1] + c[3] * (*t_ - c[0]) );
         break;
       case NASA2:
-        for( std::vector<double>::iterator ic = c.begin() + 1; ic!=c.end(); ++ic)
-          *ic *= GasConstant / molecularWeights[n]; // dimensionalize the coefficients
         h <<= h + *massFracs_[n] * cond( *t_ <= c[0] && *t_ >= minT, c[ 6] + c[1] * *t_ + c[2]/2 * t2 + c[ 3]/3 * t3 + c[ 4]/4 * t4 + c[ 5]/5 * t5) // if low temp
                                        ( *t_ >  c[0] && *t_ <= maxT, c[13] + c[8] * *t_ + c[9]/2 * t2 + c[10]/3 * t3 + c[11]/4 * t4 + c[12]/5 * t5)  // else if high temp
                                        ( *t_ < minT, c[1] * *t_ + c[2] * minT * (*t_-minT/2) + c[ 3] * minT * minT * (*t_-2*minT/3) + c[ 4] * pow(minT,3) * (*t_-3*minT/4) + c[ 5] * pow(minT,4) * (*t_-4*minT/5) + c[ 6]) // else if out of bounds - low
                                        (             c[8] * *t_ + c[9] * maxT * (*t_-maxT/2) + c[10] * maxT * maxT * (*t_-2*maxT/3) + c[11] * pow(maxT,3) * (*t_-3*maxT/4) + c[12] * pow(maxT,4) * (*t_-4*maxT/5) + c[13]); // else out of bounds - high
         break;
       case SHOMATE2:
-        double minTScaled = minT/1000;
-        double maxTScaled = maxT/1000;
-        for( std::vector<double>::iterator ic = c.begin() + 1; ic!=c.end(); ++ic )
-          *ic *= 1e6 / molecularWeights[n]; // scale the coefficients to keep units consistent
         h <<= h + *massFracs_[n] * cond( *t_ <= c[0] && *t_ >= minT, c[ 6] + c[1]**t_*1e-3 + c[2]/2 * t2*1e-6 + c[ 3]/3 * t3*1e-9 + c[ 4]/4 * t4*1e-12 - c[ 5] * recipT*1e3 ) // if low temp
                                        ( *t_ >  c[0] && *t_ <= maxT, c[13] + c[8]**t_*1e-3 + c[9]/2 * t2*1e-6 + c[10]/3 * t3*1e-9 + c[11]/4 * t4*1e-12 - c[12] * recipT*1e3 )  // else if high temp
-                                       ( *t_ < minT, c[1] * *t_*1e-3 + c[2] * minTScaled * ( *t_*1e-3 - minTScaled/2 ) + c[ 3] * minTScaled * minTScaled * ( *t_*1e-3 - 2*minTScaled/3 ) + c[ 4] * pow(minTScaled,3) * ( *t_*1e-3 - 3*minTScaled/4 ) - c[ 5] * pow(minTScaled,-1) * (-*t_*1e-3 / minTScaled + 2 ) + c[ 6] ) // else if out of bounds - low
-                                       (             c[8] * *t_*1e-3 + c[9] * maxTScaled * ( *t_*1e-3 - maxTScaled/2 ) + c[10] * maxTScaled * maxTScaled * ( *t_*1e-3 - 2*maxTScaled/3 ) + c[11] * pow(maxTScaled,3) * ( *t_*1e-3 - 3*maxTScaled/4 ) - c[12] * pow(maxTScaled,-1) * (-*t_*1e-3 / maxTScaled + 2 ) + c[13] ); // else out of bounds - high
+                                       ( *t_ < minT, c[1] * *t_*1e-3 + c[2] * minT*1e-3 * ( *t_*1e-3 - minT*1e-3/2 ) + c[ 3] * minT*1e-3 * minT*1e-3 * ( *t_*1e-3 - 2*minT*1e-3/3 ) + c[ 4] * pow(minT*1e-3,3) * ( *t_*1e-3 - 3*minT*1e-3/4 ) - c[ 5] * pow(minT*1e-3,-1) * (-*t_*1e-3 / minT*1e-3 + 2 ) + c[ 6] ) // else if out of bounds - low
+                                       (             c[8] * *t_*1e-3 + c[9] * maxT*1e-3 * ( *t_*1e-3 - maxT*1e-3/2 ) + c[10] * maxT*1e-3 * maxT*1e-3 * ( *t_*1e-3 - 2*maxT*1e-3/3 ) + c[11] * pow(maxT*1e-3,3) * ( *t_*1e-3 - 3*maxT*1e-3/4 ) - c[12] * pow(maxT*1e-3,-1) * (-*t_*1e-3 / maxT*1e-3 + 2 ) + c[13] ); // else out of bounds - high
     }
   }
 }
@@ -290,10 +320,34 @@ SpeciesEnthalpy( const Expr::Tag& tTag,
     : Expr::Expression<FieldT>(),
       tTag_( tTag ),
       tPowerTags_( TemperaturePowers<FieldT>::temperature_powers_tags() ),
-      gasMix_( CanteraObjects::get_gasmix() ),
       n_ ( n )
 {
   this->set_gpu_runnable( true );
+
+  Cantera_CXX::IdealGasMix* const gasMix = CanteraObjects::get_gasmix();
+  const Cantera::SpeciesThermo& spThermo = gasMix->speciesThermo();
+
+  double molecularWeight = gasMix->molecularWeight(n_);
+  c_.resize(15); //vector of Cantera's coefficients
+  double refPressure;
+  spThermo.reportParams(n_, polyType_, &c_[0], minT_, maxT_, refPressure);
+  switch (polyType_) {
+  case SIMPLE:
+    c_[1] /= molecularWeight; // convert to mass basis
+    c_[3] /= molecularWeight; // convert to mass basis
+    break;
+  case NASA2:
+    for( std::vector<double>::iterator ic = c_.begin() + 1; ic!=c_.end(); ++ic)
+      *ic *= Cantera::GasConstant / molecularWeight; // dimensionalize the coefficients to mass basis
+    break;
+  case SHOMATE2:
+    for( std::vector<double>::iterator ic = c_.begin() + 1; ic!=c_.end(); ++ic ){
+      *ic *= 1e6 / molecularWeight; // scale the coefficients to keep units consistent on mas basis
+    }
+    break;
+  }
+
+  CanteraObjects::restore_gasmix(gasMix);
 }
 
 //--------------------------------------------------------------------
@@ -302,7 +356,7 @@ template< typename FieldT >
 SpeciesEnthalpy<FieldT>::
 ~SpeciesEnthalpy()
 {
-  CanteraObjects::restore_gasmix(gasMix_);
+
 }
 
 //--------------------------------------------------------------------
@@ -350,38 +404,21 @@ evaluate()
   const FieldT& t5 = *tPowers_[3]; // t^5
   const FieldT& recipT = *tPowers_[4]; // t^-1
 
-  std::vector<double> c(15,0); // vector of Cantera's coefficients
-  int polyType; // type of polynomial
-  double minT;  // minimum temperature where polynomial is valid
-  double maxT;  // maximum temperature where polynomial is valid
-  double refPressure;
-  gasMix_->speciesThermo().reportParams( n_, polyType, &c[0], minT, maxT, refPressure );
-  const std::vector<double>& molecularWeights = gasMix_->molecularWeights();
-
-  switch (polyType) {
+  switch (polyType_) {
     case SIMPLE:
-      h <<= ( c[1] + c[3] * (*t_-c[0]) )
-      / molecularWeights[n_];
+      h <<= c_[1] + c_[3] * (*t_ - c_[0]);
       break;
     case NASA2:
-      for( std::vector<double>::iterator ic = c.begin() + 1; ic!=c.end(); ++ic){
-        *ic *= GasConstant / molecularWeights[n_]; // dimensionalize coefficients
-      }
-      h <<= cond( *t_ <= c[0] && *t_ >= minT, c[ 6] + c[1] * *t_ + c[2]/2 * t2 + c[ 3]/3 * t3 + c[ 4]/4 * t4 + c[ 5]/5 * t5) // if low temp
-                                 ( *t_ >  c[0] && *t_ <= maxT, c[13] + c[8] * *t_ + c[9]/2 * t2 + c[10]/3 * t3 + c[11]/4 * t4 + c[12]/5 * t5)  // else if high temp
-                                 ( *t_ <  minT                 , c[1] * *t_ + c[2] * minT * (*t_-minT/2) + c[ 3] * minT * minT * (*t_ - 2*minT/3) + c[ 4] * pow(minT,3) * (*t_ - 3*minT/4) + c[ 5] * pow(minT,4) * (*t_ - 4*minT/5) + c[ 6]) // else if out of bounds - low
-                                 (                                c[8] * *t_ + c[9] * maxT * (*t_-maxT/2) + c[10] * maxT * maxT * (*t_ - 2*maxT/3) + c[11] * pow(maxT,3) * (*t_ - 3*maxT/4) + c[12] * pow(maxT,4) * (*t_ - 4*maxT/5) + c[13]); // else out of bounds - high
+      h <<= cond( *t_ <= c_[0] && *t_ >= minT_, c_[ 6] + c_[1] * *t_ + c_[2]/2 * t2 + c_[ 3]/3 * t3 + c_[ 4]/4 * t4 + c_[ 5]/5 * t5) // if low temp
+                ( *t_ >  c_[0] && *t_ <= maxT_, c_[13] + c_[8] * *t_ + c_[9]/2 * t2 + c_[10]/3 * t3 + c_[11]/4 * t4 + c_[12]/5 * t5)  // else if high temp
+                ( *t_ <  minT_                 , c_[1] * *t_ + c_[2] * minT_ * (*t_-minT_/2) + c_[ 3] * minT_ * minT_ * (*t_ - 2*minT_/3) + c_[ 4] * pow(minT_,3) * (*t_ - 3*minT_/4) + c_[ 5] * pow(minT_,4) * (*t_ - 4*minT_/5) + c_[ 6]) // else if out of bounds - low
+                (                                c_[8] * *t_ + c_[9] * maxT_ * (*t_-maxT_/2) + c_[10] * maxT_ * maxT_ * (*t_ - 2*maxT_/3) + c_[11] * pow(maxT_,3) * (*t_ - 3*maxT_/4) + c_[12] * pow(maxT_,4) * (*t_ - 4*maxT_/5) + c_[13]); // else out of bounds - high
       break;
     case SHOMATE2:
-      for( std::vector<double>::iterator ic = c.begin() + 1; ic!=c.end(); ++ic ){
-        *ic *= 1e6 / molecularWeights[n_]; // scale the coefficients to keep units consistent
-      }
-      double minTScaled = minT/1000;
-      double maxTScaled = maxT/1000;
-      h <<= cond( *t_ <= c[0] && *t_ >= minT, c[ 6] + c[1] * *t_*1e-3 + c[2]/2 * t2*1e-6 + c[ 3]/3 * t3*1e-9 + c[ 4]/4 * t4*1e-12 - c[ 5] * recipT*1e3 ) // if low temp
-                                 ( *t_ >  c[0] && *t_ <= maxT, c[13] + c[8] * *t_*1e-3 + c[9]/2 * t2*1e-6 + c[10]/3 * t3*1e-9 + c[11]/4 * t4*1e-12 - c[12] * recipT*1e3 )  // else if high range
-                                 ( *t_ <  minT, c[1] * *t_*1e-3 + c[2] * minTScaled * ( *t_*1e-3 - minTScaled/2 ) + c[ 3] * minTScaled * minTScaled * ( *t_*1e-3 - 2*minTScaled/3 ) + c[ 4] * pow(minTScaled,3) * ( *t_*1e-3 - 3*minTScaled/4 ) - c[ 5] * pow(minTScaled,-1) * ( -*t_*1e-3/minTScaled + 2 ) + c[ 6] ) // else if out of bounds - low
-                                 (               c[8] * *t_*1e-3 + c[9] * maxTScaled * ( *t_*1e-3 - maxTScaled/2 ) + c[10] * maxTScaled * maxTScaled * ( *t_*1e-3 - 2*maxTScaled/3 ) + c[11] * pow(maxTScaled,3) * ( *t_*1e-3 - 3*maxTScaled/4 ) - c[12] * pow(maxTScaled,-1) * ( -*t_*1e-3/maxTScaled + 2 ) + c[13] ); // else out of bounds - high
+      h <<= cond( *t_ <= c_[0] && *t_ >= minT_, c_[ 6] + c_[1] * *t_*1e-3 + c_[2]/2 * t2*1e-6 + c_[ 3]/3 * t3*1e-9 + c_[ 4]/4 * t4*1e-12 - c_[ 5] * recipT*1e3 ) // if low temp
+                ( *t_ >  c_[0] && *t_ <= maxT_, c_[13] + c_[8] * *t_*1e-3 + c_[9]/2 * t2*1e-6 + c_[10]/3 * t3*1e-9 + c_[11]/4 * t4*1e-12 - c_[12] * recipT*1e3 )  // else if high range
+                ( *t_ <  minT_, c_[1] * *t_*1e-3 + c_[2] * minT_*1e-3 * ( *t_*1e-3 - minT_*1e-3/2 ) + c_[ 3] * minT_*1e-3 * minT_*1e-3 * ( *t_*1e-3 - 2*minT_*1e-3/3 ) + c_[ 4] * pow(minT_*1e-3,3) * ( *t_*1e-3 - 3*minT_*1e-3/4 ) - c_[ 5] * pow(minT_*1e-3,-1) * ( -*t_*1e-3/minT_*1e-3 + 2 ) + c_[ 6] ) // else if out of bounds - low
+                (               c_[8] * *t_*1e-3 + c_[9] * maxT_*1e-3 * ( *t_*1e-3 - maxT_*1e-3/2 ) + c_[10] * maxT_*1e-3 * maxT_*1e-3 * ( *t_*1e-3 - 2*maxT_*1e-3/3 ) + c_[11] * pow(maxT_*1e-3,3) * ( *t_*1e-3 - 3*maxT_*1e-3/4 ) - c_[12] * pow(maxT_*1e-3,-1) * ( -*t_*1e-3/maxT_*1e-3 + 2 ) + c_[13] ); // else out of bounds - high
       break;
   }
 }
