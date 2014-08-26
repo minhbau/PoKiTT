@@ -306,23 +306,23 @@ evaluate()
   for( size_t n=0; n<nSpec_; ++n)
     gPtrvec.push_back( SpatialFieldStore::get<FieldT>(t) );
 
-  FieldT& conc = *concPtr;
-  FieldT& conc2 = *conc2Ptr;
+  FieldT& conc    = *concPtr;
+  FieldT& conc2   = *conc2Ptr;
   FieldT& logConc = *logConcPtr;
 
-  FieldT& k = *kPtr;
+  FieldT& k  = *kPtr;
   FieldT& kr = *krPtr;
 
   FieldT& trecip = *trecipPtr;
-  FieldT& logt = *logtPtr;
+  FieldT& logt   = *logtPtr;
 
   FieldT& dg = *dgPtr;
 
-  trecip <<= 1/ t;
-  logt <<= log(t);
-  conc <<= trecip * p / GasConstant; // molar concentration
+  trecip  <<= 1/ t;
+  logt    <<= log(t);
+  conc    <<= trecip * p / GasConstant; // molar concentration
   logConc <<= log(conc);
-  conc <<= conc * *mmw_; // mass concentration
+  conc    <<= conc * *mmw_; // mass concentration
 
   { // add scope resolution so that fields of powers of t go out of scope after evaluation of gibbs energy polynomial
     // pre-compute powers of t used in gibbs energy polynomial for each species
@@ -332,7 +332,7 @@ evaluate()
     const FieldT& t3 = *tPowers_[1]; // t^3
     const FieldT& t4 = *tPowers_[2]; // t^4
     const FieldT& t5 = *tPowers_[3]; // t^5
-    FieldT& tlogt = *tlogtPtr;
+    FieldT& tlogt    = *tlogtPtr;
 
     tlogt <<= t * logt;
 
@@ -347,14 +347,14 @@ evaluate()
       spThermo.reportParams(n, polyType, &c[0], minT, maxT, refPressure);
       switch ( polyType ){
         case SIMPLE:
-          *gPtrvec[n] <<=        c[1] + c[3] * ( t - c[0]           ) // H
+          *gPtrvec[n] <<=        c[1] + c[3] * ( t    - c[0]        ) // H
                          - t * ( c[2] + c[3] * ( logt - log(c[0]) ) ); // -TS
           break;
         case NASA2:{
           /* polynomials are applicable in two temperature ranges - high and low
            * If the temperature is out of range, the value is set to the value at the min or max temp
            */
-          std::vector<double>::iterator ic = c.begin() + 1;
+          std::vector<double>::iterator ic    = c.begin() + 1;
           std::vector<double>::iterator icend = c.end();
           for( ; ic != icend; ++ic)
             *ic *= GasConstant; // dimensionalize the coefficients
