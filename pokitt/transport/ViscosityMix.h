@@ -274,16 +274,14 @@ evaluate()
   FieldT& logt   = *logtPtr;
   FieldT& logtt  = *logttPtr;
   FieldT& logttt = *logtttPtr;
-  FieldT& logt4  = *logt4Ptr;
-  FieldT& tOneFourth = *tOneFourthPtr;
 
   logt   <<= log( *temperature_ );
   logtt  <<= logt * logt;
   logttt <<= logtt * logt;
 
   if( trans_->model() == Cantera::cMixtureAveraged ){
-    tOneFourth <<= pow( *temperature_, 0.25 );
-    logt4 <<= logttt * logt;
+    *tOneFourthPtr <<= pow( *temperature_, 0.25 );
+    *logt4Ptr      <<= logttt * logt;
   }
 
   const std::vector<std::vector<double> >& viscosityCoefs = trans_->getViscosityCoefficients();
@@ -296,7 +294,7 @@ evaluate()
 
   for( size_t n = 0; n<nSpec_; ++n ){
     if( trans_->model() == Cantera::cMixtureAveraged ) // Cantera uses a 5 coefficient polynomial in temperature
-      *sqrtSpeciesVis[n] <<= tOneFourth * ( viscosityCoefs[n][0] + viscosityCoefs[n][1] * logt + viscosityCoefs[n][2] * logtt + viscosityCoefs[n][3] * logttt + viscosityCoefs[n][4] * logt4 );
+      *sqrtSpeciesVis[n] <<= *tOneFourthPtr * ( viscosityCoefs[n][0] + viscosityCoefs[n][1] * logt + viscosityCoefs[n][2] * logtt + viscosityCoefs[n][3] * logttt + viscosityCoefs[n][4] * *logt4Ptr );
     else // CK mode
       *sqrtSpeciesVis[n] <<= exp ( 0.5 * (viscosityCoefs[n][0] + viscosityCoefs[n][1] * logt + viscosityCoefs[n][2] * logtt + viscosityCoefs[n][3] * logttt) );
   }
