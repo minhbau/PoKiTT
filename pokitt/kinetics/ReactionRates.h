@@ -79,11 +79,13 @@ class ReactionRates
   typedef std::vector<FieldT*> SpecT;
 
   const Expr::Tag tTag_;
+  const Expr::TagList tPowerTags_;
   const Expr::Tag pTag_;
   const Expr::Tag mmwTag_;
   Expr::TagList massFracTags_;
 
   const FieldT* t_;
+  std::vector<const FieldT*> tPowers_;
   const FieldT* p_;
   const FieldT* mmw_; // mixture molecular weight
 
@@ -157,6 +159,7 @@ ReactionRates( const Expr::Tag& tTag,
                const Expr::Tag& mmwTag )
   : Expr::Expression<FieldT>(),
     tTag_( tTag ),
+    tPowerTags_( TemperaturePowers<FieldT>::temperature_powers_tags() ),
     pTag_( pTag ),
     mmwTag_( mmwTag ),
     gasMix_( CanteraObjects::get_gasmix() ),
@@ -244,6 +247,7 @@ ReactionRates<FieldT>::
 advertise_dependents( Expr::ExprDeps& exprDeps )
 {
   exprDeps.requires_expression( tTag_ );
+  exprDeps.requires_expression( tPowerTags_ );
   exprDeps.requires_expression( pTag_ );
   exprDeps.requires_expression( massFracTags_ );
   exprDeps.requires_expression( mmwTag_ );
@@ -258,8 +262,15 @@ bind_fields( const Expr::FieldManagerList& fml )
 {
   const typename Expr::FieldMgrSelector<FieldT>::type& fm = fml.field_manager<FieldT>();
   t_ = &fm.field_ref( tTag_ );
+
+  tPowers_.clear();
+  BOOST_FOREACH( const Expr::Tag& tag, tPowerTags_ ){
+    tPowers_.push_back( &fm.field_ref(tag) );
+  }
+
   p_ = &fm.field_ref( pTag_ );
   mmw_ = &fm.field_ref( mmwTag_ );
+
   massFracs_.clear();
   BOOST_FOREACH( const Expr::Tag& tag, massFracTags_ ){
     massFracs_.push_back( &fm.field_ref(tag) );
@@ -315,22 +326,14 @@ evaluate()
 
   { // add scope resolution so that fields of powers of t go out of scope after evaluation of gibbs energy polynomial
     // pre-compute powers of t used in gibbs energy polynomial for each species
-    SpatFldPtr<FieldT> t2Ptr    = SpatialFieldStore::get<FieldT>(t); // t^2
-    SpatFldPtr<FieldT> t3Ptr    = SpatialFieldStore::get<FieldT>(t); // t^3
-    SpatFldPtr<FieldT> t4Ptr    = SpatialFieldStore::get<FieldT>(t); // t^4
-    SpatFldPtr<FieldT> t5Ptr    = SpatialFieldStore::get<FieldT>(t); // t^5
     SpatFldPtr<FieldT> tlogtPtr = SpatialFieldStore::get<FieldT>(t); // t * log(t)
 
-    FieldT& t2 = *t2Ptr;
-    FieldT& t3 = *t3Ptr;
-    FieldT& t4 = *t4Ptr;
-    FieldT& t5 = *t5Ptr;
+    const FieldT& t2 = *tPowers_[0]; // t^2
+    const FieldT& t3 = *tPowers_[1]; // t^3
+    const FieldT& t4 = *tPowers_[2]; // t^4
+    const FieldT& t5 = *tPowers_[3]; // t^5
     FieldT& tlogt = *tlogtPtr;
 
-    t2 <<= t * t;
-    t3 <<= t2 * t;
-    t4 <<= t3 * t;
-    t5 <<= t4 * t;
     tlogt <<= t * logt;
 
     const Cantera::SpeciesThermo& spThermo = gasMix_->speciesThermo();

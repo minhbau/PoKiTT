@@ -9,8 +9,9 @@
 #include <stdio.h>
 #include <fstream>
 
-#include <pokitt/kinetics/ReactionRates.h>
+#include <pokitt/thermo/TemperaturePowers.h>
 #include <pokitt/MixtureMolWeight.h>
+#include <pokitt/kinetics/ReactionRates.h>
 
 #include <expression/ExprLib.h>
 
@@ -45,10 +46,11 @@ int main(){
     const std::vector<double>& molecularWeights = gasMix->molecularWeights();
 
     typedef Expr::PlaceHolder <CellField> Temp;
+    typedef TemperaturePowers < CellField > TemperaturePowers;
     typedef Expr::PlaceHolder <CellField> Pressure;
     typedef Expr::PlaceHolder <CellField> MassFracs;
-    typedef MixtureMolWeight <CellField> MixtureMolWeight;
-    typedef ReactionRates <CellField> ReactionRate;
+    typedef MixtureMolWeight  <CellField> MixtureMolWeight;
+    typedef ReactionRates     <CellField> ReactionRate;
 
     const Expr::Tag tTag ( "Temperature"   , Expr::STATE_NONE);
     const Expr::Tag pTag ( "Pressure"   , Expr::STATE_NONE);
@@ -67,6 +69,7 @@ int main(){
     Expr::ExpressionFactory exprFactory;
 
     exprFactory.register_expression( new Temp ::Builder (tTag                 ) );
+    exprFactory.register_expression( new TemperaturePowers::Builder(tTag) );
     exprFactory.register_expression( new Pressure ::Builder (pTag                 ) );
     BOOST_FOREACH( Expr::Tag yiTag, yiTags){
       exprFactory.register_expression( new MassFracs::Builder (yiTag) );
