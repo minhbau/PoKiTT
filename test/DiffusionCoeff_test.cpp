@@ -179,9 +179,9 @@ int main()
       std::vector< SpatFldPtr<CellField> > canteraResults;
       for( n=0; n < nSpec; ++n){
         canteraResults.push_back(SpatialFieldStore::get<CellField>(xcoord));
-#     ifdef ENABLE_CUDA
-      canteraResults[n]->add_device( CPU_INDEX );
-#     endif
+#       ifdef ENABLE_CUDA
+        canteraResults[n]->add_device( CPU_INDEX );
+#       endif
       }
       i=0;
       std::vector<double>::const_iterator itemp = tVec.begin();
