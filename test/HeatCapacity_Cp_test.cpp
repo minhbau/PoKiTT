@@ -23,6 +23,7 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/timer.hpp>
 #include <boost/foreach.hpp>
+#include <boost/program_options.hpp>
 
 #include <cantera/IdealGasMix.h>
 
@@ -31,30 +32,53 @@ typedef So::SVolField   CellField;
 
 namespace Cantera_CXX{ class IdealGasMix; } //location of polynomial
 
-int main()
+namespace po = boost::program_options;
+
+std::set< Expr::ExpressionID > register_cp( bool mix, Expr::ExpressionFactory& exprFactory, Expr::TagList cpTags, Expr::Tag tTag, Expr::Tag yiTag, int nSpec);
+
+void write_tree( bool mix, Expr::ExpressionTree& tree);
+
+std::vector< So::SpatFldPtr<CellField> > get_Cantera_results( bool mix, Cantera_CXX::IdealGasMix* gasMix, int npts, int nSpec, CellField prototype);
+
+int main( int iarg, char* carg[] )
 {
   try {
+    std::string inputFileName;
+    std::string inpGroup;
+    bool mix;
+
+    // parse the command line options input describing the problem
+    {
+      po::options_description desc("Supported Options");
+      desc.add_options()
+                ( "help", "print help message" )
+                ( "input", po::value<std::string>(&inputFileName)->default_value("thermo_tester.xml"), "Cantera input file name" )
+                ( "phase", po::value<std::string>(&inpGroup)->default_value("const_cp"), "name of phase in Cantera input" )
+                ( "mix", po::value<bool>(&mix)->default_value(true), "0 for species heat capacity" );
+
+      po::variables_map args;
+      po::store( po::parse_command_line(iarg,carg,desc), args );
+      po::notify(args);
+
+      if (args.count("help")) {
+        std::cout << desc << "\n";
+        return 1;
+      }
+    }
+
     TestHelper status( true );
-    const CanteraObjects::Setup setup( "Mix", "thermo_tester.xml", "const_cp"  );
-    //const CanteraObjects::Setup setup( "Mix", "thermo_tester.xml", "shomate_cp");
-    //const CanteraObjects::Setup setup( "Mix", "h2o2.xml",          "ohmech"    );
-    //const CanteraObjects::Setup setup( "Mix", "gri30.xml",         "gri30_mix" );
-    //const CanteraObjects::Setup setup( "Mix", "ethanol_mech.xml",  "gas"       );
+    const CanteraObjects::Setup setup( "Mix", inputFileName, inpGroup );
 
     CanteraObjects::setup_cantera(setup);
     Cantera_CXX::IdealGasMix* const gasMix = CanteraObjects::get_gasmix();
 
     const int nSpec=gasMix->nSpecies();
     size_t n;
-    const double refPressure=gasMix->pressure();
     const std::vector<double>& molecularWeights = gasMix->molecularWeights();
 
     typedef Expr::PlaceHolder      < CellField > Temp;
     typedef TemperaturePowers      < CellField > TemperaturePowers;
     typedef Expr::PlaceHolder      < CellField > MassFracs;
-    typedef HeatCapacity_Cp        < CellField > HeatCapacity;
-    typedef SpeciesHeatCapacity_Cp < CellField > SpeciesHeatCapacity;
-
 
     const Expr::Tag tTag ( "Temperature", Expr::STATE_NONE );
     const Expr::Tag yiTag ( "yi", Expr::STATE_NONE );
@@ -64,10 +88,13 @@ int main()
       name << "yi_" << n;
       yiTags.push_back( Expr::Tag( name.str(), Expr::STATE_NONE ) );
     }
-    Expr::Tag cpMixTag ("cp mix", Expr::STATE_NONE);
     Expr::TagList cpTags;
-    for( n=0; n<nSpec; ++n ){
-      cpTags.push_back( Expr::Tag( "cp" + boost::lexical_cast<std::string>(n), Expr::STATE_NONE ) );
+    if( mix )
+      cpTags.push_back(Expr::Tag("cp mix", Expr::STATE_NONE));
+    else{
+      for( n=0; n<nSpec; ++n ){
+        cpTags.push_back( Expr::Tag( "cp" + boost::lexical_cast<std::string>(n), Expr::STATE_NONE ) );
+      }
     }
 
     Expr::ExpressionFactory exprFactory;
@@ -77,22 +104,11 @@ int main()
     BOOST_FOREACH( Expr::Tag yiTag, yiTags){
       exprFactory.register_expression( new MassFracs::Builder (yiTag) );
     }
-    const Expr::ExpressionID cpMixture_id = exprFactory.register_expression( new HeatCapacity::Builder( cpMixTag, tTag, yiTag ));
-    std::set< Expr::ExpressionID > cpSpecies_id;
-    for( n=0; n<nSpec; ++n ){
-      cpSpecies_id.insert(exprFactory.register_expression( new SpeciesHeatCapacity::Builder(cpTags[n], tTag, n) ));
-    }
+    std::set< Expr::ExpressionID > cp_id = register_cp( mix, exprFactory, cpTags, tTag, yiTag, nSpec);
 
-    Expr::ExpressionTree mixtureTree( cpMixture_id, exprFactory, 0 );
-    Expr::ExpressionTree speciesTree( cpSpecies_id, exprFactory, 0 );
+    Expr::ExpressionTree cpTree( cp_id, exprFactory, 0 );
 
-    {
-      std::ofstream mixture( "EnthalpyMixture.dot" );
-      std::ofstream species( "EnthalpySpecies.dot" );
-
-      mixtureTree.write_tree( mixture );
-      speciesTree.write_tree( species ) ;
-    }
+    write_tree( mix, cpTree);
 
     std::vector<int> ptvec;
 #   ifdef TIMINGS
@@ -125,13 +141,11 @@ int main()
 
       Expr::FieldManagerList fml;
 
-      mixtureTree.register_fields( fml );
-      speciesTree.register_fields( fml );
+      cpTree.register_fields( fml );
 
       fml.allocate_fields( Expr::FieldAllocInfo( npts, 0, 0, false, false, false ) );
 
-      mixtureTree.bind_fields( fml );
-      speciesTree.bind_fields( fml );
+      cpTree.bind_fields( fml );
 
       using namespace SpatialOps;
       Expr::FieldMgrSelector<CellField>::type& cellFM = fml.field_manager< CellField>();
@@ -139,91 +153,42 @@ int main()
       CellField& temp = cellFM.field_ref(tTag);
       temp <<= 500.0 + 1000.0*xcoord;
 
-      SpatFldPtr<CellField> sum  = SpatialFieldStore::get<CellField>(temp);
-      *sum<<=0.0;
-      for( n=0; n<nSpec; ++n ){
-        CellField& yi = cellFM.field_ref(yiTags[n]);
-        yi <<= n + 1 + xcoord;
-        *sum <<= *sum + yi;
+      if(mix){
+        SpatFldPtr<CellField> sum  = SpatialFieldStore::get<CellField>(temp);
+        *sum<<=0.0;
+        for( n=0; n<nSpec; ++n ){
+          CellField& yi = cellFM.field_ref(yiTags[n]);
+          yi <<= n + 1 + xcoord;
+          *sum <<= *sum + yi;
+        }
+        BOOST_FOREACH( Expr::Tag yiTag, yiTags){
+          CellField& yi = cellFM.field_ref(yiTag);
+          yi <<= yi / *sum;
+        }
       }
-      BOOST_FOREACH( Expr::Tag yiTag, yiTags){
-        CellField& yi = cellFM.field_ref(yiTag);
-        yi <<= yi / *sum;
-      }
-
-      mixtureTree.lock_fields( fml );  // prevent fields from being deallocated so that we can get them after graph execution.
-      speciesTree.lock_fields( fml );
+      cpTree.lock_fields( fml );  // prevent fields from being deallocated so that we can get them after graph execution.
 
 #     ifdef TIMINGS
       std::cout << std::endl << setup.inputFile << " - " << *ptit << std::endl;
 #     endif
-      boost::timer mixTimer;
-      mixtureTree.execute_tree();
+      boost::timer cpTimer;
+      cpTree.execute_tree();
 #     ifdef TIMINGS
-      std::cout << "PoKiTT mixture cp time  " << mixTimer.elapsed() << std::endl;
+      std::cout << "PoKiTT cp time  " << cpTimer.elapsed() << std::endl;
 #     endif
-      CellField& cp = fml.field_manager<CellField>().field_ref(cpMixTag);
 #     ifdef ENABLE_CUDA
-      cp.add_device(CPU_INDEX);
+      BOOST_FOREACH( Expr::Tag cpTag, cpTags){
+        CellField& cp = fml.field_manager<CellField>().field_ref(cpTag);
+        cp.add_device(CPU_INDEX);
+      }
 #     endif
 
-      boost::timer specTimer;
-      speciesTree.execute_tree();
-#     ifdef TIMINGS
-      std::cout << "PoKiTT species cp time  " << specTimer.elapsed() << std::endl;
-#     endif
-
-      std::vector<double> tVec;
-      for( i=0; i<*ptit+2; ++i)
-        tVec.push_back( 500.0 + 1000.0 * (i-0.5)/ *ptit);
-
-      std::vector< std::vector<double> > massfracs;
-      for( i=0; i<*ptit+2; ++i){
-        std::vector<double> massfrac;
-        double sum = 0.0;
-        for( n=0; n<nSpec; ++n){
-          massfrac.push_back(1 + n + (i-0.5)/ *ptit);
-          sum+=massfrac[n];
-        }
-        for( n=0; n<nSpec; ++n)
-          massfrac[n] = massfrac[n]/sum;
-        massfracs.push_back(massfrac);
-      }
-
-      std::vector< std::vector<double> >::iterator imass = massfracs.begin();
-      std::vector<double>::const_iterator itemp = tVec.begin();
-      SpatFldPtr<CellField> canteraResult  = SpatialFieldStore::get<CellField>(temp);
-      boost::timer hMixtimer;
-      for(CellField::iterator icant = canteraResult->begin(); icant!=canteraResult->end(); ++itemp, ++imass, ++icant){
-        gasMix->setState_TPY( *itemp, refPressure, &(*imass)[0]);
-        *icant=gasMix->cp_mass();
-      }
-#     ifdef TIMINGS
-      std::cout << "Cantera mixture cp time " << hMixtimer.elapsed() << std::endl;
-#     endif
-      status( field_equal(cp, *canteraResult, 1e-14), "mix");
-
-      std::vector< SpatFldPtr<CellField> > canteraResults;
-      for( n=0; n < nSpec; ++n){
-        canteraResults.push_back(SpatialFieldStore::get<CellField>(temp));
-      }
-      i=0;
-      itemp = tVec.begin();
-      imass = massfracs.begin();
-      std::vector<double> cp_result(nSpec,0.0);
-      boost::timer cTimer;
-      for( i=0; i<*ptit+2; ++itemp, ++imass, ++i){
-        gasMix->setState_TPY( *itemp, refPressure, &(*imass)[0]);
-        gasMix->getPartialMolarCp(&cp_result[0]);
-        for( n=0; n<nSpec; ++n){
-          (*canteraResults[n])[i] = cp_result[n];
-        }
-      }
-
-      for( n=0; n<nSpec; ++n){
-        *canteraResults[n] <<= *canteraResults[n] / molecularWeights[n];
-        CellField& cp = cellFM.field_ref(cpTags[n]);
-        status(field_equal(cp, *canteraResults[n], 1e-14), n);
+      std::vector< SpatFldPtr<CellField> > canteraResults = get_Cantera_results( mix, gasMix, *ptit, nSpec, xcoord);
+      std::vector< SpatFldPtr<CellField> >::iterator icantera = canteraResults.begin();
+      BOOST_FOREACH( Expr::Tag cpTag, cpTags){
+        CellField& cp = cellFM.field_ref(cpTag);
+        status(field_equal(cp, **icantera, 1e-14), cpTag.name());
+        ++icantera;
       }
 
     } // number of points
@@ -245,3 +210,92 @@ int main()
   std::cout << "FAIL\n";
   return -1;
 }
+
+std::set< Expr::ExpressionID > register_cp( bool mix, Expr::ExpressionFactory& exprFactory, Expr::TagList cpTags, Expr::Tag tTag, Expr::Tag yiTag, int nSpec)
+        {
+  typedef HeatCapacity_Cp        < CellField > HeatCapacity;
+  typedef SpeciesHeatCapacity_Cp < CellField > SpeciesHeatCapacity;
+  std::set< Expr::ExpressionID > cp_id;
+  if( mix )
+    cp_id.insert(exprFactory.register_expression( new HeatCapacity::Builder( cpTags[0], tTag, yiTag )));
+  else{
+    for( size_t n=0; n<nSpec; ++n ){
+      cp_id.insert(exprFactory.register_expression( new SpeciesHeatCapacity::Builder(cpTags[n], tTag, n) ));
+    }
+  }
+  return cp_id;
+        }
+
+void write_tree( bool mix, Expr::ExpressionTree& tree)
+{
+  if(mix){
+    std::ofstream out( "CpMixture.dot" );
+    tree.write_tree(out);
+  }
+  else{
+    std::ofstream out( "CpSpecies.dot" );
+    tree.write_tree(out);
+  }
+}
+
+std::vector< So::SpatFldPtr<CellField> > get_Cantera_results( bool mix, Cantera_CXX::IdealGasMix* gasMix, int npts, int nSpec, CellField prototype)
+        {
+  using namespace SpatialOps;
+  size_t i;
+  size_t n;
+  const double refPressure=gasMix->pressure();
+  const std::vector<double>& molecularWeights = gasMix->molecularWeights();
+  std::vector<double> tVec;
+  for( i=0; i<npts+2; ++i)
+    tVec.push_back( 500.0 + 1000.0 * (i-0.5)/ npts);
+
+  std::vector< std::vector<double> > massfracs;
+  for( i=0; i<npts+2; ++i){
+    std::vector<double> massfrac;
+    double sum = 0.0;
+    for( n=0; n<nSpec; ++n){
+      massfrac.push_back(1 + n + (i-0.5)/ npts);
+      sum+=massfrac[n];
+    }
+    for( n=0; n<nSpec; ++n)
+      massfrac[n] = massfrac[n]/sum;
+    massfracs.push_back(massfrac);
+  }
+
+  std::vector< SpatFldPtr<CellField> > canteraResults;
+  std::vector<double>::const_iterator itemp = tVec.begin();
+  std::vector< std::vector<double> >::iterator imass = massfracs.begin();
+  if( mix ){
+    SpatFldPtr<CellField> canteraResult = SpatialFieldStore::get<CellField>(prototype);
+    boost::timer cpTimer;
+    for(CellField::iterator icant = canteraResult->begin(); icant!=canteraResult->end(); ++itemp, ++imass, ++icant){
+      gasMix->setState_TPY( *itemp, refPressure, &(*imass)[0]);
+      *icant=gasMix->cp_mass();
+    }
+#   ifdef TIMINGS
+    std::cout << "Cantera cp time " << cpTimer.elapsed() << std::endl;
+#   endif
+    canteraResults.push_back(canteraResult);
+  }
+  else{
+    for( n=0; n < nSpec; ++n){
+      canteraResults.push_back(SpatialFieldStore::get<CellField>(prototype));
+    }
+    std::vector<double> cp_result(nSpec,0.0);
+    boost::timer cpTimer;
+    for( i=0; i<npts+2; ++itemp, ++imass, ++i){
+      gasMix->setState_TPY( *itemp, refPressure, &(*imass)[0]);
+      gasMix->getPartialMolarCp(&cp_result[0]);
+      for( n=0; n<nSpec; ++n){
+        (*canteraResults[n])[i] = cp_result[n];
+      }
+    }
+#   ifdef TIMINGS
+    std::cout << "Cantera cp time " << cpTimer.elapsed() << std::endl;
+#   endif
+    for( n=0; n<nSpec; ++n){
+      *canteraResults[n] <<= *canteraResults[n] / molecularWeights[n];
+    }
+  }
+  return canteraResults;
+        }
