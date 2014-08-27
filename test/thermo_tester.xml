@@ -17,7 +17,7 @@
     <transport model="Mix"/>
   </phase>
   
-    <phase dim="3" id="shomate_cp">
+    <phase dim="3" id="shomate">
     <elementArray datasrc="elements.xml">O  N  Ar </elementArray>
     <speciesArray datasrc="#species_data">shomate NASA</speciesArray>
     <reactionArray datasrc="#reaction_data"/>

@@ -51,7 +51,7 @@ int main()
   try {
     TestHelper status( true );
     const CanteraObjects::Setup setup( "Mix", "thermo_tester.xml", "const_cp"  );
-    //const CanteraObjects::Setup setup( "Mix", "thermo_tester.xml", "shomate_cp");
+    //const CanteraObjects::Setup setup( "Mix", "thermo_tester.xml", "shomate");
     //const CanteraObjects::Setup setup( "Mix", "h2o2.xml",          "ohmech"    );
     //const CanteraObjects::Setup setup( "Mix", "gri30.xml",         "gri30_mix" );
     //const CanteraObjects::Setup setup( "Mix", "ethanol_mech.xml",  "gas"       );
