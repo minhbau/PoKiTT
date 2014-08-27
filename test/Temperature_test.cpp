@@ -46,9 +46,10 @@ void calculate_internal_energy( Expr::Tag e0Tag,
                                 Expr::FieldMgrSelector<CellField>::type& cellFM,
                                 Cantera_CXX::IdealGasMix* const gasMix);
 
-int main(){
-  TestHelper status( true );
+int main()
+{
   try {
+    TestHelper status( true );
     const CanteraObjects::Setup setup( "Mix", "thermo_tester.xml", "const_cp"  );
     //const CanteraObjects::Setup setup( "Mix", "thermo_tester.xml", "shomate_cp");
     //const CanteraObjects::Setup setup( "Mix", "h2o2.xml",          "ohmech"    );
@@ -231,9 +232,9 @@ int main(){
       std::cout << "PoKiTT temperature from e0 time  " << te0Timer.elapsed() << std::endl;
 #     endif
 
-#ifdef ENABLE_CUDA
+#     ifdef ENABLE_CUDA
       temp.add_device(CPU_INDEX);
-#endif
+#     endif
 
       std::vector< std::vector<double> >::iterator imass = massfracs.begin();
       std::vector<double>::iterator itempd = tVecDiff.begin();
@@ -258,20 +259,29 @@ int main(){
       CellField& tempe0 = cellFM.field_ref(te0Tag);
       status( field_equal(tempe0, *canteraResult, 1e-6), "temperature from e0");
     }
+
+    if( status.ok() ){
+      std::cout << "PASS\n";
+      return 0;
+    }
   }
   catch( Cantera::CanteraError& ){
     Cantera::showErrors();
   }
+  catch( std::exception& err ){
+    std::cout << err.what() << std::endl;
+  }
 
-  if( status.ok() ) return 0;
-    return -1;
+  std::cout << "FAIL\n";
+  return -1;
 }
 
 void calculate_enthalpy( Expr::Tag hTag,
                          Expr::Tag tTag,
                          Expr::TagList yiTags,
                          Expr::FieldMgrSelector<CellField>::type& cellFM,
-                         Cantera_CXX::IdealGasMix* const gasMix){
+                         Cantera_CXX::IdealGasMix* const gasMix )
+{
   const Cantera::SpeciesThermo* spThermo = &gasMix->speciesThermo();
   const int nSpec=gasMix->nSpecies();
   const std::vector<double>& molecularWeights = gasMix->molecularWeights();
@@ -295,19 +305,25 @@ void calculate_enthalpy( Expr::Tag hTag,
       enthalpy <<= enthalpy + yi*(c[1] + c[3]*(temp-c[0]))
       / molecularWeights[n];
     else if (type == NASA2)
-      enthalpy<<= enthalpy + Cantera::GasConstant * yi * cond( temp <= c[0] && temp >= minTemp, c[ 6] + c[1] * temp + c[2]/2 * temp*temp + c[ 3]/3 * temp*temp*temp + c[ 4]/4 * temp*temp*temp*temp + c[ 5]/5 * temp*temp*temp*temp*temp) // if low temp
-    ( temp >  c[0] && temp <= maxTemp, c[13] + c[8] * temp + c[9]/2 * temp*temp + c[10]/3 * temp*temp*temp + c[11]/4 * temp*temp*temp*temp+ c[12]/5 * temp*temp*temp*temp*temp)  // else if high range
-    ( temp < minTemp, c[1]*temp + c[2]*minTemp*(temp-minTemp/2) + c[ 3]*minTemp*minTemp*(temp-2*minTemp/3) + c[ 4]*pow(minTemp,3)*(temp-3*minTemp/4) + c[ 5]*pow(minTemp,4)*(temp-4*minTemp/5) + c[ 6]) // else if out of bounds - low
-    (                 c[8]*temp + c[9]*maxTemp*(temp-maxTemp/2) + c[10]*maxTemp*maxTemp*(temp-2*maxTemp/3) + c[11]*pow(maxTemp,3)*(temp-3*maxTemp/4) + c[12]*pow(maxTemp,4)*(temp-4*maxTemp/5) + c[13]) // else out of bounds - high
-    / molecularWeights[n];
-    else if ( type == SHOMATE2 )
-      enthalpy<<= enthalpy + yi * 1e6 * cond( temp <= c[0] && temp >= minTemp, c[ 6] + c[1]*temp*1e-3 + c[2]/2 * temp*temp*1e-6 + c[ 3]/3 * temp*temp*temp*1e-9 + c[ 4]/4 * temp*temp*temp*temp*1e-12 - c[ 5] *1e3/temp ) // if low temp
-    ( temp >  c[0] && temp <= maxTemp, c[13] + c[8]*temp*1e-3 + c[9]/2 * temp*temp*1e-6 + c[10]/3 * temp*temp*temp*1e-9 + c[11]/4 * temp*temp*temp*temp*1e-12 - c[12] * 1e3/temp )  // else if high range
-    ( temp < minTemp, c[1]*temp*1e-3 + c[2] *minTempScaled* ( temp*1e-3 - minTempScaled/2 ) + c[ 3] * minTempScaled*minTempScaled * ( temp*1e-3 - 2*minTempScaled/3 ) + c[ 4] * pow(minTempScaled,3) * ( temp*1e-3 - 3*minTempScaled/4 ) - c[ 5] * pow(minTempScaled,-1) * (-temp*1e-3/minTempScaled + 2 ) + c[ 6] )
-    (                 c[8]*maxTempScaled + c[9]/2 * maxTempScaled * maxTempScaled + c[10]/3 * pow(maxTempScaled,3) + c[11]/4 * pow(maxTempScaled,4) - c[12] * pow(maxTempScaled,-1) + c[13] + (temp*1e-3 - maxTempScaled)*(c[8] + c[9] * maxTempScaled + c[10] * maxTempScaled * maxTempScaled + c[11] * pow(maxTempScaled,3) + c[12] * pow(maxTempScaled,-2)))
-    / molecularWeights[n];
-    else
-      std::cout<<"Thermo model not supported\nModel = "<<type<<std::endl;
+      enthalpy <<= enthalpy + Cantera::GasConstant * yi
+            * cond( temp <= c[0] && temp >= minTemp, c[ 6] + c[1] * temp + c[2]/2 * temp*temp + c[ 3]/3 * temp*temp*temp + c[ 4]/4 * temp*temp*temp*temp + c[ 5]/5 * temp*temp*temp*temp*temp) // if low temp
+                  ( temp >  c[0] && temp <= maxTemp, c[13] + c[8] * temp + c[9]/2 * temp*temp + c[10]/3 * temp*temp*temp + c[11]/4 * temp*temp*temp*temp+ c[12]/5 * temp*temp*temp*temp*temp)  // else if high range
+                  ( temp < minTemp, c[1]*temp + c[2]*minTemp*(temp-minTemp/2) + c[ 3]*minTemp*minTemp*(temp-2*minTemp/3) + c[ 4]*pow(minTemp,3)*(temp-3*minTemp/4) + c[ 5]*pow(minTemp,4)*(temp-4*minTemp/5) + c[ 6]) // else if out of bounds - low
+                  (                 c[8]*temp + c[9]*maxTemp*(temp-maxTemp/2) + c[10]*maxTemp*maxTemp*(temp-2*maxTemp/3) + c[11]*pow(maxTemp,3)*(temp-3*maxTemp/4) + c[12]*pow(maxTemp,4)*(temp-4*maxTemp/5) + c[13]) // else out of bounds - high
+            / molecularWeights[n];
+    else if( type == SHOMATE2 ){
+      enthalpy <<= enthalpy + yi * 1e6
+                * cond( temp <= c[0] && temp >= minTemp, c[ 6] + c[1]*temp*1e-3 + c[2]/2 * temp*temp*1e-6 + c[ 3]/3 * temp*temp*temp*1e-9 + c[ 4]/4 * temp*temp*temp*temp*1e-12 - c[ 5] *1e3/temp ) // if low temp
+                      ( temp >  c[0] && temp <= maxTemp, c[13] + c[8]*temp*1e-3 + c[9]/2 * temp*temp*1e-6 + c[10]/3 * temp*temp*temp*1e-9 + c[11]/4 * temp*temp*temp*temp*1e-12 - c[12] * 1e3/temp )  // else if high range
+                      ( temp < minTemp, c[1]*temp*1e-3 + c[2] *minTempScaled* ( temp*1e-3 - minTempScaled/2 ) + c[ 3] * minTempScaled*minTempScaled * ( temp*1e-3 - 2*minTempScaled/3 ) + c[ 4] * pow(minTempScaled,3) * ( temp*1e-3 - 3*minTempScaled/4 ) - c[ 5] * pow(minTempScaled,-1) * (-temp*1e-3/minTempScaled + 2 ) + c[ 6] )
+                      (                 c[8]*maxTempScaled + c[9]/2 * maxTempScaled * maxTempScaled + c[10]/3 * pow(maxTempScaled,3) + c[11]/4 * pow(maxTempScaled,4) - c[12] * pow(maxTempScaled,-1) + c[13] + (temp*1e-3 - maxTempScaled)*(c[8] + c[9] * maxTempScaled + c[10] * maxTempScaled * maxTempScaled + c[11] * pow(maxTempScaled,3) + c[12] * pow(maxTempScaled,-2)))
+                / molecularWeights[n];
+    }
+    else{
+      std::ostringstream msg;
+      msg << "Thermo model not supported\nModel = " << type << std::endl;
+      throw std::invalid_argument( msg.str() );
+    }
   }
 }
 
@@ -315,7 +331,8 @@ void calculate_internal_energy( Expr::Tag e0Tag,
                                 Expr::Tag tTag,
                                 Expr::TagList yiTags,
                                 Expr::FieldMgrSelector<CellField>::type& cellFM,
-                                Cantera_CXX::IdealGasMix* const gasMix){
+                                Cantera_CXX::IdealGasMix* const gasMix )
+{
   const Cantera::SpeciesThermo* spThermo = &gasMix->speciesThermo();
   const int nSpec=gasMix->nSpecies();
   const std::vector<double>& molecularWeights = gasMix->molecularWeights();
@@ -323,7 +340,7 @@ void calculate_internal_energy( Expr::Tag e0Tag,
   CellField& e0 = cellFM.field_ref(e0Tag);
   CellField& temp = cellFM.field_ref(tTag);
   e0 <<= 0.0;
-  for( size_t n=0; n<nSpec; ++n){
+  for( size_t n=0; n<nSpec; ++n ){
     int type; //type of correlation used
     std::vector<double> c(15,0); //vector of Cantera's coefficients, at most 15 for NASA7
     double minTemp;
@@ -337,25 +354,29 @@ void calculate_internal_energy( Expr::Tag e0Tag,
     if( type == SIMPLE )
       e0<<= e0 + yi*(c[1] + c[3]*(temp-c[0]) - Cantera::GasConstant*temp)
       / molecularWeights[n];
-    else if (type == NASA2){
+    else if( type == NASA2 ){
       c[1]-=1;
       c[8]-=1;
 
-      e0<<= e0 + Cantera::GasConstant * yi* cond( temp <= c[0] && temp >= minTemp, c[ 6] + c[1] * temp + c[2]/2 * temp*temp + c[ 3]/3 * temp*temp*temp + c[ 4]/4 * temp*temp*temp*temp + c[ 5]/5 * temp*temp*temp*temp*temp) // if low temp
-      ( temp >  c[0] && temp <= maxTemp, c[13] + c[8] * temp + c[9]/2 * temp*temp + c[10]/3 * temp*temp*temp + c[11]/4 * temp*temp*temp*temp+ c[12]/5 * temp*temp*temp*temp*temp)  // else if high range
-      ( temp < minTemp, c[1]*temp + c[2]*minTemp*(temp-minTemp/2) + c[ 3]*minTemp*minTemp*(temp-2*minTemp/3) + c[ 4]*pow(minTemp,3)*(temp-3*minTemp/4) + c[ 5]*pow(minTemp,4)*(temp-4*minTemp/5) + c[ 6]) // else if out of bounds - low
-      (                 c[8]*temp + c[9]*maxTemp*(temp-maxTemp/2) + c[10]*maxTemp*maxTemp*(temp-2*maxTemp/3) + c[11]*pow(maxTemp,3)*(temp-3*maxTemp/4) + c[12]*pow(maxTemp,4)*(temp-4*maxTemp/5) + c[13])
-      / molecularWeights[n];
+      e0<<= e0 + Cantera::GasConstant * yi
+            * cond( temp <= c[0] && temp >= minTemp, c[ 6] + c[1] * temp + c[2]/2 * temp*temp + c[ 3]/3 * temp*temp*temp + c[ 4]/4 * temp*temp*temp*temp + c[ 5]/5 * temp*temp*temp*temp*temp) // if low temp
+                  ( temp >  c[0] && temp <= maxTemp, c[13] + c[8] * temp + c[9]/2 * temp*temp + c[10]/3 * temp*temp*temp + c[11]/4 * temp*temp*temp*temp+ c[12]/5 * temp*temp*temp*temp*temp)  // else if high range
+                  ( temp < minTemp, c[1]*temp + c[2]*minTemp*(temp-minTemp/2) + c[ 3]*minTemp*minTemp*(temp-2*minTemp/3) + c[ 4]*pow(minTemp,3)*(temp-3*minTemp/4) + c[ 5]*pow(minTemp,4)*(temp-4*minTemp/5) + c[ 6]) // else if out of bounds - low
+                  (                 c[8]*temp + c[9]*maxTemp*(temp-maxTemp/2) + c[10]*maxTemp*maxTemp*(temp-2*maxTemp/3) + c[11]*pow(maxTemp,3)*(temp-3*maxTemp/4) + c[12]*pow(maxTemp,4)*(temp-4*maxTemp/5) + c[13])
+            / molecularWeights[n];
     }// else out of bounds - high
-    else if ( type == SHOMATE2 )
-    {
-      e0<<= e0 + yi *(-Cantera::GasConstant*temp + 1e6 * cond( temp <= c[0] && temp >= minTemp, c[ 6] + c[1]*temp*1e-3 + c[2]/2 * temp*temp*1e-6 + c[ 3]/3 * temp*temp*temp*1e-9 + c[ 4]/4 * temp*temp*temp*temp*1e-12 - c[ 5] *1e3/temp ) // if low temp
-      ( temp >  c[0] && temp <= maxTemp, c[13] + c[8]*temp*1e-3 + c[9]/2 * temp*temp*1e-6 + c[10]/3 * temp*temp*temp*1e-9 + c[11]/4 * temp*temp*temp*temp*1e-12 - c[12] * 1e3/temp )  // else if high range
-      ( temp < minTemp, c[1]*temp*1e-3 + c[2] *minTempScaled* ( temp*1e-3 - minTempScaled/2 ) + c[ 3] * minTempScaled*minTempScaled * ( temp*1e-3 - 2*minTempScaled/3 ) + c[ 4] * pow(minTempScaled,3) * ( temp*1e-3 - 3*minTempScaled/4 ) - c[ 5] * pow(minTempScaled,-1) * (-temp*1e-3/minTempScaled + 2 ) + c[ 6] )
-      (                 c[8]*maxTempScaled + c[9]/2 * maxTempScaled * maxTempScaled + c[10]/3 * pow(maxTempScaled,3) + c[11]/4 * pow(maxTempScaled,4) - c[12] * pow(maxTempScaled,-1) + c[13] + (temp*1e-3 - maxTempScaled)*(c[8] + c[9] * maxTempScaled + c[10] * maxTempScaled * maxTempScaled + c[11] * pow(maxTempScaled,3) + c[12] * pow(maxTempScaled,-2))))
-                    / molecularWeights[n];
+    else if( type == SHOMATE2 ){
+      e0<<= e0 + yi *(-Cantera::GasConstant*temp + 1e6
+          * cond( temp <= c[0] && temp >= minTemp, c[ 6] + c[1]*temp*1e-3 + c[2]/2 * temp*temp*1e-6 + c[ 3]/3 * temp*temp*temp*1e-9 + c[ 4]/4 * temp*temp*temp*temp*1e-12 - c[ 5] *1e3/temp ) // if low temp
+                ( temp >  c[0] && temp <= maxTemp, c[13] + c[8]*temp*1e-3 + c[9]/2 * temp*temp*1e-6 + c[10]/3 * temp*temp*temp*1e-9 + c[11]/4 * temp*temp*temp*temp*1e-12 - c[12] * 1e3/temp )  // else if high range
+                ( temp < minTemp, c[1]*temp*1e-3 + c[2] *minTempScaled* ( temp*1e-3 - minTempScaled/2 ) + c[ 3] * minTempScaled*minTempScaled * ( temp*1e-3 - 2*minTempScaled/3 ) + c[ 4] * pow(minTempScaled,3) * ( temp*1e-3 - 3*minTempScaled/4 ) - c[ 5] * pow(minTempScaled,-1) * (-temp*1e-3/minTempScaled + 2 ) + c[ 6] )
+                (                 c[8]*maxTempScaled + c[9]/2 * maxTempScaled * maxTempScaled + c[10]/3 * pow(maxTempScaled,3) + c[11]/4 * pow(maxTempScaled,4) - c[12] * pow(maxTempScaled,-1) + c[13] + (temp*1e-3 - maxTempScaled)*(c[8] + c[9] * maxTempScaled + c[10] * maxTempScaled * maxTempScaled + c[11] * pow(maxTempScaled,3) + c[12] * pow(maxTempScaled,-2)))
+          ) / molecularWeights[n];
     }
-    else
-      std::cout<<"Thermo model not supported\nModel = "<<type<<std::endl;
+    else{
+      std::ostringstream msg;
+      msg << "Thermo model not supported\nModel = " << type << std::endl;
+      throw std::invalid_argument( msg.str() );
+    }
   }
 }

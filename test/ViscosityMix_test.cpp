@@ -26,9 +26,10 @@
 namespace So = SpatialOps;
 typedef So::SVolField   CellField;
 
-int main(){
-  TestHelper status( true );
+int main()
+{
   try {
+    TestHelper status( true );
     const CanteraObjects::Setup setup( "Mix", "h2o2.xml",          "ohmech"    );
     //const CanteraObjects::Setup setup( "Mix", "gri30.xml",         "gri30_mix" );
     //const CanteraObjects::Setup setup( "Mix", "ethanol_mech.xml",  "gas"       );
@@ -172,11 +173,19 @@ int main(){
 
     } // number of points
 
+    if( status.ok() ){
+      std::cout << "PASS\n";
+      return 0;
+    }
+
   } // try
   catch( Cantera::CanteraError& ){
     Cantera::showErrors();
   }
+  catch( std::exception& err ){
+    std::cout << err.what() << std::endl;
+  }
 
-  if( status.ok() ) return 0;
-    return -1;
+  std::cout << "FAIL\n";
+  return -1;
 }

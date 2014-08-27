@@ -33,8 +33,8 @@ namespace Cantera_CXX{ class IdealGasMix; } //location of polynomial
 
 int main()
 {
-  TestHelper status( true );
   try {
+    TestHelper status( true );
     const CanteraObjects::Setup setup( "Mix", "thermo_tester.xml", "const_cp"  );
     //const CanteraObjects::Setup setup( "Mix", "thermo_tester.xml", "shomate_cp");
     //const CanteraObjects::Setup setup( "Mix", "h2o2.xml",          "ohmech"    );
@@ -228,11 +228,20 @@ int main()
 
     } // number of points
 
+    if( status.ok() ){
+      std::cout << "PASS\n";
+      return 0;
+    }
+
   } // try
   catch( Cantera::CanteraError& ){
     Cantera::showErrors();
   }
 
-  if( status.ok() ) return 0;
-    return -1;
+  catch( std::exception& err ){
+    std::cout << err.what() << std::endl;
+  }
+
+  std::cout << "FAIL\n";
+  return -1;
 }
