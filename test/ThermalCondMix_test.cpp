@@ -144,7 +144,7 @@ int main()
       tree.execute_tree();
       std::cout << "tree time " << treetimer.elapsed() << std::endl;
 
-      const CellField& tCondMix = cellFM.field_ref(tCondMixTag);
+      CellField& tCondMix = cellFM.field_ref(tCondMixTag);
 #     ifdef ENABLE_CUDA
       tCondMix.add_device(CPU_INDEX);
 #     endif
