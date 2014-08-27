@@ -5,6 +5,8 @@
  *      Author: nate
  */
 
+//#define TIMINGS
+
 #include <iostream>
 #include <stdio.h>
 #include <fstream>
@@ -54,31 +56,6 @@ int main()
     typedef Expr::PlaceHolder <CellField> MassFracs;
     typedef Viscosity <CellField> ViscosityMix;
 
-    Expr::ExpressionFactory exprFactory;
-
-    const Expr::Tag tTag ( "Temperature"   , Expr::STATE_NONE);
-    const Expr::Tag yiTag ( "yi", Expr::STATE_NONE );
-    Expr::TagList yiTags;
-    for( n=0; n<nSpec; ++n ){
-      std::ostringstream name;
-      name << yiTag.name() << "_" << n;
-      yiTags.push_back( Expr::Tag(name.str(),yiTag.context()) );
-    }
-    const Expr::Tag visMixTag ( "Viscosity Mix", Expr::STATE_NONE);
-
-    exprFactory.register_expression( new Temp ::Builder (tTag                 ) );
-    BOOST_FOREACH( Expr::Tag yiTag, yiTags){
-      exprFactory.register_expression( new MassFracs::Builder (yiTag) );
-    }
-    const Expr::ExpressionID visMix_id = exprFactory.register_expression( new ViscosityMix::Builder (visMixTag ,tTag ,yiTag) );
-
-    Expr::ExpressionTree tree( visMix_id, exprFactory, 0 );
-
-    {
-      std::ofstream fout( "ThermalConductivity.dot" );
-      tree.write_tree(fout);
-    }
-
     std::vector<int> ptvec;
 #   ifdef TIMINGS
     ptvec.push_back(8*8*8);
@@ -94,6 +71,31 @@ int main()
 
     for( std::vector<int>::iterator ptit = ptvec.begin(); ptit!= ptvec.end(); ++ptit){
       size_t i;
+
+      Expr::ExpressionFactory exprFactory;
+
+       const Expr::Tag tTag ( "Temperature"   , Expr::STATE_NONE);
+       const Expr::Tag yiTag ( "yi", Expr::STATE_NONE );
+       Expr::TagList yiTags;
+       for( n=0; n<nSpec; ++n ){
+         std::ostringstream name;
+         name << yiTag.name() << "_" << n;
+         yiTags.push_back( Expr::Tag(name.str(),yiTag.context()) );
+       }
+       const Expr::Tag visMixTag ( "Viscosity Mix", Expr::STATE_NONE);
+
+       exprFactory.register_expression( new Temp ::Builder (tTag                 ) );
+       BOOST_FOREACH( Expr::Tag yiTag, yiTags){
+         exprFactory.register_expression( new MassFracs::Builder (yiTag) );
+       }
+       const Expr::ExpressionID visMix_id = exprFactory.register_expression( new ViscosityMix::Builder (visMixTag ,tTag ,yiTag) );
+
+       Expr::ExpressionTree tree( visMix_id, exprFactory, 0 );
+
+       {
+         std::ofstream fout( "ThermalConductivity.dot" );
+         tree.write_tree(fout);
+       }
 
       So::IntVec npts(*ptit,1,1);
 
@@ -163,7 +165,10 @@ int main()
 
       std::vector< std::vector<double> >::iterator imass = massfracs.begin();
       std::vector<double>::const_iterator itemp = tVec.begin();
-      SpatFldPtr<CellField> canteraResult  = SpatialFieldStore::get<CellField>(visMix);
+      SpatFldPtr<CellField> canteraResult  = SpatialFieldStore::get<CellField>(xcoord);
+#     ifdef ENABLE_CUDA
+      canteraResult->add_device( CPU_INDEX );
+#     endif
       for(CellField::iterator icant = canteraResult->begin(); icant!=canteraResult->end(); ++itemp, ++imass, ++icant){
         mixTrans->thermo().setState_TPY( *itemp, refPressure, &(*imass)[0]);
         *icant=mixTrans->viscosity();

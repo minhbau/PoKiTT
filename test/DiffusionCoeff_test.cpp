@@ -5,6 +5,8 @@
  *      Author: nate
  */
 
+//#define TIMINGS
+
 #include <iostream>
 #include <stdio.h>
 #include <fstream>
@@ -51,11 +53,11 @@ int main()
     const double refPressure=mixTrans->thermo().pressure();
     const std::vector<double>& molecularWeights = mixTrans->thermo().molecularWeights();
 
-    typedef Expr::PlaceHolder <CellField > Temperature;
+    typedef Expr::PlaceHolder <CellField> Temperature;
     typedef Expr::PlaceHolder <CellField> Pressure;
     typedef Expr::PlaceHolder <CellField> MassFracs;
-    typedef MixtureMolWeight <CellField> MixtureMolWeight;
-    typedef DiffusionCoeff <CellField> DiffusionCoeffMix;
+    typedef MixtureMolWeight  <CellField> MixtureMolWeight;
+    typedef DiffusionCoeff    <CellField> DiffusionCoeffMix;
 
     const Expr::Tag tTag ( "Temperature"   , Expr::STATE_NONE);
     const Expr::Tag pTag ( "Pressure"   , Expr::STATE_NONE);
@@ -70,23 +72,6 @@ int main()
     Expr::TagList diffusionCoeffMixTags;
     for( n=0; n<nSpec; ++n )
       diffusionCoeffMixTags.push_back( Expr::Tag( "Di" + boost::lexical_cast<std::string>(n), Expr::STATE_NONE ) );
-
-    Expr::ExpressionFactory exprFactory;
-
-    exprFactory.register_expression( new Temperature::Builder (tTag) );
-    exprFactory.register_expression( new Pressure ::Builder (pTag                 ) );
-    BOOST_FOREACH( Expr::Tag yiTag, yiTags){
-      exprFactory.register_expression( new MassFracs::Builder (yiTag) );
-    }
-    exprFactory.register_expression( new MixtureMolWeight::Builder( mmwTag, yiTag, molecularWeights));
-    const Expr::ExpressionID diffCoeffMix_id = exprFactory.register_expression( new DiffusionCoeffMix::Builder (diffusionCoeffMixTags, tTag, pTag ,yiTag, mmwTag) );
-
-    Expr::ExpressionTree tree( diffCoeffMix_id, exprFactory, 0 );
-
-    {
-      std::ofstream fout( "DiffusionCoeff.dot" );
-      tree.write_tree(fout);
-    }
 
     std::vector<int> ptvec;
 #   ifdef TIMINGS
@@ -103,6 +88,23 @@ int main()
 
     for( std::vector<int>::iterator ptit = ptvec.begin(); ptit!= ptvec.end(); ++ptit){
       size_t i;
+
+      Expr::ExpressionFactory exprFactory;
+
+      exprFactory.register_expression( new Temperature::Builder (tTag) );
+      exprFactory.register_expression( new Pressure ::Builder (pTag                 ) );
+      BOOST_FOREACH( Expr::Tag yiTag, yiTags){
+        exprFactory.register_expression( new MassFracs::Builder (yiTag) );
+      }
+      exprFactory.register_expression( new MixtureMolWeight::Builder( mmwTag, yiTag, molecularWeights));
+      const Expr::ExpressionID diffCoeffMix_id = exprFactory.register_expression( new DiffusionCoeffMix::Builder (diffusionCoeffMixTags, tTag, pTag ,yiTag, mmwTag) );
+
+      Expr::ExpressionTree tree( diffCoeffMix_id, exprFactory, 0 );
+
+      {
+        std::ofstream fout( "DiffusionCoeff.dot" );
+        tree.write_tree(fout);
+      }
 
       So::IntVec npts(*ptit,1,1);
       const So::BoundaryCellInfo cellBCInfo = So::BoundaryCellInfo::build<CellField>(false,false,false);
@@ -152,8 +154,8 @@ int main()
 
 #     ifdef ENABLE_CUDA
       for( n=0; n<nSpec; ++n){
-        CellField& d = cellFM.field_ref(diffusionCoeffMixTags[n]);
-        d.add_device(CPU_INDEX);
+        CellField& D = cellFM.field_ref(diffusionCoeffMixTags[n]);
+        D.add_device(CPU_INDEX);
       }
 #     endif
 
@@ -176,7 +178,10 @@ int main()
 
       std::vector< SpatFldPtr<CellField> > canteraResults;
       for( n=0; n < nSpec; ++n){
-        canteraResults.push_back(SpatialFieldStore::get<CellField>(temp));
+        canteraResults.push_back(SpatialFieldStore::get<CellField>(xcoord));
+#     ifdef ENABLE_CUDA
+      canteraResults[n]->add_device( CPU_INDEX );
+#     endif
       }
       i=0;
       std::vector<double>::const_iterator itemp = tVec.begin();
