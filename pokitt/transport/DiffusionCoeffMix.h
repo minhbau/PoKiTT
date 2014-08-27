@@ -21,16 +21,16 @@
  *
  *  This class calculates the diffusion coefficient
  *  appropriate for calculating the mass averaged diffusive flux with respect
- *  to the mass averaged velocity using gradients of the mole fraction.
+ *  to the mass averaged velocity using gradients of the mass fraction.
  *  The diffusion coefficients are calculated using the following mixing rule,
  *
  * \f[
- * D_{km}' = \frac{\left( \bar{M} - x_k M_k \right)}{ \bar{\qquad M \qquad } }  {\left( \sum_{j \ne k} \frac{x_j}{D_{kj}} \right) }^{-1}
+ * \frac{1}{D_{k,mix}'} = \sum^K_{j \neq k} \frac{x_j}{D_{kj}} + \frac{x_k}{1-y_{k}} \sum^K_{j \neq k} \frac{y_j}{D_{kj}}
  * \f]
  *
  * Where \f$ D_kj \f$ is the binary diffusion coefficient of species k and j,
- * \f$ \bar{M} \f$ is the mixture average molecular weight, \f$ x_k \f$ is the mole
- * fraction of species k, and \f$ M_k \f$ is the molecular weight of species k.
+ * \f$ y_j \f$ is the mass fraction of species j, and \f$ x_j \f$ is the mole
+ * fraction of species j.
  *
  * Units are m^2/s.
  *
