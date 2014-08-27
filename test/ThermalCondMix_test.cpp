@@ -5,6 +5,8 @@
  *      Author: Nathan Yonkee
  */
 
+//#define TIMINGS
+
 #include <iostream>
 #include <stdio.h>
 #include <fstream>
@@ -56,8 +58,6 @@ int main()
     typedef MixtureMolWeight    <CellField> MixtureMolWeight;
     typedef ThermalConductivity <CellField> ThermalConductivityMix;
 
-    Expr::ExpressionFactory exprFactory;
-
     const Expr::Tag tTag ( "Temperature"   , Expr::STATE_NONE);
     const Expr::Tag yiTag ( "yi", Expr::STATE_NONE );
     Expr::TagList yiTags;
@@ -68,20 +68,6 @@ int main()
     }
     const Expr::Tag mmwTag( "mmw", Expr::STATE_NONE);
     const Expr::Tag tCondMixTag ( "Thermal Conductivity Mix", Expr::STATE_NONE);
-
-    exprFactory.register_expression( new Temp ::Builder (tTag                 ) );
-    BOOST_FOREACH( Expr::Tag yiTag, yiTags){
-      exprFactory.register_expression( new MassFracs::Builder (yiTag) );
-    }
-    exprFactory.register_expression( new MixtureMolWeight::Builder( mmwTag, yiTag, molecularWeights));
-    const Expr::ExpressionID tCondMix_id = exprFactory.register_expression( new ThermalConductivityMix::Builder (tCondMixTag ,tTag ,yiTag, mmwTag) );
-
-    Expr::ExpressionTree tree( tCondMix_id, exprFactory, 0 );
-
-    {
-      std::ofstream fout( "ThermalConductivity.dot" );
-      tree.write_tree(fout);
-    }
 
     std::vector<int> ptvec;
 #   ifdef TIMINGS
@@ -98,6 +84,22 @@ int main()
 
     for( std::vector<int>::iterator ptit = ptvec.begin(); ptit!= ptvec.end(); ++ptit){
       size_t i;
+
+      Expr::ExpressionFactory exprFactory;
+
+      exprFactory.register_expression( new Temp ::Builder (tTag                 ) );
+      BOOST_FOREACH( Expr::Tag yiTag, yiTags){
+        exprFactory.register_expression( new MassFracs::Builder (yiTag) );
+      }
+      exprFactory.register_expression( new MixtureMolWeight::Builder( mmwTag, yiTag, molecularWeights));
+      const Expr::ExpressionID tCondMix_id = exprFactory.register_expression( new ThermalConductivityMix::Builder (tCondMixTag ,tTag ,yiTag, mmwTag) );
+
+      Expr::ExpressionTree tree( tCondMix_id, exprFactory, 0 );
+
+      {
+        std::ofstream fout( "ThermalConductivity.dot" );
+        tree.write_tree(fout);
+      }
 
       So::IntVec npts(*ptit,1,1);
       const So::BoundaryCellInfo cellBCInfo = So::BoundaryCellInfo::build<CellField>(false,false,false);
@@ -142,7 +144,7 @@ int main()
       tree.execute_tree();
       std::cout << "tree time " << treetimer.elapsed() << std::endl;
 
-      CellField& tCondMix = cellFM.field_ref(tCondMixTag);
+      const CellField& tCondMix = cellFM.field_ref(tCondMixTag);
 #     ifdef ENABLE_CUDA
       tCondMix.add_device(CPU_INDEX);
 #     endif
@@ -166,14 +168,15 @@ int main()
 
       std::vector< std::vector<double> >::iterator imass = massfracs.begin();
       std::vector<double>::const_iterator itemp = tVec.begin();
-      SpatFldPtr<CellField> canteraResult  = SpatialFieldStore::get<CellField>(tCondMix);
-
+      SpatFldPtr<CellField> canteraResult  = SpatialFieldStore::get<CellField>(xcoord);
+#     ifdef ENABLE_CUDA
+      canteraResult->add_device( CPU_INDEX );
+#     endif
       for(CellField::iterator icant = canteraResult->begin(); icant!=canteraResult->end(); ++itemp, ++imass, ++icant){
         mixTrans->thermo().setState_TPY( *itemp, refPressure, &(*imass)[0]);
         *icant=mixTrans->thermalConductivity();
       }
       status( field_equal(tCondMix, *canteraResult, 1e-12), "thermal conductivity");
-
     } // number of points
 
     if( status.ok() ){
