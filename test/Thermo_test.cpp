@@ -87,11 +87,11 @@ std::set< Expr::ExpressionID > register_thermo_id( const bool mix,
 void write_tree( const bool mix, const std::string& thermo_quantity, const Expr::ExpressionTree& tree)
 {
   if( mix ){
-    std::ofstream out( thermo_quantity + "Mixture.dot" );
+    std::ofstream out( (thermo_quantity + "Mixture.dot").c_str() );
     tree.write_tree(out);
   }
   else{
-    std::ofstream out( thermo_quantity + "Species.dot" );
+    std::ofstream out( (thermo_quantity + "Species.dot").c_str() );
     tree.write_tree(out);
   }
 }
