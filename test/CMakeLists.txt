@@ -58,3 +58,7 @@ add_test( viscosity_test viscosity_test )
 
 nebo_add_executable( thermo_test Thermo_test.cpp )
 target_link_libraries( thermo_test pokitt )
+add_test( NAME thermo_test_mix          COMMAND thermo_test --xml-input-file=thermo_tester.xml --mix )
+add_test( NAME thermo_test              COMMAND thermo_test --xml-input-file=thermo_tester.xml       )
+add_test( NAME thermo_test_shomate_mix  COMMAND thermo_test --xml-input-file=thermo_tester.xml --mix --phase=shomate )
+add_test( NAME thermo_test_shomate      COMMAND thermo_test --xml-input-file=thermo_tester.xml       --phase=shomate )
