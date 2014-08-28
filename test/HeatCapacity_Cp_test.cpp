@@ -34,7 +34,10 @@ namespace po = boost::program_options;
 
 //==============================================================================
 
-std::set< Expr::ExpressionID > register_cp( bool mix, Expr::ExpressionFactory& exprFactory, Expr::TagList cpTags, Expr::Tag tTag, Expr::Tag yiTag, int nSpec)
+std::set< Expr::ExpressionID > register_cp( const bool mix,
+                                            Expr::ExpressionFactory& exprFactory,
+                                            const Expr::TagList& cpTags, const Expr::Tag& tTag, const Expr::Tag& yiTag,
+                                            const int nSpec)
 {
   typedef HeatCapacity_Cp        < CellField > HeatCapacity;
   typedef SpeciesHeatCapacity_Cp < CellField > SpeciesHeatCapacity;
@@ -52,7 +55,7 @@ std::set< Expr::ExpressionID > register_cp( bool mix, Expr::ExpressionFactory& e
 
 //==============================================================================
 
-void write_tree( bool mix, Expr::ExpressionTree& tree)
+void write_tree( const bool mix, const Expr::ExpressionTree& tree)
 {
   if(mix){
     std::ofstream out( "CpMixture.dot" );
@@ -72,7 +75,7 @@ get_cantera_results( const bool mix,
                      Cantera_CXX::IdealGasMix& gasMix,
                      const int npts,
                      const int nSpec,
-                     const CellField prototype )
+                     const CellField& prototype )
 {
   using namespace SpatialOps;
 
