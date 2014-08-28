@@ -158,6 +158,12 @@ int main( int iarg, char* carg[] )
       mix = args.count("mix") > 0;
       timings = args.count("timings") > 0;
 
+      if (!args.count("xml-input-file")){
+        std::cout << "You must enter an xml input file for Cantera" << std::endl;
+        std::cout << desc << std::endl;
+        return 1;
+      }
+
       if (args.count("help")) {
         std::cout << desc << "\n";
         return 1;
