@@ -19,9 +19,18 @@ if( NOT ENABLE_CUDA )
   add_test( enthalpy_test enthalpy_test )
 endif( NOT ENABLE_CUDA )
 
+#-----------------------------------------
+# Isobaric heat capacity calculation tests
 nebo_add_executable( cp_test HeatCapacity_Cp_test.cpp )
 target_link_libraries( cp_test pokitt )
-add_test( cp_test cp_test )
+
+add_test( cp_test_mix         COMMAND cp_test --xml-input-file=thermo_tester.xml --mix )
+add_test( cp_test             COMMAND cp_test --xml-input-file=thermo_tester.xml       )
+add_test( cp_test_mix_shomate COMMAND cp_test --xml-input-file=thermo_tester.xml --phase=shomate --mix )
+add_test( cp_test_shomate     COMMAND cp_test --xml-input-file=thermo_tester.xml --phase=shomate       )
+
+add_test( cp_test_GRI_mix     COMMAND cp_test --xml-input-file=gri30.xml --phase=gri30 --mix )
+#-----------------------------------------
 
 nebo_add_executable( cv_test HeatCapacity_Cv_test.cpp )
 target_link_libraries( cv_test pokitt )
