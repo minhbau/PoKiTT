@@ -218,7 +218,6 @@ HeatCapacity_Cv( const Expr::Tag& tTag,
         *ic *= Cantera::GasConstant / molecularWeights[n]; // dimensionalize the coefficients to mass basis
       break;
     case SHOMATE2:
-
       c[1] -= Cantera::GasConstant * 1e-3; //change coefficients from isobaric to isometric
       c[8] -= Cantera::GasConstant * 1e-3;
       for( std::vector<double>::iterator ic = c.begin() + 1; ic!=c.end(); ++ic ){
