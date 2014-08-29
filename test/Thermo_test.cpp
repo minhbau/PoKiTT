@@ -10,7 +10,7 @@
 #include <fstream>
 #include "TestHelper.h"
 
-#include <pokitt/thermo/TemperaturePowers.h>
+#include <test/TemperaturePowers.h>
 #include <pokitt/thermo/HeatCapacity_Cp.h>
 #include <pokitt/thermo/HeatCapacity_Cv.h>
 #include <pokitt/thermo/Enthalpy.h>

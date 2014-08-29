@@ -10,7 +10,7 @@
 #include <fstream>
 #include "TestHelper.h"
 
-#include <pokitt/thermo/TemperaturePowers.h>
+#include <test/TemperaturePowers.h>
 #include <pokitt/MixtureMolWeight.h>
 #include <pokitt/kinetics/ReactionRates.h>
 

@@ -12,7 +12,7 @@
 #include <fstream>
 #include "TestHelper.h"
 
-#include <pokitt/thermo/TemperaturePowers.h>
+#include <test/TemperaturePowers.h>
 #include <pokitt/thermo/HeatCapacity_Cv.h>
 
 #include <expression/ExprLib.h>

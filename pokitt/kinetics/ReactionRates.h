@@ -4,6 +4,7 @@
 #include <expression/Expression.h>
 
 #include <pokitt/CanteraObjects.h> // include cantera wrapper
+#include <pokitt/thermo/Temperature.h>
 
 #include <cantera/kernel/ct_defs.h> // contains value of gas constant
 #include <cantera/kernel/reaction_defs.h> // reaction type definitions
@@ -159,7 +160,7 @@ ReactionRates( const Expr::Tag& tTag,
                const Expr::Tag& mmwTag )
   : Expr::Expression<FieldT>(),
     tTag_( tTag ),
-    tPowerTags_( TemperaturePowers<FieldT>::temperature_powers_tags() ),
+    tPowerTags_( Temperature<FieldT>::temperature_powers_tags() ),
     pTag_( pTag ),
     mmwTag_( mmwTag ),
     gasMix_( CanteraObjects::get_gasmix() ),

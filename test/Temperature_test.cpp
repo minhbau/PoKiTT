@@ -13,7 +13,7 @@
 #include "TestHelper.h"
 
 #include <pokitt/thermo/Temperature.h>
-#include <pokitt/thermo/TemperaturePowers.h>
+#include <test/TemperaturePowers.h>
 #include <pokitt/MixtureMolWeight.h>
 
 #include <expression/ExprLib.h>
@@ -68,8 +68,8 @@ int main()
     typedef Expr::PlaceHolder <CellField> IntEnergy;
     typedef Expr::PlaceHolder <CellField> KineticEnergy;
     typedef Expr::PlaceHolder <CellField> MassFracs;
-    typedef MixtureMolWeight <CellField> MixtureMolWeight;
-    typedef Temperature <CellField> Temperature;
+    typedef MixtureMolWeight  <CellField> MixtureMolWeight;
+    typedef Temperature       <CellField> Temperature;
     typedef TemperatureFromE0 <CellField> TemperatureE0;
 
     const Expr::Tag hTag ( "Enthalpy"   , Expr::STATE_NONE);
@@ -82,6 +82,7 @@ int main()
       name << yiTag.name() << "_" << n;
       yiTags.push_back( Expr::Tag(name.str(),yiTag.context()) );
     }
+    const Expr::TagList tPowerTags = Temperature::temperature_powers_tags();
     const Expr::Tag mmwTag ( "Mixture Mol Weight", Expr::STATE_NONE );
     const Expr::Tag tTag ( "Temperature", Expr::STATE_NONE);
     const Expr::Tag te0Tag ( "Temperature E0", Expr::STATE_NONE);
@@ -141,12 +142,12 @@ int main()
       Expr::FieldManagerList fml;
 
       tTree.register_fields( fml );
-      te0Tree.register_fields( fml );
+//      te0Tree.register_fields( fml );
 
       fml.allocate_fields( Expr::FieldAllocInfo( npts, 0, 0, false, false, false ) );
 
       tTree.bind_fields( fml );
-      te0Tree.bind_fields( fml );
+//      te0Tree.bind_fields( fml );
 
       using namespace SpatialOps;
       Expr::FieldMgrSelector<CellField>::type& cellFM = fml.field_manager< CellField>();
@@ -195,17 +196,17 @@ int main()
         enthalpy_massVec.push_back( gasMix -> enthalpy_mass());
       }
 
-      calculate_internal_energy( e0Tag, tTag, yiTags, cellFM, gasMix);
+//      calculate_internal_energy( e0Tag, tTag, yiTags, cellFM, gasMix);
 
-      std::vector<double> e0_massVec;
-      i=0;
-      for( itemp = tVec.begin(); itemp < itend; ++itemp, ++i){
-        gasMix->setState_TPY(*itemp,refPressure, &massfracs[i][0]);
-        e0_massVec.push_back( gasMix -> intEnergy_mass());
-      }
-
-      CellField& ke = cellFM.field_ref(keTag);
-      ke <<= 0.0;
+//      std::vector<double> e0_massVec;
+//      i=0;
+//      for( itemp = tVec.begin(); itemp < itend; ++itemp, ++i){
+//        gasMix->setState_TPY(*itemp,refPressure, &massfracs[i][0]);
+//        e0_massVec.push_back( gasMix -> intEnergy_mass());
+//      }
+//
+//      CellField& ke = cellFM.field_ref(keTag);
+//      ke <<= 0.0;
 
       temp <<= temp + 25 - 50 * xcoord;
 
@@ -214,7 +215,7 @@ int main()
         tVecDiff.push_back( 525.0 + 950.0 * (i-0.5)/ *ptit);
 
       tTree.lock_fields( fml );  // prevent fields from being deallocated so that we can get them after graph execution.
-      te0Tree.lock_fields( fml );
+//      te0Tree.lock_fields( fml );
 
 #     ifdef TIMINGS
       std::cout << std::endl << setup.inputFile << " - " << *ptit << std::endl;
@@ -227,7 +228,7 @@ int main()
 #     endif
 
       boost::timer te0Timer;
-      te0Tree.execute_tree();
+//      te0Tree.execute_tree();
 #     ifdef TIMINGS
       std::cout << "PoKiTT temperature from e0 time  " << te0Timer.elapsed() << std::endl;
 #     endif
@@ -246,20 +247,23 @@ int main()
         *icant=gasMix->temperature();
       }
       status( field_equal(temp, *canteraResult, 1e-6), "temperature from h");
-
-      imass = massfracs.begin();
-      itempd = tVecDiff.begin();
-      i=0;
-      for(CellField::iterator icant = canteraResult->begin(); icant!=canteraResult->end(); ++itempd, ++imass, ++icant, ++i){
-        gasMix->setState_TPY( *itempd, refPressure, &(*imass)[0]);
-        double meanMW = gasMix->meanMolecularWeight();
-        gasMix->setState_UV( e0_massVec[i], Cantera::GasConstant*tVec[i]*meanMW/refPressure);
-        *icant=gasMix->temperature();
-      }
-      CellField& tempe0 = cellFM.field_ref(te0Tag);
-      status( field_equal(tempe0, *canteraResult, 1e-6), "temperature from e0");
+      *canteraResult <<= *canteraResult * *canteraResult;
+      CellField& t2 = cellFM.field_ref(tPowerTags[0]);
+      status( field_equal(t2, *canteraResult , 1e-6), "temperature^2");
+//      imass = massfracs.begin();
+//      itempd = tVecDiff.begin();
+//      i=0;
+//      for(CellField::iterator icant = canteraResult->begin(); icant!=canteraResult->end(); ++itempd, ++imass, ++icant, ++i){
+//        gasMix->setState_TPY( *itempd, refPressure, &(*imass)[0]);
+//        double meanMW = gasMix->meanMolecularWeight();
+//        gasMix->setState_UV( e0_massVec[i], Cantera::GasConstant*tVec[i]*meanMW/refPressure);
+//        *icant=gasMix->temperature();
+//      }
+//      CellField& tempe0 = cellFM.field_ref(te0Tag);
+//      status( field_equal(tempe0, *canteraResult, 1e-6), "temperature from e0");
+      std::cout<<"here" <<std::endl;
     }
-
+    std::cout<<"or here" <<std::endl;
     if( status.ok() ){
       std::cout << "PASS\n";
       return 0;
