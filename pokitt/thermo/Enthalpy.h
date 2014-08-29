@@ -195,7 +195,7 @@ Enthalpy( const Expr::Tag& tTag,
       break;
     case SHOMATE2:
       for( std::vector<double>::iterator ic = c.begin() + 1; ic!=c.end(); ++ic ){
-        *ic *= 1e6 / molecularWeights[n]; // scale the coefficients to keep units consistent on mas basis
+        *ic *= 1e6 / molecularWeights[n]; // scale the coefficients to keep units consistent on mass basis
       }
       break;
     }
@@ -259,10 +259,10 @@ evaluate()
   using namespace Cantera;
   FieldT& h = this->value();
 
-  const FieldT& t2 = *tPowers_[0]; // t^2
-  const FieldT& t3 = *tPowers_[1]; // t^3
-  const FieldT& t4 = *tPowers_[2]; // t^4
-  const FieldT& t5 = *tPowers_[3]; // t^5
+  const FieldT& t2 =     *tPowers_[0]; // t^2
+  const FieldT& t3 =     *tPowers_[1]; // t^3
+  const FieldT& t4 =     *tPowers_[2]; // t^4
+  const FieldT& t5 =     *tPowers_[3]; // t^5
   const FieldT& recipT = *tPowers_[4]; // t^-1
 
   h <<= 0.0;
@@ -344,7 +344,7 @@ SpeciesEnthalpy( const Expr::Tag& tTag,
     break;
   case SHOMATE2:
     for( std::vector<double>::iterator ic = c_.begin() + 1; ic!=c_.end(); ++ic ){
-      *ic *= 1e6 / molecularWeight; // scale the coefficients to keep units consistent on mas basis
+      *ic *= 1e6 / molecularWeight; // scale the coefficients to keep units consistent on mass basis
     }
     break;
   }
@@ -400,10 +400,10 @@ evaluate()
   using namespace Cantera;
   FieldT& h = this->value();
 
-  const FieldT& t2 = *tPowers_[0]; // t^2
-  const FieldT& t3 = *tPowers_[1]; // t^3
-  const FieldT& t4 = *tPowers_[2]; // t^4
-  const FieldT& t5 = *tPowers_[3]; // t^5
+  const FieldT& t2 =     *tPowers_[0]; // t^2
+  const FieldT& t3 =     *tPowers_[1]; // t^3
+  const FieldT& t4 =     *tPowers_[2]; // t^4
+  const FieldT& t5 =     *tPowers_[3]; // t^5
   const FieldT& recipT = *tPowers_[4]; // t^-1
 
   switch (polyType_) {
