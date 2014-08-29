@@ -441,14 +441,14 @@ evaluate()
       cv <<= cond( *t_ <= c_[0] && *t_ >= minT_, c_[1] + c_[2] * *t_ + c_[ 3] * t2 + c_[ 4] * t3 + c_[ 5] * t4 ) // if low temp
                  ( *t_ >  c_[0] && *t_ <= maxT_, c_[8] + c_[9] * *t_ + c_[10] * t2 + c_[11] * t3 + c_[12] * t4 )  // else if high temp
                  ( *t_ < minT_, c_[1] + c_[2] * minT_ + c_[ 3] * minT_ * minT_ + c_[ 4] * pow(minT_,3) + c_[ 5] * pow(minT_,4) )  // else if out of bounds - low
-                 (             c_[8] + c_[9] * maxT_ + c_[10] * maxT_ * maxT_ + c_[11] * pow(maxT_,3) + c_[12] * pow(maxT_,4) ); // else out of bounds - high
+                 (              c_[8] + c_[9] * maxT_ + c_[10] * maxT_ * maxT_ + c_[11] * pow(maxT_,3) + c_[12] * pow(maxT_,4) ); // else out of bounds - high
 
       break;
     case SHOMATE2:
       cv <<= cond( *t_ <= c_[0] && *t_ >= minT_, c_[1] + c_[2] * *t_*1e-3 + c_[ 3] * t2*1e-6 + c_[ 4] * t3*1e-9 + c_[ 5] * recipRecipT*1e6 ) // if low temp
                  ( *t_ >  c_[0] && *t_ <= maxT_, c_[8] + c_[9] * *t_*1e-3 + c_[10] * t2*1e-6 + c_[11] * t3*1e-9 + c_[12] * recipRecipT*1e6 )  // else if high temp
                  ( *t_ < minT_, c_[1] + c_[2] * minT_*1e-3 + c_[ 3] * minT_*1e-3 * minT_*1e-3 + c_[ 4] * pow(minT_*1e-3,3) + c_[ 5] * pow(minT_*1e-3,-2) )  // else if out of bounds - low
-                 (             c_[8] + c_[9] * maxT_*1e-3 + c_[10] * maxT_*1e-3 * maxT_*1e-3 + c_[11] * pow(maxT_*1e-3,3) + c_[12] * pow(maxT_*1e-3,-2) ); // else out of bounds - high
+                 (              c_[8] + c_[9] * maxT_*1e-3 + c_[10] * maxT_*1e-3 * maxT_*1e-3 + c_[11] * pow(maxT_*1e-3,3) + c_[12] * pow(maxT_*1e-3,-2) ); // else out of bounds - high
 
       break;
   }
