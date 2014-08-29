@@ -139,21 +139,21 @@ get_cantera_results( const bool mix,
   }
 
   std::vector< SpatFldPtr<CellField> > canteraResults;
-  std::vector<double>::const_iterator itemp = tVec.begin();
-  std::vector< std::vector<double> >::iterator imass = massfracs.begin();
+  std::vector<double>::const_iterator iTemp = tVec.begin();
+  std::vector< std::vector<double> >::iterator iMass = massfracs.begin();
   double evalTime;
 
   if( mix ){
     SpatFldPtr<CellField> canteraResult = SpatialFieldStore::get<CellField>(prototype);
-    CellField::iterator icantend = canteraResult->end();
+    CellField::iterator iCantEnd = canteraResult->end();
     boost::timer thermoTimer;
 
-    for( CellField::iterator icant = canteraResult->begin(); icant!=icantend; ++itemp, ++imass, ++icant ){
-      gasMix.setState_TPY( *itemp, refPressure, &(*imass)[0]);
+    for( CellField::iterator iCant = canteraResult->begin(); iCant!=iCantEnd; ++iTemp, ++iMass, ++iCant ){
+      gasMix.setState_TPY( *iTemp, refPressure, &(*iMass)[0]);
       switch(thermoQuantity){
-        case CP  :*icant=gasMix.cp_mass();        break;
-        case CV  : *icant=gasMix.cv_mass();       break;
-        case ENTH: *icant=gasMix.enthalpy_mass(); break;
+        case CP  : *iCant=gasMix.cp_mass();       break;
+        case CV  : *iCant=gasMix.cv_mass();       break;
+        case ENTH: *iCant=gasMix.enthalpy_mass(); break;
       } // switch(thermoQuantity)
     }
     evalTime = thermoTimer.elapsed();
@@ -167,8 +167,8 @@ get_cantera_results( const bool mix,
     std::vector<double> thermoResult(nSpec,0.0);
     boost::timer thermoTimer;
 
-    for( size_t i=0; i<npts+2; ++itemp, ++imass, ++i){
-      gasMix.setState_TPY( *itemp, refPressure, &(*imass)[0]);
+    for( size_t i=0; i<npts+2; ++iTemp, ++iMass, ++i){
+      gasMix.setState_TPY( *iTemp, refPressure, &(*iMass)[0]);
       switch( thermoQuantity ){
         case CP  : gasMix.getPartialMolarCp(&thermoResult[0]); break;
         case CV  : gasMix.getPartialMolarCp(&thermoResult[0]); break;
@@ -194,12 +194,11 @@ get_cantera_results( const bool mix,
 
 //==============================================================================
 
-bool driver( const std::string& inputFileName,
-             const bool timings,
+bool driver( const bool timings,
              const bool mix,
              const ThermoQuantity thermoQuantity )
 {
-  TestHelper status( !timings ); // we don't need test helper output if we're running timings
+  TestHelper status( !timings );
 
   Cantera_CXX::IdealGasMix* const gasMix = CanteraObjects::get_gasmix();
 
@@ -254,12 +253,12 @@ bool driver( const std::string& inputFileName,
     ptvec.push_back(10);
   }
 
-  for( std::vector<int>::iterator ptit = ptvec.begin(); ptit!= ptvec.end(); ++ptit){
+  for( std::vector<int>::iterator iPts = ptvec.begin(); iPts!= ptvec.end(); ++iPts){
 
     Expr::ExpressionTree thermoTree( thermoID, exprFactory, 0 );
     write_tree( mix, thermoQuantity, thermoTree);
 
-    So::IntVec npts(*ptit,1,1);
+    So::IntVec npts(*iPts,1,1);
     const So::BoundaryCellInfo cellBCInfo = So::BoundaryCellInfo::build<CellField>(false,false,false);
     const So::GhostData cellGhosts(1);
     const So::MemoryWindow vwindow( So::get_window_with_ghost(npts,cellGhosts,cellBCInfo) );
@@ -300,12 +299,12 @@ bool driver( const std::string& inputFileName,
 
     thermoTree.lock_fields( fml );  // prevent fields from being deallocated so that we can get them after graph execution.
 
-    if( timings ) std::cout << std::endl << inputFileName << " - " << *ptit << std::endl;
+    if( timings ) std::cout << std::endl << thermo_name(thermoQuantity) << " test - " << *iPts << std::endl;
 
     boost::timer thermoTimer;
     thermoTree.execute_tree();
 
-    if( timings ) std::cout << "PoKiTT " + thermo_name(thermoQuantity) + " time  " << thermoTimer.elapsed() << std::endl;
+    if( timings ) std::cout << "PoKiTT  " + thermo_name(thermoQuantity) + " time " << thermoTimer.elapsed() << std::endl;
 
 #   ifdef ENABLE_CUDA
     BOOST_FOREACH( Expr::Tag thermoTag, thermoTags){
@@ -314,13 +313,13 @@ bool driver( const std::string& inputFileName,
     }
 #   endif
 
-    const std::vector< SpatFldPtr<CellField> > canteraResults = get_cantera_results( mix, thermoQuantity, timings, *gasMix, *ptit, nSpec, xcoord );
+    const std::vector< SpatFldPtr<CellField> > canteraResults = get_cantera_results( mix, thermoQuantity, timings, *gasMix, *iPts, nSpec, xcoord );
 
-    std::vector< SpatFldPtr<CellField> >::const_iterator icantera = canteraResults.begin();
+    std::vector< SpatFldPtr<CellField> >::const_iterator iCantera = canteraResults.begin();
     BOOST_FOREACH( const Expr::Tag& thermoTag, thermoTags ){
       CellField& thermo = cellFM.field_ref(thermoTag);
-      status( field_equal( thermo, **icantera, 1e-14 ), thermoTag.name() );
-      ++icantera;
+      status( field_equal( thermo, **iCantera, 1e-14 ), thermoTag.name() );
+      ++iCantera;
     }
 
   } // number of points
@@ -377,9 +376,9 @@ int main( int iarg, char* carg[] )
     CanteraObjects::setup_cantera( setup );
 
     TestHelper status( !timings );
-    status( driver( inputFileName, timings, mix, CP   ), thermo_name(CP  ) );
-    status( driver( inputFileName, timings, mix, CV   ), thermo_name(CV  ) );
-    status( driver( inputFileName, timings, mix, ENTH ), thermo_name(ENTH) );
+    status( driver(  timings, mix, CP   ), thermo_name(CP  ) );
+    status( driver(  timings, mix, CV   ), thermo_name(CV  ) );
+    status( driver(  timings, mix, ENTH ), thermo_name(ENTH) );
 
     if( status.ok() ){
       std::cout << "\nPASS\n";
