@@ -38,6 +38,7 @@ template< typename FieldT >
 class Enthalpy
     : public Expr::Expression<FieldT>
 {
+  typedef std::vector<double> PolyVals; // values used for polynomial
   const Expr::Tag tTag_;
   const Expr::TagList tPowerTags_;
   Expr::TagList massFracTags_;
@@ -46,9 +47,9 @@ class Enthalpy
   std::vector<const FieldT*> massFracs_;
 
   int nSpec_; // number of species
-  std::vector<double> minTVec_; // vector of minimum temperatures for polynomial evaluations
-  std::vector<double> maxTVec_; // vector of maximum temperatures for polynomial evaluations
-  std::vector< std::vector<double> > cVec_; // vector of polynomial coefficients
+  PolyVals minTVec_; // vector of minimum temperatures for polynomial evaluations
+  PolyVals maxTVec_; // vector of maximum temperatures for polynomial evaluations
+  std::vector< PolyVals > cVec_; // vector of polynomial coefficients
   std::vector<int> polyTypeVec_; // vector of polynomial types
 
   Enthalpy( const Expr::Tag& tTag,
@@ -397,7 +398,6 @@ SpeciesEnthalpy<FieldT>::
 evaluate()
 {
   using namespace SpatialOps;
-  using namespace Cantera;
   FieldT& h = this->value();
 
   const FieldT& t2 =     *tPowers_[0]; // t^2
