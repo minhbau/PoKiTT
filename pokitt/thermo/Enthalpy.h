@@ -3,11 +3,12 @@
 
 #include <expression/Expression.h>
 
+#include <pokitt/CanteraObjects.h> //include cantera wrapper
+#include <pokitt/thermo/Temperature.h>
+
 #include <cantera/kernel/ct_defs.h> // contains value of gas constant
 #include <cantera/kernel/SpeciesThermoInterpType.h> // contains definitions for which polynomial is being used
 #include <cantera/IdealGasMix.h>
-
-#include <pokitt/CanteraObjects.h> //include cantera wrapper
 
 namespace Cantera_CXX{ class IdealGasMix; } //location of polynomial
 
@@ -158,7 +159,7 @@ Enthalpy( const Expr::Tag& tTag,
           const Expr::Tag& massFracTag )
   : Expr::Expression<FieldT>(),
     tTag_( tTag ),
-    tPowerTags_( TemperaturePowers<FieldT>::temperature_powers_tags() )
+    tPowerTags_( Temperature<FieldT>::temperature_powers_tags() )
 {
   this->set_gpu_runnable( true );
 
@@ -257,7 +258,6 @@ Enthalpy<FieldT>::
 evaluate()
 {
   using namespace SpatialOps;
-  using namespace Cantera;
   FieldT& h = this->value();
 
   const FieldT& t2 =     *tPowers_[0]; // t^2
@@ -321,7 +321,7 @@ SpeciesEnthalpy( const Expr::Tag& tTag,
                  const int n )
     : Expr::Expression<FieldT>(),
       tTag_( tTag ),
-      tPowerTags_( TemperaturePowers<FieldT>::temperature_powers_tags() ),
+      tPowerTags_( Temperature<FieldT>::temperature_powers_tags() ),
       n_ ( n )
 {
   this->set_gpu_runnable( true );

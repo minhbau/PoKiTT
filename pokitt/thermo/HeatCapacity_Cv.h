@@ -4,7 +4,7 @@
 #include <expression/Expression.h>
 
 #include <pokitt/CanteraObjects.h> //include cantera wrapper
-#include <pokitt/thermo/TemperaturePowers.h>
+#include <pokitt/thermo/Temperature.h>
 
 #include <cantera/kernel/ct_defs.h> // contains value of Cantera::GasConstant
 #include <cantera/kernel/speciesThermoTypes.h> // contains definitions for which polynomial is being used
@@ -179,7 +179,7 @@ HeatCapacity_Cv( const Expr::Tag& tTag,
                  const Expr::Tag& massFracTag )
   : Expr::Expression<FieldT>(),
     tTag_( tTag ),
-    tPowerTags_( TemperaturePowers<FieldT>::temperature_powers_tags() )
+    tPowerTags_( Temperature<FieldT>::temperature_powers_tags() )
 {
   this->set_gpu_runnable( true );
 
@@ -345,7 +345,7 @@ SpeciesHeatCapacity_Cv( const Expr::Tag& tTag,
                         const int n )
   : Expr::Expression<FieldT>(),
     tTag_( tTag ),
-    tPowerTags_( TemperaturePowers<FieldT>::temperature_powers_tags() ),
+    tPowerTags_( Temperature<FieldT>::temperature_powers_tags() ),
     n_ ( n )
 {
   this->set_gpu_runnable( true );
