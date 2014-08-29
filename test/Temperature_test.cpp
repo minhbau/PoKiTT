@@ -97,17 +97,17 @@ int main()
     }
     exprFactory.register_expression( new MixtureMolWeight::Builder ( mmwTag, yiTag, molecularWeights));
     const Expr::ExpressionID temp_id = exprFactory.register_expression( new Temperature ::Builder (tTag, yiTag, hTag) );
-    const Expr::ExpressionID tempe0_id = exprFactory.register_expression( new TemperatureE0 ::Builder (te0Tag, yiTag, e0Tag, keTag) );
+//    const Expr::ExpressionID tempe0_id = exprFactory.register_expression( new TemperatureE0 ::Builder (te0Tag, yiTag, e0Tag, keTag) );
 
     Expr::ExpressionTree tTree( temp_id , exprFactory, 0 );
-    Expr::ExpressionTree te0Tree( tempe0_id, exprFactory, 0 );
+//    Expr::ExpressionTree te0Tree( tempe0_id, exprFactory, 0 );
 
     {
       std::ofstream tGraph( "Temperature.dot" );
-      std::ofstream te0Graph( "TemperatureFromE0.dot" );
+//      std::ofstream te0Graph( "TemperatureFromE0.dot" );
 
       tTree.write_tree( tGraph );
-      te0Tree.write_tree( te0Graph ) ;
+//      te0Tree.write_tree( te0Graph ) ;
     }
 
     std::vector<int> ptvec;
@@ -285,9 +285,7 @@ int main()
 //      }
 //      CellField& tempe0 = cellFM.field_ref(te0Tag);
 //      status( field_equal(tempe0, *canteraResult, 1e-6), "temperature from e0");
-      std::cout<<"here" <<std::endl;
     }
-    std::cout<<"or here" <<std::endl;
     if( status.ok() ){
       std::cout << "PASS\n";
       return 0;

@@ -126,6 +126,7 @@ template< typename FieldT >
 class TemperatureFromE0
     : public Expr::Expression<FieldT>
 {
+  typedef std::vector<FieldT*> SpecT;
   const Expr::Tag e0Tag_;
   const Expr::Tag keTag_;
   Expr::TagList massFracTags_;
@@ -142,7 +143,7 @@ class TemperatureFromE0
                      const Expr::Tag& keTag );
 public:
 
-  static const Expr::TagList& temperature_powers_tags();
+  static Expr::TagList& temperature_powers_tags();
 
   class Builder : public Expr::ExpressionBuilder
   {
@@ -279,12 +280,12 @@ evaluate()
   using namespace SpatialOps;
   using namespace Cantera;
   SpecT& temp_vec = this->get_value_vec();
-  FieldT& temp = *temp_vec[0];
-  FieldT& t2 = *temp_vec[1]; // t^2
-  FieldT& t3 = *temp_vec[2]; // t^3
-  FieldT& t4 = *temp_vec[3]; // t^4
-  FieldT& t5 = *temp_vec[4]; // t^5
-  FieldT& recipT = *temp_vec[5]; // t^-1
+  FieldT& temp =        *temp_vec[0];
+  FieldT& t2 =          *temp_vec[1]; // t^2
+  FieldT& t3 =          *temp_vec[2]; // t^3
+  FieldT& t4 =          *temp_vec[3]; // t^4
+  FieldT& t5 =          *temp_vec[4]; // t^5
+  FieldT& recipT =      *temp_vec[5]; // t^-1
   FieldT& recipRecipT = *temp_vec[6]; // t^-2
 
   SpatFldPtr<FieldT> delHPtr  = SpatialFieldStore::get<FieldT>(temp); // difference between enthalpy field value and enthalpy evaluated at current temperature
@@ -293,23 +294,6 @@ evaluate()
   FieldT& delH = *delHPtr;
   FieldT& res = *resPtr;
   FieldT& dhdT = *dhdTPtr;
-
-//  if( nasaFlag_ == true || shomateFlag_ == true){
-
-//    t2 = SpatialFieldStore::get<FieldT>(temp);
-//    t3 = SpatialFieldStore::get<FieldT>(temp);
-//    t4 = SpatialFieldStore::get<FieldT>(temp);
-//
-//    if( nasaFlag_ == true ){
-//      t5 = SpatialFieldStore::get<FieldT>(temp);
-//    }
-//
-//    if( shomateFlag_ == true ){
-//      recipT = SpatialFieldStore::get<FieldT>(temp);
-//      recipRecipT = SpatialFieldStore::get<FieldT>(temp);
-//    }
-//
-//  }
 
   std::vector<double> c(15,0); //vector of Cantera's polynomial coefficients
   int polyType; // type of polynomial
@@ -432,17 +416,12 @@ evaluate()
     temp <<= temp + res;
     isConverged = nebo_max( abs(res) ) < 1e-3; // Converged when the temperature has changed by less than 1e-3
   }
-  if( nasaFlag_ == true || shomateFlag_ == true ){
-    t2 <<= temp * temp;
-    t3 <<= t2 * temp;
-    t4 <<= t3 * temp;
-    if( nasaFlag_ == true )
-      t5 <<= t4 * temp;
-    if( shomateFlag_ == true ){
-      recipT <<= 1/ temp;
-      recipRecipT <<= recipT * recipT;
-    }
-  }
+  t2 <<= temp * temp;
+  t3 <<= t2 * temp;
+  t4 <<= t3 * temp;
+  t5 <<= t4 * temp;
+  recipT <<= 1/ temp;
+  recipRecipT <<= recipT * recipT;
 }
 
 
@@ -471,7 +450,7 @@ Builder::build() const
 //--------------------------------------------------------------------
 
 template< typename FieldT >
-const Expr::TagList&
+Expr::TagList&
 TemperatureFromE0<FieldT>::temperature_powers_tags()
 {
   using namespace Expr;
@@ -571,7 +550,14 @@ evaluate()
 {
   using namespace SpatialOps;
   using namespace Cantera;
-  FieldT& temp = this->value();
+  SpecT& temp_vec = this->get_value_vec();
+  FieldT& temp =        *temp_vec[0];
+  FieldT& t2 =          *temp_vec[1]; // t^2
+  FieldT& t3 =          *temp_vec[2]; // t^3
+  FieldT& t4 =          *temp_vec[3]; // t^4
+  FieldT& t5 =          *temp_vec[4]; // t^5
+  FieldT& recipT =      *temp_vec[5]; // t^-1
+  FieldT& recipRecipT = *temp_vec[6]; // t^-2
 
   SpatFldPtr<FieldT> delE0Ptr = SpatialFieldStore::get<FieldT>(temp); // difference between internal energy field value and internal energy at current temperature
   SpatFldPtr<FieldT> dE0dTPtr = SpatialFieldStore::get<FieldT>(temp); // dE0dT for Newton's method
@@ -580,25 +566,6 @@ evaluate()
   FieldT& delE0 = *delE0Ptr;
   FieldT& res   = *resPtr;
   FieldT& dE0dT = *dE0dTPtr;
-
-  SpatFldPtr<FieldT> t2; // t^2
-  SpatFldPtr<FieldT> t3; // t^3
-  SpatFldPtr<FieldT> t4; // t^4
-  SpatFldPtr<FieldT> t5; // t^5
-  SpatFldPtr<FieldT> recipT; // t^-1
-  SpatFldPtr<FieldT> recipRecipT; // t^-2
-
-  if( nasaFlag_ || shomateFlag_ ){
-    t2 = SpatialFieldStore::get<FieldT>(temp);
-    t3 = SpatialFieldStore::get<FieldT>(temp);
-    t4 = SpatialFieldStore::get<FieldT>(temp);
-    if( nasaFlag_ )
-      t5 = SpatialFieldStore::get<FieldT>(temp);
-    if( shomateFlag_ ){
-      recipT = SpatialFieldStore::get<FieldT>(temp);
-      recipRecipT = SpatialFieldStore::get<FieldT>(temp);
-    }
-  }
 
   std::vector<double> c(15,0); //vector of Cantera's coefficients
   int polyType; // type of polynomial
@@ -616,14 +583,14 @@ evaluate()
 
     // pre-compute powers of temperature used in polynomial evaluations
     if( nasaFlag_ == true | shomateFlag_ == true ){
-      *t2 <<= temp * temp;
-      *t3 <<= *t2 * temp;
-      *t4 <<= *t3 * temp;
+      t2 <<= temp * temp;
+      t3 <<= t2 * temp;
+      t4 <<= t3 * temp;
       if( nasaFlag_ == true )
-        *t5<<=*t4 * temp;
+        t5<<=t4 * temp;
       if( shomateFlag_ == true ){
-        *recipT <<= 1/ temp;
-        *recipRecipT <<= *recipT * *recipT;
+        recipT <<= 1/ temp;
+        recipRecipT <<= recipT * recipT;
       }
     }
 
@@ -646,24 +613,24 @@ evaluate()
             c[8] -= 1.0;
             for( ; ic != icend; ++ic)
               *ic *= GasConstant / molecularWeights[n]; // dimensionalize the coefficients
-            delE0 <<= delE0 - *massFracs_[n] * cond( temp <= c[0], c[ 6] + c[1] * temp + c[2]/2 * *t2 + c[ 3]/3 * *t3 + c[ 4]/4 * *t4 + c[ 5]/5 * *t5 ) // if low temp
-                                                   (               c[13] + c[8] * temp + c[9]/2 * *t2 + c[10]/3 * *t3 + c[11]/4 * *t4 + c[12]/5 * *t5 );// else if high temp
+            delE0 <<= delE0 - *massFracs_[n] * cond( temp <= c[0], c[ 6] + c[1] * temp + c[2]/2 * t2 + c[ 3]/3 * t3 + c[ 4]/4 * t4 + c[ 5]/5 * t5 ) // if low temp
+                                                   (               c[13] + c[8] * temp + c[9]/2 * t2 + c[10]/3 * t3 + c[11]/4 * t4 + c[12]/5 * t5 );// else if high temp
 
-            dE0dT <<= dE0dT + *massFracs_[n] * cond( temp <= c[0], c[1] + c[2] * temp + c[ 3] * *t2 + c[ 4] * *t3 + c[ 5] * *t4) // if low temp
-                                                   (               c[8] + c[9] * temp + c[10] * *t2 + c[11] * *t3 + c[12] * *t4);// else if high temp
+            dE0dT <<= dE0dT + *massFracs_[n] * cond( temp <= c[0], c[1] + c[2] * temp + c[ 3] * t2 + c[ 4] * t3 + c[ 5] * t4) // if low temp
+                                                   (               c[8] + c[9] * temp + c[10] * t2 + c[11] * t3 + c[12] * t4);// else if high temp
             break;
           case SHOMATE2:
             c[1] -= GasConstant * 1e-3; //change coefficients from enthalpy to internal energy
             c[8] -= GasConstant * 1e-3;
             for( ; ic != icend; ++ic)
               *ic *= 1e6 / molecularWeights[n]; // scale the coefficients again to keep units consistent
-            delE0 <<= delE0 - *massFracs_[n] * cond( temp <= c[0], c[ 6] + c[1] * temp*1e-3 + c[2]/2 * *t2*1e-6 + c[ 3]/3 * *t3*1e-9 + c[ 4]/4 * *t4*1e-12 - c[ 5] * *recipT*1e3 ) // if low temp
-                                                     (               c[13] + c[8] * temp*1e-3 + c[9]/2 * *t2*1e-6 + c[10]/3 * *t3*1e-9 + c[11]/4 * *t4*1e-12 - c[12] * *recipT*1e3 ); // else if high range
+            delE0 <<= delE0 - *massFracs_[n] * cond( temp <= c[0], c[ 6] + c[1] * temp*1e-3 + c[2]/2 * t2*1e-6 + c[ 3]/3 * t3*1e-9 + c[ 4]/4 * t4*1e-12 - c[ 5] * recipT*1e3 ) // if low temp
+                                                     (               c[13] + c[8] * temp*1e-3 + c[9]/2 * t2*1e-6 + c[10]/3 * t3*1e-9 + c[11]/4 * t4*1e-12 - c[12] * recipT*1e3 ); // else if high range
 
             for( ic = c.begin() + 1; ic != icend; ++ic)
               *ic *= 1e-3; // scale the coefficients again to keep units consistent
-            dE0dT <<= dE0dT + *massFracs_[n] * cond( temp <= c[0], c[1] + c[2] * temp*1e-3 + c[ 3] * *t2*1e-6 + c[ 4] * *t3*1e-9 + c[ 5] * *recipRecipT*1e6 ) // if low temp
-                                                   (               c[8] + c[9] * temp*1e-3 + c[10] * *t2*1e-6 + c[11] * *t3*1e-9 + c[12] * *recipRecipT*1e6 ); // else if high range
+            dE0dT <<= dE0dT + *massFracs_[n] * cond( temp <= c[0], c[1] + c[2] * temp*1e-3 + c[ 3] * t2*1e-6 + c[ 4] * t3*1e-9 + c[ 5] * recipRecipT*1e6 ) // if low temp
+                                                   (               c[8] + c[9] * temp*1e-3 + c[10] * t2*1e-6 + c[11] * t3*1e-9 + c[12] * recipRecipT*1e6 ); // else if high range
             break;
         }
       }
@@ -686,14 +653,14 @@ evaluate()
             c[8] -= 1.0;
             for( ; ic != icend; ++ic)
               *ic *= GasConstant / molecularWeights[n];
-            delE0 <<= delE0 - *massFracs_[n] * cond( temp <= c[0] && temp >= minT, c[ 6] + c[1] * temp + c[2]/2 * *t2 + c[ 3]/3 * *t3 + c[ 4]/4 * *t4 + c[ 5]/5 * *t5 ) // if low temp
-                                                   ( temp >  c[0] && temp <= maxT, c[13] + c[8] * temp + c[9]/2 * *t2 + c[10]/3 * *t3 + c[11]/4 * *t4 + c[12]/5 * *t5 )  // else if high temp
+            delE0 <<= delE0 - *massFracs_[n] * cond( temp <= c[0] && temp >= minT, c[ 6] + c[1] * temp + c[2]/2 * t2 + c[ 3]/3 * t3 + c[ 4]/4 * t4 + c[ 5]/5 * t5 ) // if low temp
+                                                   ( temp >  c[0] && temp <= maxT, c[13] + c[8] * temp + c[9]/2 * t2 + c[10]/3 * t3 + c[11]/4 * t4 + c[12]/5 * t5 )  // else if high temp
                                                    ( temp < minT, c[1] * temp + c[2] * minT * (temp - minT/2) + c[ 3] * minT * minT * (temp - 2*minT/3) + c[ 4]*pow(minT,3) * (temp - 3*minT/4) + c[ 5]*pow(minT,4) * (temp - 4*minT/5) + c[ 6] ) // else if out of bounds - low
                                                    (              c[8] * temp + c[9] * maxT * (temp - maxT/2) + c[10] * maxT * maxT * (temp - 2*maxT/3) + c[11]*pow(maxT,3) * (temp - 3*maxT/4) + c[12]*pow(maxT,4) * (temp - 4*maxT/5) + c[13] ); // else out of bounds - high
 
 
-            dE0dT <<= dE0dT + *massFracs_[n] * cond( temp <= c[0] && temp >= minT, c[1] + c[2] * temp + c[ 3] * *t2 + c[ 4] * *t3 + c[ 5] * *t4 ) // if low temp
-                                                     ( temp >  c[0] && temp <= maxT, c[8] + c[9] * temp + c[10] * *t2 + c[11] * *t3 + c[12] * *t4 )  // else if high temp
+            dE0dT <<= dE0dT + *massFracs_[n] * cond( temp <= c[0] && temp >= minT, c[1] + c[2] * temp + c[ 3] * t2 + c[ 4] * t3 + c[ 5] * t4 ) // if low temp
+                                                     ( temp >  c[0] && temp <= maxT, c[8] + c[9] * temp + c[10] * t2 + c[11] * t3 + c[12] * t4 )  // else if high temp
                                                      ( temp < minT, c[1] + c[2] * minT + c[ 3] * minT * minT + c[ 4] * pow(minT,3) + c[ 5] * pow(minT,4) )  // else if out of bounds - low
                                                      (              c[8] + c[9] * maxT + c[10] * maxT * maxT + c[11] * pow(maxT,3) + c[12] * pow(maxT,4) ); // else out of bounds - high
 
@@ -705,16 +672,16 @@ evaluate()
             c[8] -= GasConstant * 1e-3;
             for( ; ic != icend; ++ic)
               *ic *= 1e6 / molecularWeights[n]; // scale the coefficients again to keep units consistent
-            delE0 <<= delE0 - *massFracs_[n] * cond( temp <= c[0] && temp >= minT, c[ 6] + c[1] * temp*1e-3 + c[2]/2 * *t2*1e-6 + c[ 3]/3 * *t3*1e-9 + c[ 4]/4 * *t4*1e-12 - c[ 5] * *recipT*1e3 ) // if low temp
-                                                   ( temp >  c[0] && temp <= maxT, c[13] + c[8] * temp*1e-3 + c[9]/2 * *t2*1e-6 + c[10]/3 * *t3*1e-9 + c[11]/4 * *t4*1e-12 - c[12] * *recipT*1e3 )  // else if high temp
+            delE0 <<= delE0 - *massFracs_[n] * cond( temp <= c[0] && temp >= minT, c[ 6] + c[1] * temp*1e-3 + c[2]/2 * t2*1e-6 + c[ 3]/3 * t3*1e-9 + c[ 4]/4 * t4*1e-12 - c[ 5] * recipT*1e3 ) // if low temp
+                                                   ( temp >  c[0] && temp <= maxT, c[13] + c[8] * temp*1e-3 + c[9]/2 * t2*1e-6 + c[10]/3 * t3*1e-9 + c[11]/4 * t4*1e-12 - c[12] * recipT*1e3 )  // else if high temp
                                                    ( temp < minT, c[1] * temp*1e-3 + c[2] * minTScaled * (temp*1e-3 - minTScaled/2) + c[ 3] * minTScaled * minTScaled * (temp*1e-3 - 2*minTScaled/3) + c[ 4]*pow(minTScaled,3) * (temp*1e-3 - 3*minTScaled/4) - c[ 5]*pow(minTScaled,-1) * (-temp*1e-3 / minTScaled + 2) + c[ 6] ) // else if out of bounds - low
                                                    (              c[8] * temp*1e-3 + c[9] * maxTScaled * (temp*1e-3 - maxTScaled/2) + c[10] * maxTScaled * maxTScaled * (temp*1e-3 - 2*maxTScaled/3) + c[11]*pow(maxTScaled,3) * (temp*1e-3 - 3*maxTScaled/4) - c[12]*pow(maxTScaled,-1) * (-temp*1e-3 / maxTScaled + 2) + c[13] ); // else out of bounds - high
 
 
             for( ic = c.begin() + 1; ic != icend; ++ic)
               *ic *= 1e-3; // scale the coefficients again to keep units consistent
-            dE0dT <<= dE0dT + *massFracs_[n] * cond( temp <= c[0] && temp >= minT, c[1] + c[2] * temp*1e-3 + c[ 3] * *t2*1e-6 + c[ 4] * *t3*1e-9 + c[ 5] * *recipRecipT*1e6 ) // if low temp
-                                                   ( temp >  c[0] && temp <= maxT, c[8] + c[9] * temp*1e-3 + c[10] * *t2*1e-6 + c[11] * *t3*1e-9 + c[12] * *recipRecipT*1e6 )  // else if high temp
+            dE0dT <<= dE0dT + *massFracs_[n] * cond( temp <= c[0] && temp >= minT, c[1] + c[2] * temp*1e-3 + c[ 3] * t2*1e-6 + c[ 4] * t3*1e-9 + c[ 5] * recipRecipT*1e6 ) // if low temp
+                                                   ( temp >  c[0] && temp <= maxT, c[8] + c[9] * temp*1e-3 + c[10] * t2*1e-6 + c[11] * t3*1e-9 + c[12] * recipRecipT*1e6 )  // else if high temp
                                                    ( temp < minT, c[1] + c[2] * minTScaled + c[ 3] * minTScaled * minTScaled + c[ 4] * pow(minTScaled,3) + c[ 5] * pow(minTScaled,-2) )  // else if out of bounds - low
                                                    (              c[8] + c[9] * maxTScaled + c[10] * maxTScaled * maxTScaled + c[11] * pow(maxTScaled,3) + c[12] * pow(maxTScaled,-2) ); // else out of bounds - high
 
@@ -726,6 +693,12 @@ evaluate()
     temp <<= temp + res;
     isConverged = nebo_max( abs(res) ) < 1e-3; // Converged when the temperature has changed by less than 1e-3
   }
+  t2 <<= temp * temp;
+  t3 <<= t2 * temp;
+  t4 <<= t3 * temp;
+  t5 <<= t4 * temp;
+  recipT <<= 1/ temp;
+  recipRecipT <<= recipT * recipT;
 }
 
 
@@ -737,7 +710,7 @@ Builder::Builder( const Expr::Tag& resultTag,
                   const Expr::Tag& massFracTag,
                   const Expr::Tag& e0Tag,
                   const Expr::Tag& keTag )
-: ExpressionBuilder( resultTag ),
+: ExpressionBuilder( tag_list( resultTag, TemperatureFromE0<FieldT>::temperature_powers_tags()) ),
   massFracTag_ ( massFracTag ),
   e0Tag_( e0Tag ),
   keTag_( keTag )
