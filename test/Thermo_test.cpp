@@ -109,22 +109,19 @@ void write_tree( const bool mix, const ThermoQuantity thermoQuantity, const Expr
 
 std::vector< So::SpatFldPtr<CellField> >
 get_cantera_results( const bool mix,
-                     const ThermoQuantity thermoQuantity,
                      const bool timings,
+                     const ThermoQuantity thermoQuantity,
                      Cantera_CXX::IdealGasMix& gasMix,
                      const int npts,
-                     const int nSpec,
-                     const CellField& prototype )
+                     const CellField& temp)
 {
   using namespace SpatialOps;
 
   const double refPressure=gasMix.pressure();
   const std::vector<double>& molecularWeights = gasMix.molecularWeights();
+  const int nSpec = gasMix.nSpecies();
 
-  std::vector<double> tVec;
-  for( size_t i=0; i<npts+2; ++i)
-    tVec.push_back( 500.0 + 1000.0 * (i-0.5)/ npts);
-
+  // we need to calculate massfracs manually because they don't get registered for the pure species case
   std::vector< std::vector<double> > massfracs;
   for( size_t i=0; i<npts+2; ++i){
     std::vector<double> massfrac;
@@ -139,12 +136,12 @@ get_cantera_results( const bool mix,
   }
 
   std::vector< SpatFldPtr<CellField> > canteraResults;
-  std::vector<double>::const_iterator iTemp = tVec.begin();
+  CellField::const_iterator iTemp = temp.begin();
   std::vector< std::vector<double> >::iterator iMass = massfracs.begin();
   double evalTime;
 
   if( mix ){
-    SpatFldPtr<CellField> canteraResult = SpatialFieldStore::get<CellField>(prototype);
+    SpatFldPtr<CellField> canteraResult = SpatialFieldStore::get<CellField>(temp);
     CellField::iterator iCantEnd = canteraResult->end();
     boost::timer thermoTimer;
 
@@ -162,7 +159,7 @@ get_cantera_results( const bool mix,
 
   else{ // species
     for( size_t n=0; n < nSpec; ++n){
-      canteraResults.push_back( SpatialFieldStore::get<CellField>(prototype) );
+      canteraResults.push_back( SpatialFieldStore::get<CellField>(temp) );
     }
     std::vector<double> thermoResult(nSpec,0.0);
     boost::timer thermoTimer;
@@ -170,8 +167,8 @@ get_cantera_results( const bool mix,
     for( size_t i=0; i<npts+2; ++iTemp, ++iMass, ++i){
       gasMix.setState_TPY( *iTemp, refPressure, &(*iMass)[0]);
       switch( thermoQuantity ){
-        case CP  : gasMix.getPartialMolarCp(&thermoResult[0]); break;
-        case CV  : gasMix.getPartialMolarCp(&thermoResult[0]); break;
+        case CP  : gasMix.getPartialMolarCp(&thermoResult[0]);         break;
+        case CV  : gasMix.getPartialMolarCp(&thermoResult[0]);         break;
         case ENTH: gasMix.getPartialMolarEnthalpies(&thermoResult[0]); break;
       }
       for( size_t n=0; n<nSpec; ++n ){
@@ -181,9 +178,9 @@ get_cantera_results( const bool mix,
     evalTime = thermoTimer.elapsed();
     for( size_t n=0; n<nSpec; ++n){
       switch( thermoQuantity ){
-        case CP  : *canteraResults[n] <<= *canteraResults[n] / molecularWeights[n];                             break; // convert to mass basis for field comparison
+        case CP  : *canteraResults[n] <<=   *canteraResults[n] / molecularWeights[n];                           break; // convert to mass basis for field comparison
         case CV  : *canteraResults[n] <<= ( *canteraResults[n] - Cantera::GasConstant ) / molecularWeights[n];  break; // convert from molar cp to mass cv for field comparison
-        case ENTH: *canteraResults[n] <<= *canteraResults[n] / molecularWeights[n];                             break; // convert to mass basis for field comparison
+        case ENTH: *canteraResults[n] <<=   *canteraResults[n] / molecularWeights[n];                           break; // convert to mass basis for field comparison
       }
     }
   }
@@ -313,7 +310,12 @@ bool driver( const bool timings,
     }
 #   endif
 
-    const std::vector< SpatFldPtr<CellField> > canteraResults = get_cantera_results( mix, thermoQuantity, timings, *gasMix, *iPts, nSpec, xcoord );
+    const std::vector< SpatFldPtr<CellField> > canteraResults = get_cantera_results( mix,
+                                                                                     timings,
+                                                                                     thermoQuantity,
+                                                                                     *gasMix,
+                                                                                     *iPts,
+                                                                                     temp );
 
     std::vector< SpatFldPtr<CellField> >::const_iterator iCantera = canteraResults.begin();
     BOOST_FOREACH( const Expr::Tag& thermoTag, thermoTags ){
