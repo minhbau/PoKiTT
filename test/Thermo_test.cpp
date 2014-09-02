@@ -308,6 +308,7 @@ bool driver( const bool timings,
       CellField& thermo = fml.field_manager<CellField>().field_ref(thermoTag);
       thermo.add_device(CPU_INDEX);
     }
+    set_active_field_location( tTag, CPU_INDEX );
 #   endif
 
     const std::vector< SpatFldPtr<CellField> > canteraResults = get_cantera_results( mix,
