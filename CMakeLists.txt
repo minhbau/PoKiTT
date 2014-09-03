@@ -8,6 +8,13 @@ project( PoKiTT CXX C )
 option( BUILD_UPSTREAM_LIBS "Auto-build ExprLib and SpatialOps" OFF )
 option( ENABLE_TESTS "Enable tests" ON )
 
+# default to release builds
+if( NOT CMAKE_BUILD_TYPE )
+  set( CMAKE_BUILD_TYPE "Release" CACHE STRING
+    "Choose the type of build, options are: Debug Release RelWithDebInfo MinSizeRel."
+    FORCE )
+endif( NOT CMAKE_BUILD_TYPE )
+
 #-- Set the location for the installation.  Comment this out to install to /usr/local
 if( CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT )
   set (CMAKE_INSTALL_PREFIX
