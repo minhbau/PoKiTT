@@ -263,27 +263,27 @@ bool driver( bool timings, EnergyType energyType)
 
       SpatFldPtr<CellField> canteraTPower = SpatialFieldStore::get<CellField>(*canteraResult);
       *canteraTPower <<= *canteraResult * *canteraResult;
-      CellField& t2 = cellFM.field_ref(tPowerTags[1]);
+      CellField& t2 = cellFM.field_ref(tPowerTags[0]);
       status( field_equal(t2, *canteraTPower , 1e-6), "temperature^2");
 
       *canteraTPower <<= *canteraResult * *canteraResult * *canteraResult;
-      CellField& t3 = cellFM.field_ref(tPowerTags[2]);
+      CellField& t3 = cellFM.field_ref(tPowerTags[1]);
       status( field_equal(t3, *canteraTPower , 1e-6), "temperature^3");
 
       *canteraTPower <<= *canteraResult * *canteraResult * *canteraResult * *canteraResult;
-      CellField& t4 = cellFM.field_ref(tPowerTags[3]);
+      CellField& t4 = cellFM.field_ref(tPowerTags[2]);
       status( field_equal(t4, *canteraTPower , 1e-6), "temperature^4");
 
       *canteraTPower <<= *canteraResult * *canteraResult * *canteraResult * *canteraResult * *canteraResult;
-      CellField& t5 = cellFM.field_ref(tPowerTags[4]);
+      CellField& t5 = cellFM.field_ref(tPowerTags[3]);
       status( field_equal(t5, *canteraTPower , 1e-6), "temperature^5");
 
       *canteraTPower <<= 1 / *canteraResult;
-      CellField& recipT = cellFM.field_ref(tPowerTags[5]);
+      CellField& recipT = cellFM.field_ref(tPowerTags[4]);
       status( field_equal(recipT, *canteraTPower , 1e-6), "temperature^-1");
 
       *canteraTPower <<=  1 / *canteraResult / *canteraResult;
-      CellField& recipRecipT = cellFM.field_ref(tPowerTags[6]);
+      CellField& recipRecipT = cellFM.field_ref(tPowerTags[5]);
       status( field_equal(recipRecipT, *canteraTPower , 1e-6), "temperature^-2");
 
 

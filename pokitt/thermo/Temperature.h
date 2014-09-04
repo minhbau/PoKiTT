@@ -62,7 +62,7 @@ class Temperature
                const Expr::Tag& enthTag );
 public:
 
-  static Expr::TagList& temperature_powers_tags();
+  static const Expr::TagList& temperature_powers_tags();
 
   class Builder : public Expr::ExpressionBuilder
   {
@@ -143,7 +143,7 @@ class TemperatureFromE0
                      const Expr::Tag& keTag );
 public:
 
-  static Expr::TagList& temperature_powers_tags();
+  static const Expr::TagList& temperature_powers_tags();
 
   class Builder : public Expr::ExpressionBuilder
   {
@@ -181,7 +181,7 @@ public:
 // ###################################################################
 
 template< typename FieldT >
-Expr::TagList&
+const Expr::TagList&
 Temperature<FieldT>::temperature_powers_tags()
 {
   using namespace Expr;
@@ -450,11 +450,11 @@ Builder::build() const
 //--------------------------------------------------------------------
 
 template< typename FieldT >
-Expr::TagList&
+const Expr::TagList&
 TemperatureFromE0<FieldT>::temperature_powers_tags()
 {
   using namespace Expr;
-  static TagList tags = tag_list( Tag("T^2"  ,STATE_NONE),
+  static const TagList tags = tag_list( Tag("T^2"  ,STATE_NONE),
                                   Tag("T^3"  ,STATE_NONE),
                                   Tag("T^4"  ,STATE_NONE),
                                   Tag("T^5"  ,STATE_NONE),
