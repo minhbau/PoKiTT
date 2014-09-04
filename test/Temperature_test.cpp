@@ -50,6 +50,34 @@ std::string energy_name( const EnergyType e )
   }
 }
 
+bool TPowers_equal( TestHelper& status, So::SpatFldPtr<CellField> canteraResult, Expr::FieldMgrSelector<CellField>::type& cellFM, Expr::TagList tPowerTags ){
+  So::SpatFldPtr<CellField> canteraTPower = So::SpatialFieldStore::get<CellField>(*canteraResult);
+        *canteraTPower <<= *canteraResult * *canteraResult;
+        CellField& t2 = cellFM.field_ref(tPowerTags[0]);
+        status( field_equal(t2, *canteraTPower , 1e-6), tPowerTags[0].name());
+
+        *canteraTPower <<= *canteraResult * *canteraResult * *canteraResult;
+        CellField& t3 = cellFM.field_ref(tPowerTags[1]);
+        status( field_equal(t3, *canteraTPower , 1e-6), tPowerTags[1].name());
+
+        *canteraTPower <<= *canteraResult * *canteraResult * *canteraResult * *canteraResult;
+        CellField& t4 = cellFM.field_ref(tPowerTags[2]);
+        status( field_equal(t4, *canteraTPower , 1e-6), tPowerTags[2].name());
+
+        *canteraTPower <<= *canteraResult * *canteraResult * *canteraResult * *canteraResult * *canteraResult;
+        CellField& t5 = cellFM.field_ref(tPowerTags[3]);
+        status( field_equal(t5, *canteraTPower , 1e-6), tPowerTags[3].name());
+
+        *canteraTPower <<= 1 / *canteraResult;
+        CellField& recipT = cellFM.field_ref(tPowerTags[4]);
+        status( field_equal(recipT, *canteraTPower , 1e-6), tPowerTags[4].name());
+
+        *canteraTPower <<=  1 / *canteraResult / *canteraResult;
+        CellField& recipRecipT = cellFM.field_ref(tPowerTags[5]);
+        status( field_equal(recipRecipT, *canteraTPower , 1e-6), tPowerTags[5].name());
+        return status.ok();
+}
+
 bool driver( bool timings, EnergyType energyType)
 {
   TestHelper status( !timings );
@@ -61,7 +89,6 @@ bool driver( bool timings, EnergyType energyType)
   size_t n;
 
   typedef Expr::PlaceHolder <CellField> MassFracs;
-  typedef MixtureMolWeight  <CellField> MixtureMolWeight;
   typedef Expr::PlaceHolder <CellField> Energy;
   typedef Expr::PlaceHolder <CellField> KineticEnergy;
 
@@ -72,7 +99,6 @@ bool driver( bool timings, EnergyType energyType)
     name << yiTag.name() << "_" << n;
     yiTags.push_back( Expr::Tag(name.str(),yiTag.context()) );
   }
-  const Expr::Tag mmwTag ( "Mixture Mol Weight", Expr::STATE_NONE );
   const Expr::Tag energyTag  ( energy_name(energyType) , Expr::STATE_NONE);
   const Expr::Tag keTag  ( "kinetic energy", Expr::STATE_NONE);
 
@@ -82,7 +108,6 @@ bool driver( bool timings, EnergyType energyType)
     exprFactory.register_expression( new MassFracs::Builder (yiTag) );
   }
   exprFactory.register_expression( new Energy::Builder (energyTag) );
-  exprFactory.register_expression( new MixtureMolWeight::Builder ( mmwTag, yiTag, molecularWeights));
   Expr::TagList tPowerTags;
 
   const Expr::Tag tTag ( "Temperature", Expr::STATE_NONE);
@@ -98,7 +123,7 @@ bool driver( bool timings, EnergyType energyType)
     typedef TemperatureFromE0 <CellField> TemperatureE0;
     exprFactory.register_expression( new KineticEnergy::Builder (keTag) );
     temp_id = exprFactory.register_expression( new TemperatureE0 ::Builder (tTag, yiTag, energyTag, keTag) );
-    tPowerTags = Temperature::temperature_powers_tags();
+    tPowerTags = TemperatureE0::temperature_powers_tags();
     break;
   }
 
@@ -140,9 +165,7 @@ bool driver( bool timings, EnergyType energyType)
       Expr::FieldManagerList fml;
 
       tTree.register_fields( fml );
-
       fml.allocate_fields( Expr::FieldAllocInfo( npts, 0, 0, false, false, false ) );
-
       tTree.bind_fields( fml );
 
       using namespace SpatialOps;
@@ -203,40 +226,19 @@ bool driver( bool timings, EnergyType energyType)
 
       temp <<= temp + 25 - 50 * xcoord;
 
-//      calculate_internal_energy( e0Tag, tTag, yiTags, cellFM, gasMix);
-
-//      std::vector<double> e0_massVec;
-//      i=0;
-//      for( itemp = tVec.begin(); itemp < itend; ++itemp, ++i){
-//        gasMix->setState_TPY(*itemp,refPressure, &massfracs[i][0]);
-//        e0_massVec.push_back( gasMix -> intEnergy_mass());
-//      }
-//
-//      CellField& ke = cellFM.field_ref(keTag);
-//      ke <<= 0.0;
-
-
-
       std::vector<double> tVecDiff;
       for( i=0; i<*iPts+2; ++i)
         tVecDiff.push_back( 525.0 + 950.0 * (i-0.5)/ *iPts);
 
       tTree.lock_fields( fml );  // prevent fields from being deallocated so that we can get them after graph execution.
-//      te0Tree.lock_fields( fml );
 
-#     ifdef TIMINGS
-      std::cout << std::endl << setup.inputFile << " - " << *iPts << std::endl;
-#     endif
+
+      if( timings ) std::cout << std::endl << energy_name(energyType) << " test - " << *iPts << std::endl;
 
       boost::timer tTimer;
       tTree.execute_tree();
-#     ifdef TIMINGS
-      std::cout << "PoKiTT temperature time  " << tTimer.elapsed() << std::endl;
-#     endif
 
-#     ifdef TIMINGS
-      std::cout << "PoKiTT temperature from e0 time  " << te0Timer.elapsed() << std::endl;
-#     endif
+      if( timings ) std::cout << "PoKiTT  " + energy_name(energyType) + " time " << tTimer.elapsed() << std::endl;
 
 #     ifdef ENABLE_CUDA
       temp.add_device(CPU_INDEX);
@@ -259,52 +261,12 @@ bool driver( bool timings, EnergyType energyType)
 
         *icant=gasMix->temperature();
       }
-      status( field_equal(temp, *canteraResult, 1e-6), "temperature from h");
 
-      SpatFldPtr<CellField> canteraTPower = SpatialFieldStore::get<CellField>(*canteraResult);
-      *canteraTPower <<= *canteraResult * *canteraResult;
-      CellField& t2 = cellFM.field_ref(tPowerTags[0]);
-      status( field_equal(t2, *canteraTPower , 1e-6), "temperature^2");
+      status( field_equal(temp, *canteraResult, 1e-6), tTag.name());
 
-      *canteraTPower <<= *canteraResult * *canteraResult * *canteraResult;
-      CellField& t3 = cellFM.field_ref(tPowerTags[1]);
-      status( field_equal(t3, *canteraTPower , 1e-6), "temperature^3");
-
-      *canteraTPower <<= *canteraResult * *canteraResult * *canteraResult * *canteraResult;
-      CellField& t4 = cellFM.field_ref(tPowerTags[2]);
-      status( field_equal(t4, *canteraTPower , 1e-6), "temperature^4");
-
-      *canteraTPower <<= *canteraResult * *canteraResult * *canteraResult * *canteraResult * *canteraResult;
-      CellField& t5 = cellFM.field_ref(tPowerTags[3]);
-      status( field_equal(t5, *canteraTPower , 1e-6), "temperature^5");
-
-      *canteraTPower <<= 1 / *canteraResult;
-      CellField& recipT = cellFM.field_ref(tPowerTags[4]);
-      status( field_equal(recipT, *canteraTPower , 1e-6), "temperature^-1");
-
-      *canteraTPower <<=  1 / *canteraResult / *canteraResult;
-      CellField& recipRecipT = cellFM.field_ref(tPowerTags[5]);
-      status( field_equal(recipRecipT, *canteraTPower , 1e-6), "temperature^-2");
-
-
-//      imass = massfracs.begin();
-//      itempd = tVecDiff.begin();
-//      i=0;
-//      for(CellField::iterator icant = canteraResult->begin(); icant!=canteraResult->end(); ++itempd, ++imass, ++icant, ++i){
-//        gasMix->setState_TPY( *itempd, refPressure, &(*imass)[0]);
-//        double meanMW = gasMix->meanMolecularWeight();
-//        gasMix->setState_UV( e0_massVec[i], Cantera::GasConstant*tVec[i]*meanMW/refPressure);
-//        *icant=gasMix->temperature();
-//      }
-//      CellField& tempe0 = cellFM.field_ref(te0Tag);
-//      status( field_equal(tempe0, *canteraResult, 1e-6), "temperature from e0");
+      status( TPowers_equal( status, canteraResult, cellFM, tPowerTags ), "TPowers");
     }
-    if( status.ok() ){
-      std::cout << "PASS\n";
-      return true;
-    }
-  std::cout << "FAIL\n";
-  return false;
+  return status.ok();
 }
 
 int main( int iarg, char* carg[] )
@@ -351,8 +313,9 @@ int main( int iarg, char* carg[] )
     CanteraObjects::setup_cantera( setup );
 
     TestHelper status( !timings );
-    status( driver(  timings, H   ), "T from " + energy_name(H) );
-    status( driver(  timings, E0   ), "T from " + energy_name(E0) );
+    status( driver( timings, H  ), "T from " + energy_name(H ) );
+    std::cout << std::endl;
+    status( driver( timings, E0 ), "T from " + energy_name(E0) );
 
     if( status.ok() ){
       std::cout << "\nPASS\n";

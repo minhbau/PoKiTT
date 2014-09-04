@@ -432,7 +432,7 @@ Temperature<FieldT>::
 Builder::Builder( const Expr::Tag& resultTag,
                   const Expr::Tag& massFracTag,
                   const Expr::Tag& enthTag )
-: ExpressionBuilder( tag_list( resultTag, Temperature<FieldT>::temperature_powers_tags()) ),
+: ExpressionBuilder( tag_list( resultTag, Temperature<FieldT>::temperature_powers_tags() ) ),
   massFracTag_ ( massFracTag ),
   enthTag_( enthTag )
 {}
