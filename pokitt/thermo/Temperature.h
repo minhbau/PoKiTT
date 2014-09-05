@@ -316,20 +316,21 @@ evaluate()
   using namespace SpatialOps;
   using namespace Cantera;
   SpecT& temp_vec = this->get_value_vec();
-  FieldT& temp =        *temp_vec[0];
-  FieldT& t2 =          *temp_vec[1]; // t^2
-  FieldT& t3 =          *temp_vec[2]; // t^3
-  FieldT& t4 =          *temp_vec[3]; // t^4
-  FieldT& t5 =          *temp_vec[4]; // t^5
-  FieldT& recipT =      *temp_vec[5]; // t^-1
+  FieldT& temp        = *temp_vec[0];
+  FieldT& t2          = *temp_vec[1]; // t^2
+  FieldT& t3          = *temp_vec[2]; // t^3
+  FieldT& t4          = *temp_vec[3]; // t^4
+  FieldT& t5          = *temp_vec[4]; // t^5
+  FieldT& recipT      = *temp_vec[5]; // t^-1
   FieldT& recipRecipT = *temp_vec[6]; // t^-2
 
-  SpatFldPtr<FieldT> delHPtr  = SpatialFieldStore::get<FieldT>(temp); // difference between enthalpy field value and enthalpy evaluated at current temperature
-  SpatFldPtr<FieldT> dhdTPtr  = SpatialFieldStore::get<FieldT>(temp); // dhdT for Newton's method
-  SpatFldPtr<FieldT> resPtr   = SpatialFieldStore::get<FieldT>(temp); // change in temperature for new Newton's iteration
+  SpatFldPtr<FieldT> delHPtr = SpatialFieldStore::get<FieldT>(temp); // difference between enthalpy field value and enthalpy evaluated at current temperature
+  SpatFldPtr<FieldT> dhdTPtr = SpatialFieldStore::get<FieldT>(temp); // dhdT for Newton's method
+  SpatFldPtr<FieldT> resPtr  = SpatialFieldStore::get<FieldT>(temp); // change in temperature for new Newton's iteration
+
   FieldT& delH = *delHPtr;
-  FieldT& res = *resPtr;
   FieldT& dhdT = *dhdTPtr;
+  FieldT& res  = *resPtr;
 
   bool isConverged = false;
   while( !isConverged ){
@@ -596,12 +597,12 @@ evaluate()
   using namespace SpatialOps;
   using namespace Cantera;
   SpecT& temp_vec = this->get_value_vec();
-  FieldT& temp =        *temp_vec[0];
-  FieldT& t2 =          *temp_vec[1]; // t^2
-  FieldT& t3 =          *temp_vec[2]; // t^3
-  FieldT& t4 =          *temp_vec[3]; // t^4
-  FieldT& t5 =          *temp_vec[4]; // t^5
-  FieldT& recipT =      *temp_vec[5]; // t^-1
+  FieldT& temp        = *temp_vec[0];
+  FieldT& t2          = *temp_vec[1]; // t^2
+  FieldT& t3          = *temp_vec[2]; // t^3
+  FieldT& t4          = *temp_vec[3]; // t^4
+  FieldT& t5          = *temp_vec[4]; // t^5
+  FieldT& recipT      = *temp_vec[5]; // t^-1
   FieldT& recipRecipT = *temp_vec[6]; // t^-2
 
   SpatFldPtr<FieldT> delE0Ptr = SpatialFieldStore::get<FieldT>(temp); // difference between internal energy field value and internal energy at current temperature
@@ -609,8 +610,8 @@ evaluate()
   SpatFldPtr<FieldT> resPtr   = SpatialFieldStore::get<FieldT>(temp); // change in temperature for new Newton's iteration
 
   FieldT& delE0 = *delE0Ptr;
-  FieldT& res   = *resPtr;
   FieldT& dE0dT = *dE0dTPtr;
+  FieldT& res   = *resPtr;
 
   bool isConverged = false;
 
