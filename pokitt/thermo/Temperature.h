@@ -380,52 +380,45 @@ evaluate()
           break;
         }
       }
-//      else{
-//        /* else temperature can be out of bounds low, low temp, high temp, or out of bounds high
-//         * if out of bounds, properties are interpolated from min or max temp using a constant cp
-//         */
-//        switch (polyType){
-//        case SIMPLE: // constant cp
-//          delH<<=delH - *massFracs_[n] * ( c[1] + c[3]*(temp-c[0]) )
-//                                       / molecularWeights[n];
-//
-//          dhdT<<=dhdT + *massFracs_[n] * c[3]
-//                                       / molecularWeights[n];
-//          break;
-//        case NASA2:
-//          for( ; ic != icend; ++ic)
-//            *ic *= GasConstant / molecularWeights[n]; // dimensionalize the coefficients
-//          delH <<= delH - *massFracs_[n] * cond( temp <= c[0] && temp >= minT, c[ 6] + c[1] * temp + c[2]/2 * t2 + c[ 3]/3 * t3 + c[ 4]/4 * t4 + c[ 5]/5 * t5 ) // if low temp
-//                                               ( temp >  c[0] && temp <= maxT, c[13] + c[8] * temp + c[9]/2 * t2 + c[10]/3 * t3 + c[11]/4 * t4 + c[12]/5 * t5 )  // else if high temp
-//                                               ( temp < minT, c[ 6] + c[1] * temp + c[2] * minT * (temp - minT/2) + c[ 3] * minT * minT * (temp - 2*minT/3) + c[ 4]*pow(minT,3) * (temp - 3*minT/4) + c[ 5]*pow(minT,4) * (temp - 4*minT/5) ) // else if out of bounds - low
-//                                               (              c[13] + c[8] * temp + c[9] * maxT * (temp - maxT/2) + c[10] * maxT * maxT * (temp - 2*maxT/3) + c[11]*pow(maxT,3) * (temp - 3*maxT/4) + c[12]*pow(maxT,4) * (temp - 4*maxT/5) ); // else out of bounds - high
-//
-//          dhdT <<= dhdT + *massFracs_[n] * cond( temp <= c[0] && temp >= minT, c[1] + c[2] * temp + c[ 3] * t2 + c[ 4] * t3 + c[ 5] * t4) // if low temp
-//                                               ( temp >  c[0] && temp <= maxT, c[8] + c[9] * temp + c[10] * t2 + c[11] * t3 + c[12] * t4)  // else if high temp
-//                                               ( temp < minT, c[1] + c[2] * minT + c[ 3] * minT * minT + c[ 4] * pow(minT,3) + c[ 5] * pow(minT,4))  // else if out of bounds - low
-//                                               (              c[8] + c[9] * maxT + c[10] * maxT * maxT + c[11] * pow(maxT,3) + c[12] * pow(maxT,4)); // else out of bounds - high
-//
-//          break;
-//        case SHOMATE2:
-//          double minTScaled = minT/1000;
-//          double maxTScaled = maxT/1000;
-//          for( ; ic != icend; ++ic)
-//            *ic *= 1e6 / molecularWeights[n] ; // scale the coefficients to keep units consistent
-//          delH <<= delH - *massFracs_[n] * cond( temp <= c[0] && temp >= minT, c[ 6] + c[1] * temp*1e-3 + c[2]/2 * t2*1e-6 + c[ 3]/3 * t3*1e-9 + c[ 4]/4 * t4*1e-12 - c[ 5] * recipT*1e3 ) // if low temp
-//                                               ( temp >  c[0] && temp <= maxT, c[13] + c[8] * temp*1e-3 + c[9]/2 * t2*1e-6 + c[10]/3 * t3*1e-9 + c[11]/4 * t4*1e-12 - c[12] * recipT*1e3 )  // else if high temp
-//                                               ( temp < minT, c[1] * temp*1e-3 + c[2] * minTScaled * (temp*1e-3 - minTScaled/2) + c[ 3] * minTScaled * minTScaled * (temp*1e-3 - 2*minTScaled/3) + c[ 4]*pow(minTScaled,3) * (temp*1e-3 - 3*minTScaled/4) - c[ 5]*pow(minTScaled,-1) * (-temp*1e-3 / minTScaled + 2) + c[ 6] ) // else if out of bounds - low
-//                                               (              c[8] * temp*1e-3 + c[9] * maxTScaled * (temp*1e-3 - maxTScaled/2) + c[10] * maxTScaled * maxTScaled * (temp*1e-3 - 2*maxTScaled/3) + c[11]*pow(maxTScaled,3) * (temp*1e-3 - 3*maxTScaled/4) - c[12]*pow(maxTScaled,-1) * (-temp*1e-3 / maxTScaled + 2) + c[13] ); // else out of bounds - high
-//
-//
-//          for( ic = c.begin() + 1; ic != icend; ++ic)
-//            *ic *= 1e-3; // scale the coefficients again to keep units consistent
-//          dhdT <<= dhdT + *massFracs_[n] * cond( temp <= c[0] && temp >= minT, c[1] + c[2] * temp*1e-3 + c[ 3] * t2*1e-6 + c[ 4] * t3*1e-9 + c[ 5] * recipRecipT*1e6 ) // if low temp
-//                                               ( temp >  c[0] && temp <= maxT, c[8] + c[9] * temp*1e-3 + c[10] * t2*1e-6 + c[11] * t3*1e-9 + c[12] * recipRecipT*1e6 )  // else if high temp
-//                                               ( temp < minT, c[1] + c[2] * minTScaled + c[ 3] * minTScaled * minTScaled + c[ 4] * pow(minTScaled,3) + c[ 5] * pow(minTScaled,-2) )  // else if out of bounds - low
-//                                               (              c[8] + c[9] * maxTScaled + c[10] * maxTScaled * maxTScaled + c[11] * pow(maxTScaled,3) + c[12] * pow(maxTScaled,-2) ); // else out of bounds - high
-//
-//        } // switch
-//      }
+      else{
+        /* else temperature can be out of bounds low, low temp, high temp, or out of bounds high
+         * if out of bounds, properties are interpolated from min or max temp using a constant cp
+         */
+        switch (polyType){
+        case SIMPLE: // constant cp
+          delH<<=delH - *massFracs_[n] * ( c[1] + c[3]*(temp-c[0]) );
+          dhdT<<=dhdT + *massFracs_[n] * c[3];
+          break;
+        case NASA2:
+          delH <<= delH - *massFracs_[n] * cond( temp <= c[0] && temp >= minT, c[ 6] + c[1] * temp + c[2]/2 * t2 + c[ 3]/3 * t3 + c[ 4]/4 * t4 + c[ 5]/5 * t5 ) // if low temp
+                                               ( temp >  c[0] && temp <= maxT, c[13] + c[8] * temp + c[9]/2 * t2 + c[10]/3 * t3 + c[11]/4 * t4 + c[12]/5 * t5 )  // else if high temp
+                                               ( temp < minT, c[ 6] + c[1] * temp + c[2] * minT * (temp - minT/2) + c[ 3] * minT * minT * (temp - 2*minT/3) + c[ 4]*pow(minT,3) * (temp - 3*minT/4) + c[ 5]*pow(minT,4) * (temp - 4*minT/5) ) // else if out of bounds - low
+                                               (              c[13] + c[8] * temp + c[9] * maxT * (temp - maxT/2) + c[10] * maxT * maxT * (temp - 2*maxT/3) + c[11]*pow(maxT,3) * (temp - 3*maxT/4) + c[12]*pow(maxT,4) * (temp - 4*maxT/5) ); // else out of bounds - high
+
+          dhdT <<= dhdT + *massFracs_[n] * cond( temp <= c[0] && temp >= minT, c[1] + c[2] * temp + c[ 3] * t2 + c[ 4] * t3 + c[ 5] * t4) // if low temp
+                                               ( temp >  c[0] && temp <= maxT, c[8] + c[9] * temp + c[10] * t2 + c[11] * t3 + c[12] * t4)  // else if high temp
+                                               ( temp < minT, c[1] + c[2] * minT + c[ 3] * minT * minT + c[ 4] * pow(minT,3) + c[ 5] * pow(minT,4))  // else if out of bounds - low
+                                               (              c[8] + c[9] * maxT + c[10] * maxT * maxT + c[11] * pow(maxT,3) + c[12] * pow(maxT,4)); // else out of bounds - high
+
+          break;
+        case SHOMATE2:
+          double minTScaled = minT/1000;
+          double maxTScaled = maxT/1000;
+          delH <<= delH - *massFracs_[n] * cond( temp <= c[0] && temp >= minT, c[ 6] + c[1] * temp*1e-3 + c[2]/2 * t2*1e-6 + c[ 3]/3 * t3*1e-9 + c[ 4]/4 * t4*1e-12 - c[ 5] * recipT*1e3 ) // if low temp
+                                               ( temp >  c[0] && temp <= maxT, c[13] + c[8] * temp*1e-3 + c[9]/2 * t2*1e-6 + c[10]/3 * t3*1e-9 + c[11]/4 * t4*1e-12 - c[12] * recipT*1e3 )  // else if high temp
+                                               ( temp < minT, c[1] * temp*1e-3 + c[2] * minTScaled * (temp*1e-3 - minTScaled/2) + c[ 3] * minTScaled * minTScaled * (temp*1e-3 - 2*minTScaled/3) + c[ 4]*pow(minTScaled,3) * (temp*1e-3 - 3*minTScaled/4) - c[ 5]*pow(minTScaled,-1) * (-temp*1e-3 / minTScaled + 2) + c[ 6] ) // else if out of bounds - low
+                                               (              c[8] * temp*1e-3 + c[9] * maxTScaled * (temp*1e-3 - maxTScaled/2) + c[10] * maxTScaled * maxTScaled * (temp*1e-3 - 2*maxTScaled/3) + c[11]*pow(maxTScaled,3) * (temp*1e-3 - 3*maxTScaled/4) - c[12]*pow(maxTScaled,-1) * (-temp*1e-3 / maxTScaled + 2) + c[13] ); // else out of bounds - high
+
+
+          for( std::vector<double>::iterator ic = c.begin() + 1; ic != c.end(); ++ic)
+            *ic *= 1e-3; // scale the coefficients again to keep units consistent
+          dhdT <<= dhdT + *massFracs_[n] * cond( temp <= c[0] && temp >= minT, c[1] + c[2] * temp*1e-3 + c[ 3] * t2*1e-6 + c[ 4] * t3*1e-9 + c[ 5] * recipRecipT*1e6 ) // if low temp
+                                               ( temp >  c[0] && temp <= maxT, c[8] + c[9] * temp*1e-3 + c[10] * t2*1e-6 + c[11] * t3*1e-9 + c[12] * recipRecipT*1e6 )  // else if high temp
+                                               ( temp < minT, c[1] + c[2] * minTScaled + c[ 3] * minTScaled * minTScaled + c[ 4] * pow(minTScaled,3) + c[ 5] * pow(minTScaled,-2) )  // else if out of bounds - low
+                                               (              c[8] + c[9] * maxTScaled + c[10] * maxTScaled * maxTScaled + c[11] * pow(maxTScaled,3) + c[12] * pow(maxTScaled,-2) ); // else out of bounds - high
+
+        } // switch
+      }
     }
     // Newton's method to find root
     res <<= delH/dhdT;
