@@ -289,10 +289,10 @@ evaluate()
   cp <<= 0.0; // set cp to 0 before starting summation
 
   for( size_t n=0; n<nSpec_; ++n ){
-    int polyType = polyTypeVec_[n];
-    std::vector<double>& c = cVec_[n];
-    double minT = minTVec_[n];
-    double maxT = maxTVec_[n];
+    const int polyType = polyTypeVec_[n];
+    const std::vector<double>& c = cVec_[n];
+    const double minT = minTVec_[n];
+    const double maxT = maxTVec_[n];
     switch (polyType) {
       case SIMPLE:
         cp <<= cp + *massFracs_[n] * c[3];

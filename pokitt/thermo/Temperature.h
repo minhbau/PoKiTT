@@ -350,10 +350,10 @@ evaluate()
     }
 
     for( size_t n=0; n<nSpec_; ++n ){
-      int polyType = polyTypeVec_[n];
+      const int polyType = polyTypeVec_[n];
       std::vector<double>& c = cVec_[n];
-      double minT = minTVec_[n];
-      double maxT = maxTVec_[n];
+      const double minT = minTVec_[n];
+      const double maxT = maxTVec_[n];
       if( nebo_max(temp) <= maxT && nebo_min(temp) >= minT ){
         /* if true, temperature can only be either high or low
          * This reduces the number of checks and reduces evaluation time
@@ -631,10 +631,10 @@ evaluate()
       }
     }
     for( size_t n=0; n<nSpec_; ++n){
-      int polyType = polyTypeVec_[n];
+      const int polyType = polyTypeVec_[n];
       std::vector<double>& c = cVec_[n];
-      double minT = minTVec_[n];
-      double maxT = maxTVec_[n];
+      const double minT = minTVec_[n];
+      const double maxT = maxTVec_[n];
       if( nebo_max(temp) <= maxT && nebo_min(temp) >= minT){ // if true, temperature can only be either high or low
         switch (polyType) {
           case SIMPLE: // constant cv
