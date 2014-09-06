@@ -314,7 +314,6 @@ int main( int iarg, char* carg[] )
   std::string inputFileName;
   std::string inpGroup;
   bool timings = false;
-  EnergyType energyType;
 
   // parse the command line options input describing the problem
   try {

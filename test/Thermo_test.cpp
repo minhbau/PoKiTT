@@ -338,7 +338,6 @@ int main( int iarg, char* carg[] )
   std::string inpGroup;
   bool mix     = false;
   bool timings = false;
-  ThermoQuantity thermoQuantity;
 
   // parse the command line options input describing the problem
   try {
