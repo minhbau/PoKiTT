@@ -69,25 +69,26 @@ const std::vector< std::vector<double> > mass_fracs(const int nPts, const int nS
 
 //==============================================================================
 
-void calculate_energy(CellField& energy, const CellField& temp, Cantera_CXX::IdealGasMix& gasMix, const EnergyType energyType, const int nPts){
+void calculate_energy(CellField& energy, CellField& temp, Cantera_CXX::IdealGasMix& gasMix, const EnergyType energyType, const int nPts){
+# ifdef ENABLE_CUDA
+  energy.set_device_as_active( CPU_INDEX );
+  temp.set_device_as_active( CPU_INDEX );
+# endif
 
   const int nSpec=gasMix.nSpecies();
   const double refPressure=gasMix.pressure();
-
   const std::vector< std::vector<double> > massFracs = mass_fracs( nPts, nSpec);
 
   CellField::const_iterator iTemp = temp.begin();
   std::vector< std::vector<double> >::const_iterator iMass = massFracs.begin();
   CellField::iterator iEnergyEnd = energy.end();
-  CellField::iterator iEnergy;
-  for( iEnergy = energy.begin(); iEnergy!=iEnergyEnd; ++iTemp, ++iMass, ++iEnergy ){
+  for( CellField::iterator iEnergy = energy.begin(); iEnergy!=iEnergyEnd; ++iTemp, ++iMass, ++iEnergy ){
     gasMix.setState_TPY( *iTemp, refPressure, &(*iMass)[0]);
     switch(energyType){
     case H  : *iEnergy=gasMix.enthalpy_mass();  break;
     case E0 : *iEnergy=gasMix.intEnergy_mass(); break;
     } // switch(energyType)
   }
-
 }
 
 //==============================================================================
@@ -97,32 +98,37 @@ get_cantera_result( const bool timings,
                     const EnergyType energyType,
                     Cantera_CXX::IdealGasMix& gasMix,
                     const int nPts,
-                    const CellField& temp,
-                    const CellField& mixMW,
-                    const CellField& xcoord,
+                    CellField& temp,
+                    CellField& mixMW,
+                    CellField& xcoord,
                     const CellField& energy)
 {
+# ifdef ENABLE_CUDA
+  temp.set_device_as_active  ( CPU_INDEX );
+  xcoord.set_device_as_active( CPU_INDEX );
+  mixMW.set_device_as_active ( CPU_INDEX );
+# endif
   const int nSpec=gasMix.nSpecies();
   const double refPressure=gasMix.pressure();
 
   const std::vector< std::vector<double> > massFracs = mass_fracs( nPts, nSpec);
-  std::vector<double> tVecDiff;
+  std::vector<double> tVec;
   for( size_t i=0; i<nPts+2; ++i)
-    tVecDiff.push_back( 525.0 + 950.0 * (i-0.5)/ nPts);
-  std::vector< std::vector<double> >::const_iterator iMass = massFracs.begin();
-  std::vector<double>::iterator iTemp = tVecDiff.begin();
-  So::SpatFldPtr<CellField> canteraResult = So::SpatialFieldStore::get<CellField>(temp);
-  So::SpatFldPtr<CellField> canteraVolume = So::SpatialFieldStore::get<CellField>(temp);
+    tVec.push_back( 525.0 + 950.0 * (i-0.5)/ nPts);
+  So::SpatFldPtr<CellField> canteraResult = So::SpatialFieldStore::get<CellField>(temp, CPU_INDEX);
+  So::SpatFldPtr<CellField> canteraVolume = So::SpatialFieldStore::get<CellField>(temp, CPU_INDEX);
   *canteraVolume <<= Cantera::GasConstant * (500.0 + 1000 * xcoord) * mixMW / refPressure;
-  CellField::const_iterator iEnergy = energy.begin();
-  CellField::iterator iVolume = canteraVolume->begin();
 
+  std::vector< std::vector<double> >::const_iterator iMass = massFracs.begin();
+  std::vector<double>::iterator iTemp = tVec.begin();
+  CellField::const_iterator iEnergy = energy.begin();
+  CellField::const_iterator iVolume = canteraVolume->begin();
   boost::timer tTime;
   for(CellField::iterator iCant = canteraResult->begin(); iCant!=canteraResult->end();++iVolume, ++iEnergy, ++iTemp, ++iMass, ++iCant){
     gasMix.setState_TPY( *iTemp, refPressure, &(*iMass)[0]);
     switch( energyType ){
-    case H:  gasMix.setState_HP( *iEnergy, refPressure); break;
-    case E0: gasMix.setState_UV( *iEnergy, *iVolume   ); break;
+    case H:  gasMix.setState_HP( *iEnergy, refPressure ); break;
+    case E0: gasMix.setState_UV( *iEnergy, *iVolume    ); break;
     }
     *iCant=gasMix.temperature();
   }
@@ -133,7 +139,14 @@ get_cantera_result( const bool timings,
 //==============================================================================
 
 bool TPowers_equal( TestHelper& status, So::SpatFldPtr<CellField> canteraResult, Expr::FieldMgrSelector<CellField>::type& cellFM, const Expr::TagList& tPowerTags ){
-  So::SpatFldPtr<CellField> canteraTPower = So::SpatialFieldStore::get<CellField>(*canteraResult);
+
+  So::SpatFldPtr<CellField> canteraTPower = So::SpatialFieldStore::get<CellField>(*canteraResult, CPU_INDEX);
+# ifdef ENABLE_CUDA
+  BOOST_FOREACH( Expr::Tag tPowerTag, tPowerTags){
+    CellField& tpow = cellFM.field_ref(tPowerTag);
+    tpow.set_device_as_active( CPU_INDEX );
+  }
+# endif
 
   *canteraTPower <<= *canteraResult * *canteraResult;
   CellField& t2 = cellFM.field_ref(tPowerTags[0]);
@@ -199,7 +212,7 @@ bool driver( bool timings, EnergyType energyType)
   Expr::ExpressionID temp_id;
   switch( energyType ){
   case H:
-    typedef Temperature       <CellField> Temperature;
+    typedef Temperature <CellField> Temperature;
     temp_id = exprFactory.register_expression( new Temperature ::Builder (tTag, yiTag, energyTag) );
     tPowerTags = Temperature::temperature_powers_tags();
     break;
@@ -283,7 +296,7 @@ bool driver( bool timings, EnergyType energyType)
       ke <<= 0.0;
     }
 
-    temp <<= temp + 25 - 50 * xcoord;
+    temp <<= temp + 1;
 
     tTree.lock_fields( fml );  // prevent fields from being deallocated so that we can get them after graph execution.
 
@@ -294,15 +307,12 @@ bool driver( bool timings, EnergyType energyType)
 
     if( timings ) std::cout << "PoKiTT  T from " + energy_name(energyType) + " time " << tTimer.elapsed() << std::endl;
 
-#   ifdef ENABLE_CUDA
-    temp.add_device(CPU_INDEX);
-#   endif
-
     SpatFldPtr<CellField> canteraResult = get_cantera_result( timings, energyType, *gasMix, *iPts, temp, *mixMW, xcoord, energy );
 
     status( field_equal(temp, *canteraResult, 1e-6), tTag.name() );
 
     status( TPowers_equal( status, canteraResult, cellFM, tPowerTags ), "TPowers" );
+
   }
   return status.ok();
 }

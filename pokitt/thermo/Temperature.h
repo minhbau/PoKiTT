@@ -214,8 +214,7 @@ Temperature( const Expr::Tag& massFracTag,
     nasaFlag_ ( false ),
     shomateFlag_ ( false )
 {
-  // not GPU runnable until we get reductions supported on the GPU.
-//  this->set_gpu_runnable( true );
+  this->set_gpu_runnable( true );
   Cantera_CXX::IdealGasMix* const gasMix = CanteraObjects::get_gasmix();
   const Cantera::SpeciesThermo& spThermo = gasMix->speciesThermo();
 
@@ -331,12 +330,13 @@ evaluate()
   FieldT& delH = *delHPtr;
   FieldT& dhdT = *dhdTPtr;
   FieldT& res  = *resPtr;
-
+# ifdef ENABLE_CUDA
+  res.add_device(CPU_INDEX);
+# endif
   bool isConverged = false;
   while( !isConverged ){
     delH <<= *enth_;
     dhdT <<= 0.0;
-
     // pre-compute powers of temperature used in polynomial evaluations
     if( nasaFlag_ == true || shomateFlag_ == true ){
       t2 <<= temp * temp;
@@ -349,44 +349,37 @@ evaluate()
         recipRecipT <<= recipT * recipT;
       }
     }
-
     for( size_t n=0; n<nSpec_; ++n ){
       const int polyType = polyTypeVec_[n];
       std::vector<double>& c = cVec_[n];
       const double minT = minTVec_[n];
       const double maxT = maxTVec_[n];
-      if( nebo_max(temp) <= maxT && nebo_min(temp) >= minT ){
-        /* if true, temperature can only be either high or low
-         * This reduces the number of checks and reduces evaluation time
-         */
-        switch (polyType){
+#     ifndef ENABLE_CUDA // optimization benefits only the CPU
+      if( nebo_max(temp) <= maxT && nebo_min(temp) >= minT){ // if true, temperature can only be either high or low
+        switch (polyType) {
         case SIMPLE: // constant cp
-          delH <<= delH - *massFracs_[n] * ( c[1] + c[3] * (temp-c[0]) );
+          delH <<= delH - *massFracs_[n] * ( c[1] + c[3]*(temp-c[0]) );
           dhdT <<= dhdT + *massFracs_[n] * c[3];
           break;
         case NASA2:
-          delH <<= delH - *massFracs_[n] * cond( temp <= c[0] , c[ 6] + c[1] * temp + c[2]/2 * t2 + c[ 3]/3 * t3 + c[ 4]/4 * t4 + c[ 5]/5 * t5) // if low temp
-                                               (                c[13] + c[8] * temp + c[9]/2 * t2 + c[10]/3 * t3 + c[11]/4 * t4 + c[12]/5 * t5); // else if high temp
+          delH <<= delH - *massFracs_[n] * cond( temp <= c[0], c[ 6] + c[1] * temp + c[2]/2 * t2 + c[ 3]/3 * t3 + c[ 4]/4 * t4 + c[ 5]/5 * t5 ) // if low temp
+                                               (               c[13] + c[8] * temp + c[9]/2 * t2 + c[10]/3 * t3 + c[11]/4 * t4 + c[12]/5 * t5 );// else if high temp
 
-
-          dhdT <<= dhdT + *massFracs_[n] * cond( temp <= c[0] , c[1] + c[2] * temp + c[ 3] * t2 + c[ 4] * t3 + c[ 5] * t4) // if low temp
-                                               (                c[8] + c[9] * temp + c[10] * t2 + c[11] * t3 + c[12] * t4); // else if high temp
-
+          dhdT <<= dhdT + *massFracs_[n] * cond( temp <= c[0], c[1] + c[2] * temp + c[ 3] * t2 + c[ 4] * t3 + c[ 5] * t4) // if low temp
+                                               (               c[8] + c[9] * temp + c[10] * t2 + c[11] * t3 + c[12] * t4);// else if high temp
           break;
         case SHOMATE2:
-          delH<<= delH - *massFracs_[n] * cond( temp <= c[0] , c[ 6] + c[1] * temp*1e-3 + c[2]/2 * t2*1e-6 + c[ 3]/3 * t3*1e-9 + c[ 4]/4 * t4*1e-12 - c[ 5] * recipT*1e3 ) // if low temp
-                                              (                c[13] + c[8] * temp*1e-3 + c[9]/2 * t2*1e-6 + c[10]/3 * t3*1e-9 + c[11]/4 * t4*1e-12 - c[12] * recipT*1e3 ); // else if high temp
+          delH <<= delH - *massFracs_[n] * cond( temp <= c[0], c[ 6] + c[1] * temp*1e-3 + c[2]/2 * t2*1e-6 + c[ 3]/3 * t3*1e-9 + c[ 4]/4 * t4*1e-12 - c[ 5] * recipT*1e3 ) // if low temp
+                                               (               c[13] + c[8] * temp*1e-3 + c[9]/2 * t2*1e-6 + c[10]/3 * t3*1e-9 + c[11]/4 * t4*1e-12 - c[12] * recipT*1e3 ); // else if high range
 
-
-          for( std::vector<double>::iterator ic = c.begin() + 1; ic < c.end(); ++ic)
-            *ic *= 1e-3; // scale the coefficients to keep units consistent
-          dhdT<<= dhdT + *massFracs_[n] * cond( temp <= c[0] , c[1] + c[2] * temp*1e-3 + c[ 3] * t2*1e-6 + c[ 4] * t3*1e-9 + c[ 5] * recipRecipT*1e6) // if low temp
-                                              (                c[8] + c[9] * temp*1e-3 + c[10] * t2*1e-6 + c[11] * t3*1e-9 + c[12] * recipRecipT*1e6); // else if high temp
-
+          dhdT <<= dhdT + *massFracs_[n] * 1e-3 * cond( temp <= c[0], c[1] + c[2] * temp*1e-3 + c[ 3] * t2*1e-6 + c[ 4] * t3*1e-9 + c[ 5] * recipRecipT*1e6 ) // if low temp
+                                                      (               c[8] + c[9] * temp*1e-3 + c[10] * t2*1e-6 + c[11] * t3*1e-9 + c[12] * recipRecipT*1e6 ); // else if high range
           break;
-        }
+        } // switch( polyType )
       }
-      else{
+    else
+#   endif
+      {
         /* else temperature can be out of bounds low, low temp, high temp, or out of bounds high
          * if out of bounds, properties are interpolated from min or max temp using a constant cp
          */
@@ -408,34 +401,36 @@ evaluate()
 
           break;
         case SHOMATE2:
-          double minTScaled = minT/1000;
-          double maxTScaled = maxT/1000;
           delH <<= delH - *massFracs_[n] * cond( temp <= c[0] && temp >= minT, c[ 6] + c[1] * temp*1e-3 + c[2]/2 * t2*1e-6 + c[ 3]/3 * t3*1e-9 + c[ 4]/4 * t4*1e-12 - c[ 5] * recipT*1e3 ) // if low temp
                                                ( temp >  c[0] && temp <= maxT, c[13] + c[8] * temp*1e-3 + c[9]/2 * t2*1e-6 + c[10]/3 * t3*1e-9 + c[11]/4 * t4*1e-12 - c[12] * recipT*1e3 )  // else if high temp
-                                               ( temp < minT, c[1] * temp*1e-3 + c[2] * minTScaled * (temp*1e-3 - minTScaled/2) + c[ 3] * minTScaled * minTScaled * (temp*1e-3 - 2*minTScaled/3) + c[ 4]*pow(minTScaled,3) * (temp*1e-3 - 3*minTScaled/4) - c[ 5]*pow(minTScaled,-1) * (-temp*1e-3 / minTScaled + 2) + c[ 6] ) // else if out of bounds - low
-                                               (              c[8] * temp*1e-3 + c[9] * maxTScaled * (temp*1e-3 - maxTScaled/2) + c[10] * maxTScaled * maxTScaled * (temp*1e-3 - 2*maxTScaled/3) + c[11]*pow(maxTScaled,3) * (temp*1e-3 - 3*maxTScaled/4) - c[12]*pow(maxTScaled,-1) * (-temp*1e-3 / maxTScaled + 2) + c[13] ); // else out of bounds - high
+                                               ( temp < minT, c[1] * temp*1e-3 + c[2] * minT*1e-3 * (temp*1e-3 - minT*1e-3/2) + c[ 3] * minT*1e-3 * minT*1e-3 * (temp*1e-3 - 2*minT*1e-3/3) + c[ 4]*pow(minT*1e-3,3) * (temp*1e-3 - 3*minT*1e-3/4) - c[ 5]*pow(minT*1e-3,-1) * (-temp*1e-3 / minT*1e-3 + 2) + c[ 6] ) // else if out of bounds - low
+                                               (              c[8] * temp*1e-3 + c[9] * maxT*1e-3 * (temp*1e-3 - maxT*1e-3/2) + c[10] * maxT*1e-3 * maxT*1e-3 * (temp*1e-3 - 2*maxT*1e-3/3) + c[11]*pow(maxT*1e-3,3) * (temp*1e-3 - 3*maxT*1e-3/4) - c[12]*pow(maxT*1e-3,-1) * (-temp*1e-3 / maxT*1e-3 + 2) + c[13] ); // else out of bounds - high
 
+          dhdT <<= dhdT + *massFracs_[n] * 1e-3 * cond( temp <= c[0] && temp >= minT, c[1] + c[2] * temp*1e-3 + c[ 3] * t2*1e-6 + c[ 4] * t3*1e-9 + c[ 5] * recipRecipT*1e6 ) // if low temp
+                                                      ( temp >  c[0] && temp <= maxT, c[8] + c[9] * temp*1e-3 + c[10] * t2*1e-6 + c[11] * t3*1e-9 + c[12] * recipRecipT*1e6 )  // else if high temp
+                                                      ( temp < minT, c[1] + c[2] * minT*1e-3 + c[ 3] * minT*1e-3 * minT*1e-3 + c[ 4] * pow(minT*1e-3,3) + c[ 5] * pow(minT*1e-3,-2) )  // else if out of bounds - low
+                                                      (              c[8] + c[9] * maxT*1e-3 + c[10] * maxT*1e-3 * maxT*1e-3 + c[11] * pow(maxT*1e-3,3) + c[12] * pow(maxT*1e-3,-2) ); // else out of bounds - high
 
-          for( std::vector<double>::iterator ic = c.begin() + 1; ic != c.end(); ++ic)
-            *ic *= 1e-3; // scale the coefficients again to keep units consistent
-          dhdT <<= dhdT + *massFracs_[n] * cond( temp <= c[0] && temp >= minT, c[1] + c[2] * temp*1e-3 + c[ 3] * t2*1e-6 + c[ 4] * t3*1e-9 + c[ 5] * recipRecipT*1e6 ) // if low temp
-                                               ( temp >  c[0] && temp <= maxT, c[8] + c[9] * temp*1e-3 + c[10] * t2*1e-6 + c[11] * t3*1e-9 + c[12] * recipRecipT*1e6 )  // else if high temp
-                                               ( temp < minT, c[1] + c[2] * minTScaled + c[ 3] * minTScaled * minTScaled + c[ 4] * pow(minTScaled,3) + c[ 5] * pow(minTScaled,-2) )  // else if out of bounds - low
-                                               (              c[8] + c[9] * maxTScaled + c[10] * maxTScaled * maxTScaled + c[11] * pow(maxTScaled,3) + c[12] * pow(maxTScaled,-2) ); // else out of bounds - high
-
-        } // switch
+        } // switch( polyType )
       }
-    }
+    } // species loop
     // Newton's method to find root
-    res <<= delH/dhdT;
+    res  <<= delH/dhdT;
     temp <<= temp + res;
-    isConverged = nebo_max( abs(res) ) < 1e-3; // Converged when the temperature has changed by less than 1e-3
+#   ifdef ENABLE_CUDA
+    res.set_device_as_active(CPU_INDEX);
+#   endif
+    const double err = nebo_max( abs(res) );
+#   ifdef ENABLE_CUDA
+    res.set_device_as_active(GPU_INDEX);
+#   endif
+    isConverged = err < 1e-3; // Converged when the temperature has changed by less than 1e-3
   }
-  t2 <<= temp * temp;
-  t3 <<= t2 * temp;
-  t4 <<= t3 * temp;
-  t5 <<= t4 * temp;
-  recipT <<= 1/ temp;
+  t2          <<= temp * temp;
+  t3          <<= t2 * temp;
+  t4          <<= t3 * temp;
+  t5          <<= t4 * temp;
+  recipT      <<= 1/ temp;
   recipRecipT <<= recipT * recipT;
 }
 
@@ -470,11 +465,11 @@ TemperatureFromE0<FieldT>::temperature_powers_tags()
 {
   using namespace Expr;
   static const TagList tags = tag_list( Tag("T^2"  ,STATE_NONE),
-                                  Tag("T^3"  ,STATE_NONE),
-                                  Tag("T^4"  ,STATE_NONE),
-                                  Tag("T^5"  ,STATE_NONE),
-                                  Tag("1/T"  ,STATE_NONE),
-                                  Tag("1/T^2",STATE_NONE) );
+                                        Tag("T^3"  ,STATE_NONE),
+                                        Tag("T^4"  ,STATE_NONE),
+                                        Tag("T^5"  ,STATE_NONE),
+                                        Tag("1/T"  ,STATE_NONE),
+                                        Tag("1/T^2",STATE_NONE) );
   return tags;
 }
 
@@ -489,7 +484,7 @@ TemperatureFromE0( const Expr::Tag& massFracTag,
     nasaFlag_ ( false ),
     shomateFlag_ ( false )
 {
-//  this->set_gpu_runnable( true );
+  this->set_gpu_runnable( true );
   Cantera_CXX::IdealGasMix* const gasMix = CanteraObjects::get_gasmix();
   const Cantera::SpeciesThermo& spThermo = gasMix->speciesThermo();
 
@@ -613,12 +608,11 @@ evaluate()
   FieldT& dE0dT = *dE0dTPtr;
   FieldT& res   = *resPtr;
 
+  res.add_device(CPU_INDEX);
   bool isConverged = false;
-
   while( !isConverged ){
     delE0 <<= *e0_ - *ke_;
     dE0dT <<= 0.0;
-
     // pre-compute powers of temperature used in polynomial evaluations
     if( nasaFlag_ == true | shomateFlag_ == true ){
       t2 <<= temp * temp;
@@ -636,11 +630,12 @@ evaluate()
       std::vector<double>& c = cVec_[n];
       const double minT = minTVec_[n];
       const double maxT = maxTVec_[n];
+#     ifndef ENABLE_CUDA // optimization benefits only the CPU
       if( nebo_max(temp) <= maxT && nebo_min(temp) >= minT){ // if true, temperature can only be either high or low
         switch (polyType) {
           case SIMPLE: // constant cv
-            delE0<<=delE0 - *massFracs_[n] * ( c[1] + c[3]*(temp-c[0]) );
-            dE0dT<<=dE0dT + *massFracs_[n] * c[3];
+            delE0 <<= delE0 - *massFracs_[n] * ( c[1] + c[3]*(temp-c[0]) );
+            dE0dT <<= dE0dT + *massFracs_[n] * c[3];
             break;
           case NASA2:
             delE0 <<= delE0 - *massFracs_[n] * cond( temp <= c[0], c[ 6] + c[1] * temp + c[2]/2 * t2 + c[ 3]/3 * t3 + c[ 4]/4 * t4 + c[ 5]/5 * t5 ) // if low temp
@@ -651,16 +646,16 @@ evaluate()
             break;
           case SHOMATE2:
             delE0 <<= delE0 - *massFracs_[n] * cond( temp <= c[0], c[ 6] + c[1] * temp*1e-3 + c[2]/2 * t2*1e-6 + c[ 3]/3 * t3*1e-9 + c[ 4]/4 * t4*1e-12 - c[ 5] * recipT*1e3 ) // if low temp
-                                                     (               c[13] + c[8] * temp*1e-3 + c[9]/2 * t2*1e-6 + c[10]/3 * t3*1e-9 + c[11]/4 * t4*1e-12 - c[12] * recipT*1e3 ); // else if high range
-
-            for( std::vector<double>::iterator ic = c.begin() + 1; ic < c.end(); ++ic)
-              *ic *= 1e-3; // scale the coefficients again to keep units consistent
-            dE0dT <<= dE0dT + *massFracs_[n] * cond( temp <= c[0], c[1] + c[2] * temp*1e-3 + c[ 3] * t2*1e-6 + c[ 4] * t3*1e-9 + c[ 5] * recipRecipT*1e6 ) // if low temp
-                                                   (               c[8] + c[9] * temp*1e-3 + c[10] * t2*1e-6 + c[11] * t3*1e-9 + c[12] * recipRecipT*1e6 ); // else if high range
+                                                   (               c[13] + c[8] * temp*1e-3 + c[9]/2 * t2*1e-6 + c[10]/3 * t3*1e-9 + c[11]/4 * t4*1e-12 - c[12] * recipT*1e3 ); // else if high range
+            // 1e-3 is a factor for units conversion
+            dE0dT <<= dE0dT + *massFracs_[n] * 1e-3 * cond( temp <= c[0], c[1] + c[2] * temp*1e-3 + c[ 3] * t2*1e-6 + c[ 4] * t3*1e-9 + c[ 5] * recipRecipT*1e6 ) // if low temp
+                                                          (               c[8] + c[9] * temp*1e-3 + c[10] * t2*1e-6 + c[11] * t3*1e-9 + c[12] * recipRecipT*1e6 ); // else if high range
             break;
-        }
+        } // switch( polyType )
       }
-    else{
+    else
+#   endif
+      {
       /* else temperature can be out of bounds low, low temp, high temp, or out of bounds high
        * if out of bounds, properties are interpolated from min or max temp using a constant cv
        */
@@ -683,34 +678,34 @@ evaluate()
 
             break;
           case SHOMATE2:
-            double minTScaled = minT/1000;
-            double maxTScaled = maxT/1000;
             delE0 <<= delE0 - *massFracs_[n] * cond( temp <= c[0] && temp >= minT, c[ 6] + c[1] * temp*1e-3 + c[2]/2 * t2*1e-6 + c[ 3]/3 * t3*1e-9 + c[ 4]/4 * t4*1e-12 - c[ 5] * recipT*1e3 ) // if low temp
                                                    ( temp >  c[0] && temp <= maxT, c[13] + c[8] * temp*1e-3 + c[9]/2 * t2*1e-6 + c[10]/3 * t3*1e-9 + c[11]/4 * t4*1e-12 - c[12] * recipT*1e3 )  // else if high temp
-                                                   ( temp < minT, c[1] * temp*1e-3 + c[2] * minTScaled * (temp*1e-3 - minTScaled/2) + c[ 3] * minTScaled * minTScaled * (temp*1e-3 - 2*minTScaled/3) + c[ 4]*pow(minTScaled,3) * (temp*1e-3 - 3*minTScaled/4) - c[ 5]*pow(minTScaled,-1) * (-temp*1e-3 / minTScaled + 2) + c[ 6] ) // else if out of bounds - low
-                                                   (              c[8] * temp*1e-3 + c[9] * maxTScaled * (temp*1e-3 - maxTScaled/2) + c[10] * maxTScaled * maxTScaled * (temp*1e-3 - 2*maxTScaled/3) + c[11]*pow(maxTScaled,3) * (temp*1e-3 - 3*maxTScaled/4) - c[12]*pow(maxTScaled,-1) * (-temp*1e-3 / maxTScaled + 2) + c[13] ); // else out of bounds - high
+                                                   ( temp < minT, c[1] * temp*1e-3 + c[2] * minT*1e-3 * (temp*1e-3 - minT*1e-3/2) + c[ 3] * minT*1e-3 * minT*1e-3 * (temp*1e-3 - 2*minT*1e-3/3) + c[ 4]*pow(minT*1e-3,3) * (temp*1e-3 - 3*minT*1e-3/4) - c[ 5]*pow(minT*1e-3,-1) * (-temp*1e-3 / minT*1e-3 + 2) + c[ 6] ) // else if out of bounds - low
+                                                   (              c[8] * temp*1e-3 + c[9] * maxT*1e-3 * (temp*1e-3 - maxT*1e-3/2) + c[10] * maxT*1e-3 * maxT*1e-3 * (temp*1e-3 - 2*maxT*1e-3/3) + c[11]*pow(maxT*1e-3,3) * (temp*1e-3 - 3*maxT*1e-3/4) - c[12]*pow(maxT*1e-3,-1) * (-temp*1e-3 / maxT*1e-3 + 2) + c[13] ); // else out of bounds - high
+            // 1e-3 is a factor for units conversion
+            dE0dT <<= dE0dT + *massFracs_[n] * 1e-3 * cond( temp <= c[0] && temp >= minT, c[1] + c[2] * temp*1e-3 + c[ 3] * t2*1e-6 + c[ 4] * t3*1e-9 + c[ 5] * recipRecipT*1e6 ) // if low temp
+                                                          ( temp >  c[0] && temp <= maxT, c[8] + c[9] * temp*1e-3 + c[10] * t2*1e-6 + c[11] * t3*1e-9 + c[12] * recipRecipT*1e6 )  // else if high temp
+                                                          ( temp < minT, c[1] + c[2] * minT*1e-3 + c[ 3] * minT*1e-3 * minT*1e-3 + c[ 4] * pow(minT*1e-3,3) + c[ 5] * pow(minT*1e-3,-2) )  // else if out of bounds - low
+                                                          (              c[8] + c[9] * maxT*1e-3 + c[10] * maxT*1e-3 * maxT*1e-3 + c[11] * pow(maxT*1e-3,3) + c[12] * pow(maxT*1e-3,-2) ); // else out of bounds - high
 
-
-            for( std::vector<double>::iterator ic = c.begin() + 1; ic < c.end(); ++ic)
-              *ic *= 1e-3; // scale the coefficients again to keep units consistent
-            dE0dT <<= dE0dT + *massFracs_[n] * cond( temp <= c[0] && temp >= minT, c[1] + c[2] * temp*1e-3 + c[ 3] * t2*1e-6 + c[ 4] * t3*1e-9 + c[ 5] * recipRecipT*1e6 ) // if low temp
-                                                   ( temp >  c[0] && temp <= maxT, c[8] + c[9] * temp*1e-3 + c[10] * t2*1e-6 + c[11] * t3*1e-9 + c[12] * recipRecipT*1e6 )  // else if high temp
-                                                   ( temp < minT, c[1] + c[2] * minTScaled + c[ 3] * minTScaled * minTScaled + c[ 4] * pow(minTScaled,3) + c[ 5] * pow(minTScaled,-2) )  // else if out of bounds - low
-                                                   (              c[8] + c[9] * maxTScaled + c[10] * maxTScaled * maxTScaled + c[11] * pow(maxTScaled,3) + c[12] * pow(maxTScaled,-2) ); // else out of bounds - high
-
-        }
+        } // switch( polyType )
       }
-    }
+    } // species loop
     // Newton's method to find root
-    res <<= delE0/dE0dT;
+    res  <<= delE0/dE0dT;
     temp <<= temp + res;
-    isConverged = nebo_max( abs(res) ) < 1e-3; // Converged when the temperature has changed by less than 1e-3
+    res.set_device_as_active(CPU_INDEX);
+    const double err = nebo_max( abs(res) );
+#   ifdef ENABLE_CUDA
+    res.set_device_as_active(GPU_INDEX);
+#   endif
+    isConverged = err < 1e-3; // Converged when the temperature has changed by less than 1e-3
   }
-  t2 <<= temp * temp;
-  t3 <<= t2 * temp;
-  t4 <<= t3 * temp;
-  t5 <<= t4 * temp;
-  recipT <<= 1/ temp;
+  t2          <<= temp * temp;
+  t3          <<= t2 * temp;
+  t4          <<= t3 * temp;
+  t5          <<= t4 * temp;
+  recipT      <<= 1/ temp;
   recipRecipT <<= recipT * recipT;
 }
 

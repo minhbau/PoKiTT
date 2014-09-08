@@ -44,9 +44,8 @@ add_test( rxn_test rxn_test )
 
 nebo_add_executable( temperature_test Temperature_test.cpp )
 target_link_libraries( temperature_test pokitt )
-if( NOT ENABLE_CUDA )
-  add_test( NAME temperature_test COMMAND temperature_test --xml-input-file=thermo_tester.xml)
-endif( NOT ENABLE_CUDA )
+add_test( NAME temperature_test         COMMAND temperature_test --xml-input-file=thermo_tester.xml)
+add_test( NAME temperature_test_shomate COMMAND temperature_test --xml-input-file=thermo_tester.xml --phase=shomate)
 
 nebo_add_executable( therm_cond_test ThermalCondMix_test.cpp )
 target_link_libraries( therm_cond_test pokitt )
