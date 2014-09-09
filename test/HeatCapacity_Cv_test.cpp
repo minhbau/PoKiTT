@@ -194,7 +194,7 @@ int main()
 #     ifdef TIMINGS
       std::cout << "Cantera mixture cv time " << hMixtimer.elapsed() << std::endl;
 #     endif
-      status( field_equal(cv, *canteraResult, 1e-10), "mix");
+      status( field_equal(cv, *canteraResult, 1e-14), "mix");
 
       std::vector< SpatFldPtr<CellField> > canteraResults;
       for( n=0; n < nSpec; ++n){
@@ -216,7 +216,7 @@ int main()
       for( n=0; n<nSpec; ++n){
         *canteraResults[n] <<= ( *canteraResults[n] - Cantera::GasConstant ) / molecularWeights[n];
         CellField& cv = cellFM.field_ref(cvTags[n]);
-        status( field_equal(cv, *canteraResults[n], 1e-10), n);
+        status( field_equal(cv, *canteraResults[n], 1e-14), n);
       }
 
     } // number of points
