@@ -150,27 +150,27 @@ bool TPowers_equal( TestHelper& status, So::SpatFldPtr<CellField> canteraResult,
 
   *canteraTPower <<= *canteraResult * *canteraResult;
   CellField& t2 = cellFM.field_ref(tPowerTags[0]);
-  status( field_equal(t2, *canteraTPower , 1e-6), tPowerTags[0].name() );
+  status( field_equal(t2, *canteraTPower , 5e-4), tPowerTags[0].name() );
 
   *canteraTPower <<= *canteraResult * *canteraResult * *canteraResult;
   CellField& t3 = cellFM.field_ref(tPowerTags[1]);
-  status( field_equal(t3, *canteraTPower , 1e-6), tPowerTags[1].name() );
+  status( field_equal(t3, *canteraTPower , 5e-4), tPowerTags[1].name() );
 
   *canteraTPower <<= *canteraResult * *canteraResult * *canteraResult * *canteraResult;
   CellField& t4 = cellFM.field_ref(tPowerTags[2]);
-  status( field_equal(t4, *canteraTPower , 1e-6), tPowerTags[2].name() );
+  status( field_equal(t4, *canteraTPower , 5e-4), tPowerTags[2].name() );
 
   *canteraTPower <<= *canteraResult * *canteraResult * *canteraResult * *canteraResult * *canteraResult;
   CellField& t5 = cellFM.field_ref(tPowerTags[3]);
-  status( field_equal(t5, *canteraTPower , 1e-6), tPowerTags[3].name() );
+  status( field_equal(t5, *canteraTPower , 5e-4), tPowerTags[3].name() );
 
   *canteraTPower <<= 1 / *canteraResult;
   CellField& recipT = cellFM.field_ref(tPowerTags[4]);
-  status( field_equal(recipT, *canteraTPower , 1e-6), tPowerTags[4].name() );
+  status( field_equal(recipT, *canteraTPower , 5e-4), tPowerTags[4].name() );
 
   *canteraTPower <<=  1 / *canteraResult / *canteraResult;
   CellField& recipRecipT = cellFM.field_ref(tPowerTags[5]);
-  status( field_equal(recipRecipT, *canteraTPower , 1e-6), tPowerTags[5].name() );
+  status( field_equal(recipRecipT, *canteraTPower , 5e-4), tPowerTags[5].name() );
 
   return status.ok();
 }
@@ -296,7 +296,7 @@ bool driver( bool timings, EnergyType energyType)
       ke <<= 0.0;
     }
 
-    temp <<= temp + 1;
+    temp <<= temp + 25 - 50 * xcoord;
 
     tTree.lock_fields( fml );  // prevent fields from being deallocated so that we can get them after graph execution.
 
@@ -309,7 +309,7 @@ bool driver( bool timings, EnergyType energyType)
 
     SpatFldPtr<CellField> canteraResult = get_cantera_result( timings, energyType, *gasMix, *iPts, temp, *mixMW, xcoord, energy );
 
-    status( field_equal(temp, *canteraResult, 1e-6), tTag.name() );
+    status( field_equal(temp, *canteraResult, 5e-4), tTag.name() );
 
     status( TPowers_equal( status, canteraResult, cellFM, tPowerTags ), "TPowers" );
 

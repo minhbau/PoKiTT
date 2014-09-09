@@ -123,7 +123,7 @@ public:
  * This iteration continues until a convergence criteria is met:
  *
  * \f[
- * \mid T_{i+1} - T_{i} \mid < 10^{-3}
+ * \mid T_{i+1} - T_{i} \mid < 10^{-4}
  * \f]
  */
 
@@ -424,7 +424,7 @@ evaluate()
 #   ifdef ENABLE_CUDA
     res.set_device_as_active(GPU_INDEX);
 #   endif
-    isConverged = err < 1e-3; // Converged when the temperature has changed by less than 1e-3
+    isConverged = err < 1e-4; // Converged when the temperature has changed by less than 1e-4
   }
   t2          <<= temp * temp;
   t3          <<= t2 * temp;
