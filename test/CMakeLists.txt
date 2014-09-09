@@ -62,4 +62,4 @@ add_test( NAME thermo_test              COMMAND thermo_test --xml-input-file=pol
 add_test( NAME thermo_test_shomate_mix  COMMAND thermo_test --xml-input-file=poly_tester.xml --mix --phase=shomate )
 add_test( NAME thermo_test_shomate      COMMAND thermo_test --xml-input-file=poly_tester.xml       --phase=shomate )
 
-add_test( NAME thermo_test_GRI_mix      COMMAND cp_test --xml-input-file=gri30.xml --phase=gri30 --mix )
+add_test( NAME thermo_test_GRI_mix      COMMAND thermo_test --xml-input-file=gri30.xml --phase=gri30 --mix )
