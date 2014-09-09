@@ -351,7 +351,7 @@ evaluate()
     }
     for( size_t n=0; n<nSpec_; ++n ){
       const int polyType = polyTypeVec_[n];
-      std::vector<double>& c = cVec_[n];
+      const std::vector<double>& c = cVec_[n];
       const double minT = minTVec_[n];
       const double maxT = maxTVec_[n];
 #     ifndef ENABLE_CUDA // optimization benefits only the CPU
@@ -627,7 +627,7 @@ evaluate()
     }
     for( size_t n=0; n<nSpec_; ++n){
       const int polyType = polyTypeVec_[n];
-      std::vector<double>& c = cVec_[n];
+      const std::vector<double>& c = cVec_[n];
       const double minT = minTVec_[n];
       const double maxT = maxTVec_[n];
 #     ifndef ENABLE_CUDA // optimization benefits only the CPU
