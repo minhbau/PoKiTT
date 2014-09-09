@@ -21,6 +21,7 @@ nebo_add_executable( temperature_test Temperature_test.cpp )
 target_link_libraries( temperature_test pokitt )
 add_test( NAME temperature_test         COMMAND temperature_test --xml-input-file=poly_tester.xml)
 add_test( NAME temperature_test_shomate COMMAND temperature_test --xml-input-file=poly_tester.xml --phase=shomate)
+add_test( NAME temperature_test_GRI     COMMAND temperature_test --xml-input-file=gri30.xml)
 
 nebo_add_executable( therm_cond_test ThermalCondMix_test.cpp )
 target_link_libraries( therm_cond_test pokitt )
@@ -36,5 +37,4 @@ add_test( NAME thermo_test_mix          COMMAND thermo_test --xml-input-file=pol
 add_test( NAME thermo_test              COMMAND thermo_test --xml-input-file=poly_tester.xml       )
 add_test( NAME thermo_test_shomate_mix  COMMAND thermo_test --xml-input-file=poly_tester.xml --mix --phase=shomate )
 add_test( NAME thermo_test_shomate      COMMAND thermo_test --xml-input-file=poly_tester.xml       --phase=shomate )
-
 add_test( NAME thermo_test_GRI_mix      COMMAND thermo_test --xml-input-file=gri30.xml --phase=gri30 --mix )
