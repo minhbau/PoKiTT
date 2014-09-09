@@ -278,7 +278,7 @@ bool driver( const bool timings,
     Expr::FieldMgrSelector<CellField>::type& cellFM = fml.field_manager< CellField>();
 
     CellField& temp = cellFM.field_ref(tTag);
-    temp <<= 500.0 + 1000.0*xcoord;
+    temp <<= 500.0 + 1000.0 * xcoord;
 
     if(mix){
       SpatFldPtr<CellField> sum  = SpatialFieldStore::get<CellField>(temp);
