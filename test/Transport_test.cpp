@@ -296,7 +296,7 @@ bool driver( const bool timings,
     std::vector< SpatFldPtr<CellField> >::const_iterator iCantera = canteraResults.begin();
     BOOST_FOREACH( const Expr::Tag& transportTag, transportTags ){
       CellField& transport = cellFM.field_ref(transportTag);
-      status( field_equal( transport, **iCantera, 1e-14 ), transportTag.name() );
+      status( field_equal( transport, **iCantera, 1e-12 ), transportTag.name() );
       ++iCantera;
     }
 
