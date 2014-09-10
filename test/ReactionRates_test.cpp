@@ -127,13 +127,6 @@ bool driver( bool timings )
   exprFactory.register_expression( new MixtureMolWeight ::Builder( mmwTag, yiTag, molecularWeights));
   Expr::ExpressionID rRate_id = exprFactory.register_expression( new ReactionRate::Builder (rTags, tTag, pTag, yiTag, mmwTag) );
 
-  Expr::ExpressionTree tree( rRate_id, exprFactory, 0 );
-
-  {
-    std::ofstream fout( "ReactionRate.dot" );
-    tree.write_tree(fout);
-  }
-
   std::vector<int> ptvec;
   if( timings ){
     ptvec.push_back(8*8*8);
@@ -149,6 +142,13 @@ bool driver( bool timings )
   }
 
   for( std::vector<int>::iterator iPts = ptvec.begin(); iPts!= ptvec.end(); ++iPts){
+
+    Expr::ExpressionTree tree( rRate_id, exprFactory, 0 );
+    {
+      std::ofstream fout( "ReactionRate.dot" );
+      tree.write_tree(fout);
+    }
+
     So::IntVec npts(*iPts,1,1);
     const So::BoundaryCellInfo cellBCInfo = So::BoundaryCellInfo::build<CellField>(false,false,false);
     const So::GhostData cellGhosts(1);
