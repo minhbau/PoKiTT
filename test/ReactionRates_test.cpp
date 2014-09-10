@@ -202,6 +202,7 @@ bool driver( bool timings )
       CellField& r = fml.field_manager<CellField>().field_ref(rTag);
       r.add_device(CPU_INDEX);
     }
+    temp.set_device_as_active( CPU_INDEX );
 #   endif
 
     const std::vector< SpatFldPtr<CellField> > canteraResults = get_cantera_results( timings,
