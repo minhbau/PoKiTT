@@ -68,7 +68,6 @@ get_cantera_results( const bool timings,
   std::vector< std::vector<double> >::iterator iMass = massfracs.begin();
   std::vector<double> rResult(nSpec,0.0);
 
-  std::vector<double> r_result(nSpec,0.0);
   boost::timer cTimer;
   for( size_t i=0; i<nPts+2; ++iTemp, ++iMass, ++i){
     gasMix.setState_TPY( *iTemp, refPressure, &(*iMass)[0]);
