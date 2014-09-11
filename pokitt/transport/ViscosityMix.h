@@ -44,10 +44,14 @@ class Viscosity
   Expr::TagList massFracTags_;
   const FieldT* temperature_;
   std::vector<const FieldT*> massFracs_;
-  Cantera::MixTransport* const trans_; // transport for mixture to be evaluated
-  const int nSpec_; //number of species to iterate over
-  std::vector< std::vector<double > > molecularWeightRatios_; // pre-compute ratios of molecular weights to reduce evaluation time
-  std::vector< std::vector<double > > denominator_; // pre-compute the denominator of the mixing rule to reduce evaluation time
+
+  int nSpec_; //number of species to iterate over
+  std::vector< std::vector<double> > viscosityCoefs_; // Cantera's vector of coefficients for the pure viscosity polynomials
+  int modelType_; // type of model used by Cantera to estimate pure viscosity
+  std::vector<double> molecularWeights_; // molecular weights
+  std::vector<double> molecularWeightsInv_; // inverse of molecular weights (diving by MW is expensive)
+  std::vector< std::vector<double> > molecularWeightRatios_; // pre-compute ratios of molecular weights to reduce evaluation time
+  std::vector< std::vector<double> > denominator_; // pre-compute the denominator of the mixing rule to reduce evaluation time
 
   Viscosity ( const Expr::Tag& temperatureTag,
               const Expr::Tag& massFracTag );
@@ -157,11 +161,11 @@ Viscosity<FieldT>::
 Viscosity( const Expr::Tag& temperatureTag,
            const Expr::Tag& massFracTag )
   : Expr::Expression<FieldT>(),
-    temperatureTag_( temperatureTag ),
-    trans_( dynamic_cast<Cantera::MixTransport*>( CanteraObjects::get_transport() )), // cast gas transport object as mix transport
-    nSpec_( trans_->thermo().nSpecies() )
+    temperatureTag_( temperatureTag )
 {
   this->set_gpu_runnable( true );
+  Cantera::MixTransport* trans = dynamic_cast<Cantera::MixTransport*>( CanteraObjects::get_transport() ); // cast gas transport object as mix transport
+  nSpec_ = trans->thermo().nSpecies();
 
   massFracTags_.clear();
   for( size_t n=0; n<nSpec_; ++n ){
@@ -170,35 +174,42 @@ Viscosity( const Expr::Tag& temperatureTag,
     massFracTags_.push_back( Expr::Tag(name.str(),massFracTag.context()) );
   }
 
+  viscosityCoefs_ = trans->getViscosityCoefficients();
+  modelType_ = trans->model();
+
+  molecularWeights_ = trans->thermo().molecularWeights();
+  molecularWeightsInv_.resize(nSpec_);
+  for( size_t n=0; n<nSpec_; ++n)
+    molecularWeightsInv_[n] = 1 / molecularWeights_[n];
+
   for( size_t n=0; n!=nSpec_; ++n){
     molecularWeightRatios_.push_back( std::vector<double>(nSpec_,0.0) ); // nSpec_ by nSpec_ vector of vectors
     denominator_.push_back( std::vector<double>(nSpec_,0.0) );
   }
-  const std::vector<double>& molecularWeights = trans_->thermo().molecularWeights();
 
 # ifdef NFIELDS // evaluation requires nSpec_ temporary fields
   for(  size_t k=0; k!=nSpec_; ++k){
     for( size_t j=0; j!=nSpec_; ++j){
-      molecularWeightRatios_[k][j] = pow( molecularWeights[k]/molecularWeights[j], 0.25); // pre-compute value to reduce evaluation time
-      denominator_[j][k] = sqrt(8.0) * sqrt( 1 + molecularWeights[k]/molecularWeights[j] ) * molecularWeights[j] / molecularWeights[k]; // pre-compute value to reduce evaluation time
+      molecularWeightRatios_[k][j] = pow( molecularWeights_[k]/molecularWeights_[j], 0.25); // pre-compute value to reduce evaluation time
+      denominator_[j][k] = sqrt(8.0) * sqrt( 1 + molecularWeights_[k]/molecularWeights_[j] ) * molecularWeights_[j] / molecularWeights_[k]; // pre-compute value to reduce evaluation time
       denominator_[j][k] = 1/ denominator_[j][k];
     }
   }
 # else // evaluation requires 2*nSpec_ temporary fields
   for(  size_t k=0; k!=nSpec_; ++k){
     for( size_t j=0; j!=nSpec_; ++j){
-      denominator_[j][k] = sqrt(8.0) * sqrt( 1 + molecularWeights[k] / molecularWeights[j] ) * molecularWeights[j];
+      denominator_[j][k] = sqrt(8.0) * sqrt( 1 + molecularWeights_[k] / molecularWeights_[j] ) * molecularWeights_[j];
       denominator_[j][k] = 1/ denominator_[j][k];
     }
   }
   for( size_t k=0; k!=nSpec_; ++k){
     for( size_t j=0; j!=k; ++j){
-      molecularWeightRatios_[k][j] =      molecularWeights[j] / molecularWeights[k]       ;
-      molecularWeightRatios_[j][k] = pow( molecularWeights[j] / molecularWeights[k], 0.25);
+      molecularWeightRatios_[k][j] =      molecularWeights_[j] / molecularWeights_[k]       ;
+      molecularWeightRatios_[j][k] = pow( molecularWeights_[j] / molecularWeights_[k], 0.25);
     }
   }
 # endif
-
+  CanteraObjects::restore_transport( trans );
 }
 
 //--------------------------------------------------------------------
@@ -207,7 +218,7 @@ template< typename FieldT >
 Viscosity<FieldT>::
 ~Viscosity()
 {
-  CanteraObjects::restore_transport( trans_ );
+
 }
 
 //--------------------------------------------------------------------
@@ -255,13 +266,6 @@ evaluate()
   SpatFldPtr<FieldT> logtPtr   = SpatialFieldStore::get<FieldT>(*temperature_);
   SpatFldPtr<FieldT> logttPtr  = SpatialFieldStore::get<FieldT>(*temperature_);
   SpatFldPtr<FieldT> logtttPtr = SpatialFieldStore::get<FieldT>(*temperature_);
-  SpatFldPtr<FieldT> logt4Ptr;
-  SpatFldPtr<FieldT> tOneFourthPtr;
-
-  if( trans_->model() == Cantera::cMixtureAveraged ) { // as opposed to CK mode
-    logt4Ptr      = SpatialFieldStore::get<FieldT>(*temperature_);
-    tOneFourthPtr = SpatialFieldStore::get<FieldT>(*temperature_);
-  }
 
   FieldT& logt   = *logtPtr;
   FieldT& logtt  = *logttPtr;
@@ -271,28 +275,24 @@ evaluate()
   logtt  <<= logt * logt;
   logttt <<= logtt * logt;
 
-  if( trans_->model() == Cantera::cMixtureAveraged ){
-    *tOneFourthPtr <<= pow( *temperature_, 0.25 );
-    *logt4Ptr      <<= logttt * logt;
+  if( modelType_ == Cantera::cMixtureAveraged ) { // as opposed to CK mode
+    SpatFldPtr<FieldT> logt4Ptr      = SpatialFieldStore::get<FieldT>(*temperature_);
+    SpatFldPtr<FieldT> tOneFourthPtr = SpatialFieldStore::get<FieldT>(*temperature_);
+    FieldT& logt4      = *logt4Ptr;
+    FieldT& tOneFourth = *tOneFourthPtr;
+
+    tOneFourth <<= pow( *temperature_, 0.25 );
+    logt4      <<= logttt * logt;
+
+    for( size_t n = 0; n<nSpec_; ++n )
+      *sqrtSpeciesVis[n] <<= *tOneFourthPtr * ( viscosityCoefs_[n][0] + viscosityCoefs_[n][1] * logt + viscosityCoefs_[n][2] * logtt + viscosityCoefs_[n][3] * logttt + viscosityCoefs_[n][4] * *logt4Ptr );
   }
-
-  const std::vector<std::vector<double> >& viscosityCoefs = trans_->getViscosityCoefficients();
-
-  const std::vector<double>& molecularWeights = trans_->thermo().molecularWeights();
-
-  std::vector<double> molecularWeightsInv(nSpec_);
-  for( size_t n=0; n<nSpec_; ++n)
-    molecularWeightsInv[n] = 1 / molecularWeights[n];
-
-  for( size_t n = 0; n<nSpec_; ++n ){
-    if( trans_->model() == Cantera::cMixtureAveraged ) // Cantera uses a 5 coefficient polynomial in temperature
-      *sqrtSpeciesVis[n] <<= *tOneFourthPtr * ( viscosityCoefs[n][0] + viscosityCoefs[n][1] * logt + viscosityCoefs[n][2] * logtt + viscosityCoefs[n][3] * logttt + viscosityCoefs[n][4] * *logt4Ptr );
-    else // CK mode
-      *sqrtSpeciesVis[n] <<= exp ( 0.5 * (viscosityCoefs[n][0] + viscosityCoefs[n][1] * logt + viscosityCoefs[n][2] * logtt + viscosityCoefs[n][3] * logttt) );
+  else{
+    for( size_t n = 0; n<nSpec_; ++n )
+      *sqrtSpeciesVis[n] <<= exp ( 0.5 * (viscosityCoefs_[n][0] + viscosityCoefs_[n][1] * logt + viscosityCoefs_[n][2] * logtt + viscosityCoefs_[n][3] * logttt) );
   }
 
   result <<= 0.0; // set result to 0 before summing species contributions
-
 # ifdef NFIELDS // requires nSpec_ temporary fields
   SpatFldPtr<FieldT> phiPtr  = SpatialFieldStore::get<FieldT>(*temperature_);
   FieldT& phi = *phiPtr;
@@ -311,7 +311,7 @@ evaluate()
 
   for(size_t k=0; k<nSpec_; ++k){
     phivec.push_back(SpatialFieldStore::get<FieldT>(*temperature_));
-    *phivec[k] <<= *massFracs_[k] * molecularWeightsInv[k]; // begin sum with the k=j case, phi = y_k / M_k
+    *phivec[k] <<= *massFracs_[k] * molecularWeightsInv_[k]; // begin sum with the k=j case, phi = y_k / M_k
   }
 
   for( size_t k=0; k!=nSpec_; ++k){
@@ -326,7 +326,7 @@ evaluate()
   }
 
   for( size_t k=0; k!=nSpec_; ++k){
-    result<<=result + *massFracs_[k] * ( *sqrtSpeciesVis[k] * *sqrtSpeciesVis[k] ) / ( *phivec[k] * molecularWeights[k] ); // mixing rule
+    result<<=result + *massFracs_[k] * ( *sqrtSpeciesVis[k] * *sqrtSpeciesVis[k] ) / ( *phivec[k] * molecularWeights_[k] ); // mixing rule
   }
 # endif
 
