@@ -42,9 +42,12 @@ class DiffusionCoeff
   const FieldT* p_;
   const FieldT* mmw_; // mixture molecular weight
   std::vector<const FieldT*> massFracs_;
-  Cantera::MixTransport* const transport_; //gas mixture to be evaluated
-  const int nSpec_; //number of species to iterate over
-  const double pressure_;
+
+  int nSpec_; //number of species to iterate over
+  int modelType_; // type of model used by Cantera to estimate pure viscosity
+  std::vector<double> molecularWeights_; // molecular weights
+  std::vector<double> molecularWeightsInv_; // inverse of molecular weights (diving by MW is expensive)
+  std::vector< std::vector<double> > binaryDCoefs_;
   /* Cantera uses a polynomial in temperature to evaluate the binary diffusion coefficient of each pair [i][j] = [j][i]
    * indicies_[i][j] stores the index of the set of polynomial coefficients for the pair [i][j]
    * This is to simplify bookkeeping and does not affect the evaluation itself
@@ -107,12 +110,11 @@ DiffusionCoeff( const Expr::Tag& temperatureTag,
   : Expr::Expression<FieldT>(),
     temperatureTag_( temperatureTag ),
     pTag_( pTag ),
-    mmwTag_( mmwTag ),
-    transport_( dynamic_cast<Cantera::MixTransport*>( CanteraObjects::get_transport() )),
-    nSpec_( transport_->thermo().nSpecies() ),
-    pressure_( transport_->thermo().pressure() )
+    mmwTag_( mmwTag )
 {
   this->set_gpu_runnable( true );
+  Cantera::MixTransport* trans = dynamic_cast<Cantera::MixTransport*>( CanteraObjects::get_transport() ); // cast gas transport object as mix transport
+    nSpec_ = trans->thermo().nSpecies();
 
   massFracTags_.clear();
   for( size_t n=0; n<nSpec_; ++n ){
@@ -120,6 +122,14 @@ DiffusionCoeff( const Expr::Tag& temperatureTag,
     name << massFracTag.name() << "_" << n;
     massFracTags_.push_back( Expr::Tag(name.str(),massFracTag.context()) );
   }
+
+  binaryDCoefs_ = trans->getDiffusionPolyCoefficients();
+  modelType_ = trans->model();
+
+  molecularWeights_ = trans->thermo().molecularWeights();
+  molecularWeightsInv_.resize(nSpec_);
+  for( size_t n=0; n<nSpec_; ++n)
+    molecularWeightsInv_[n] = 1 / molecularWeights_[n];
 
   for( size_t n=0; n<nSpec_; ++n)
     indices_.push_back(std::vector<int>(nSpec_));
@@ -139,7 +149,7 @@ template< typename FieldT >
 DiffusionCoeff<FieldT>::
 ~DiffusionCoeff()
 {
-  CanteraObjects::restore_transport( transport_ );
+
 }
 
 //--------------------------------------------------------------------
@@ -180,78 +190,56 @@ DiffusionCoeff<FieldT>::
 evaluate()
 {
   using namespace SpatialOps;
-  std::vector< FieldT* >& results = this->get_value_vec();
+  std::vector< FieldT* >& mixD = this->get_value_vec();
 
   const FieldT& p = *p_;
 
-  //pre-compute powers of log(t) for polynomial evaluation of binary diffusion coefficients
+  // pre-compute power of log(t) for the species viscosity polynomial
   SpatFldPtr<FieldT> logtPtr   = SpatialFieldStore::get<FieldT>(*temperature_);
   SpatFldPtr<FieldT> logttPtr  = SpatialFieldStore::get<FieldT>(*temperature_);
   SpatFldPtr<FieldT> logtttPtr = SpatialFieldStore::get<FieldT>(*temperature_);
-  SpatFldPtr<FieldT> tThreeHalvesPtr;
-  SpatFldPtr<FieldT> logt4Ptr;
 
-  if( transport_->model() == Cantera::cMixtureAveraged ) { // as opposed to CK mode
-    logt4Ptr        = SpatialFieldStore::get<FieldT>(*temperature_);
-    tThreeHalvesPtr = SpatialFieldStore::get<FieldT>(*temperature_);
-  }
-
-  FieldT& logt   = *logtPtr; // log(t)
-  FieldT& logtt  = *logttPtr; // log(t)*log(t)
-  FieldT& logttt = *logtttPtr; // log(t)*log(t)*log(t)
-  FieldT& logt4  = *logt4Ptr; // pow( log(t), 4)
-  FieldT& tThreeHalves = *tThreeHalvesPtr; // t^(3/2)
+  FieldT& logt   = *logtPtr;
+  FieldT& logtt  = *logttPtr;
+  FieldT& logttt = *logtttPtr;
 
   logt   <<= log( *temperature_ );
   logtt  <<= logt * logt;
   logttt <<= logtt * logt;
-  if( transport_->model() == Cantera::cMixtureAveraged ) {
-    logt4        <<= logttt * logt;
-    tThreeHalves <<= pow( *temperature_, 1.5 );
-  }
 
-  SpatFldPtr<FieldT> dPtr = SpatialFieldStore::get<FieldT>(*temperature_);
-  FieldT& d = *dPtr;
+  SpatFldPtr<FieldT> dPtr    = SpatialFieldStore::get<FieldT>(*temperature_);
   SpatFldPtr<FieldT> sum1Ptr = SpatialFieldStore::get<FieldT>(*temperature_);
-  FieldT& sum1 = *sum1Ptr;
   SpatFldPtr<FieldT> sum2Ptr = SpatialFieldStore::get<FieldT>(*temperature_);
+
+  FieldT& d    = *dPtr;
+  FieldT& sum1 = *sum1Ptr;
   FieldT& sum2 = *sum2Ptr;
 
-  const std::vector< std::vector<double> >& diffusionPolyCoeffs = transport_->getDiffusionPolyCoefficients();
+  if( modelType_ == Cantera::cMixtureAveraged ) { // as opposed to CK mode
+    SpatFldPtr<FieldT> logt4Ptr        = SpatialFieldStore::get<FieldT>(*temperature_);
+    SpatFldPtr<FieldT> tThreeHalvesPtr = SpatialFieldStore::get<FieldT>(*temperature_);
+    FieldT& logt4        = *logt4Ptr;
+    FieldT& tThreeHalves = *tThreeHalvesPtr;
 
-  const std::vector<double>& molecularWeights = transport_->thermo().molecularWeights();
+    logt4        <<= logttt * logt;
+    tThreeHalves <<= pow( *temperature_, 1.5 );
 
-  std::vector<double> molecularWeightsInv(nSpec_);
-  for( size_t n=0; n<nSpec_; ++n )
-    molecularWeightsInv[n] = 1 / molecularWeights[n];
-
-//  for( size_t i=0; i<nSpec_; ++i){
-//    d <<= 0.0;
-//    for( size_t j=0; j<nSpec_; ++j){
-//      if( j!=i){
-//        const std::vector<double>& coeffs = diffusionPolyCoeffs[indices_[i][j]]; // coefficients for pair [i][j]
-//        d <<= d + *massFracs_[j] * *mmw_ / molecularWeights[j] / ( tThreeHalves * (coeffs[0] + coeffs[1] * logt + coeffs[2] * logtt + coeffs[3] * logttt + coeffs[4] * logt4) ); // polynomial in t for binary diffusion coefficients
-//      }
-//    }
-//    const std::vector<double>& coeffs = diffusionPolyCoeffs[indices_[i][i]];
-//    *results[i] <<= cond( d >= 0.0, ( 1 - *massFracs_[i] ) / (pressure_ * d) ) // use mixing rule if temporary sum is non-negative
-//                        (           tThreeHalves * (coeffs[0] + coeffs[1] * logt + coeffs[2] * logtt + coeffs[3] * logttt + coeffs[4] * logt4) / pressure_); // otherwise use self-diffusion coefficient
-//  }
-
-  for( size_t i=0; i<nSpec_; ++i){
-    sum1 <<= 0.0;
-    sum2 <<= 0.0;
-    for( size_t j=0; j<nSpec_; ++j){
-      if( j != i){
-        const std::vector<double>& coeffs = diffusionPolyCoeffs[indices_[i][j]]; // coefficients for pair [i][j]
-        d <<= *massFracs_[j] / ( tThreeHalves * (coeffs[0] + coeffs[1] * logt + coeffs[2] * logtt + coeffs[3] * logttt + coeffs[4] * logt4) ); // polynomial in t for binary diffusion coefficients
-        sum1 <<= sum1 + d * molecularWeightsInv[j];
-        sum2 <<= sum2 + d;
+    for( size_t i=0; i<nSpec_; ++i){
+      sum1 <<= 0.0;
+      sum2 <<= 0.0;
+      for( size_t j=0; j<nSpec_; ++j){
+        if( j != i){
+          const std::vector<double>& coefs = binaryDCoefs_[indices_[i][j]]; // coefficients for pair [i][j]
+          d <<= *massFracs_[j] / ( tThreeHalves * (coefs[0] + coefs[1] * logt + coefs[2] * logtt + coefs[3] * logttt + coefs[4] * logt4) ); // polynomial in t for binary diffusion coefficients
+          sum1 <<= sum1 + d * molecularWeightsInv_[j];
+          sum2 <<= sum2 + d;
+        }
       }
+      const std::vector<double>& coefs = binaryDCoefs_[indices_[i][i]];
+      *mixD[i] <<= 1 / ( p * *mmw_ * ( sum1 + sum2 * *massFracs_[i] / ( molecularWeights_[i] - molecularWeights_[i] * *massFracs_[i] ) ) ); // mixing rule
     }
-    const std::vector<double>& coeffs = diffusionPolyCoeffs[indices_[i][i]];
-    *results[i] <<= 1 / ( p * *mmw_ * ( sum1 + sum2 * *massFracs_[i] / ( molecularWeights[i] - molecularWeights[i] * *massFracs_[i] ) ) );
   }
+
 }
 
 //--------------------------------------------------------------------
