@@ -1,12 +1,7 @@
 #ifndef Viscosity_Expr_h
 #define Viscosity_Expr_h
 
-//#define TIMINGS
-
 #include <expression/Expression.h>
-#ifdef TIMINGS
-#include <boost/timer.hpp>
-#endif
 
 #include <pokitt/CanteraObjects.h> //include cantera wrapper
 
@@ -248,9 +243,6 @@ void
 Viscosity<FieldT>::
 evaluate()
 {
-# ifdef TIMINGS
-  boost::timer timer;
-# endif
   using namespace SpatialOps;
 
   FieldT& result = this->value();
@@ -338,9 +330,6 @@ evaluate()
   }
 # endif
 
-# ifdef TIMINGS
-  std::cout<<"visc time "<<timer.elapsed()<<std::endl;
-# endif
 }
 
 //--------------------------------------------------------------------

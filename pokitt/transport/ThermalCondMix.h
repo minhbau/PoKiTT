@@ -1,12 +1,7 @@
 #ifndef ThermalConductivity_Expr_h
 #define ThermalConductivity_Expr_h
 
-//#define TIMINGS
-
 #include <expression/Expression.h>
-#ifdef TIMINGS
-#include <boost/timer.hpp>
-#endif
 
 #include <pokitt/CanteraObjects.h> //include cantera wrapper
 
@@ -155,9 +150,6 @@ void
 ThermalConductivity<FieldT>::
 evaluate()
 {
-# ifdef TIMINGS
-  boost::timer timer;
-# endif
   using namespace SpatialOps;
 
   FieldT& result = this->value();
@@ -217,9 +209,6 @@ evaluate()
   }
 
   result <<= 0.5 * ( sum * *mmw_ + 1 / (inverseSum * *mmw_) ); // mixing rule
-# ifdef TIMINGS
-  std::cout<<"tc time "<<timer.elapsed()<<std::endl;
-# endif
 }
 
 //--------------------------------------------------------------------

@@ -1,12 +1,7 @@
 #ifndef DiffusionCoeff_Expr_h
 #define DiffusionCoeff_Expr_h
 
-//#define TIMINGS
-
 #include <expression/Expression.h>
-#ifdef TIMINGS
-#include <boost/timer.hpp>
-#endif
 
 #include <pokitt/CanteraObjects.h> //include cantera wrapper
 
@@ -184,10 +179,6 @@ void
 DiffusionCoeff<FieldT>::
 evaluate()
 {
-#ifdef TIMINGS
-boost::timer timer;
-#endif
-
   using namespace SpatialOps;
   std::vector< FieldT* >& results = this->get_value_vec();
 
@@ -261,11 +252,6 @@ boost::timer timer;
     const std::vector<double>& coeffs = diffusionPolyCoeffs[indices_[i][i]];
     *results[i] <<= 1 / ( p * *mmw_ * ( sum1 + sum2 * *massFracs_[i] / ( molecularWeights[i] - molecularWeights[i] * *massFracs_[i] ) ) );
   }
-
-# ifdef TIMINGS
-  std::cout<<"D time "<<timer.elapsed()<<std::endl;
-# endif
-
 }
 
 //--------------------------------------------------------------------
