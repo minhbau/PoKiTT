@@ -256,7 +256,7 @@ evaluate()
 {
   using namespace SpatialOps;
 
-  FieldT& result = this->value();
+  FieldT& mixVis = this->value();
 
   std::vector< SpatFldPtr<FieldT> > sqrtSpeciesVis;
   for( size_t n=0; n<nSpec_; ++n)
@@ -292,7 +292,7 @@ evaluate()
       *sqrtSpeciesVis[n] <<= exp ( 0.5 * (viscosityCoefs_[n][0] + viscosityCoefs_[n][1] * logt + viscosityCoefs_[n][2] * logtt + viscosityCoefs_[n][3] * logttt) );
   }
 
-  result <<= 0.0; // set result to 0 before summing species contributions
+  mixVis <<= 0.0; // set result to 0 before summing species contributions
 # ifdef NFIELDS // requires nSpec_ temporary fields
   SpatFldPtr<FieldT> phiPtr  = SpatialFieldStore::get<FieldT>(*temperature_);
   FieldT& phi = *phiPtr;
@@ -303,7 +303,7 @@ evaluate()
       if( j!=k )
         phi <<= phi + *massFracs_[j] * ( 1 + *sqrtSpeciesVis[k] / *sqrtSpeciesVis[j] * molecularWeightRatios_[j][k] ) * ( 1 + *sqrtSpeciesVis[k] / *sqrtSpeciesVis[j] * molecularWeightRatios_[j][k] ) * denominator_[j][k]; // mixing rule
     }
-    result <<= result + *sqrtSpeciesVis[k] * *sqrtSpeciesVis[k] * *massFracs_[k] / phi; // mixing rule
+    mixVis <<= mixVis + *sqrtSpeciesVis[k] * *sqrtSpeciesVis[k] * *massFracs_[k] / phi; // mixing rule
   }
 # else // requires 2*nSpec_ temporary fields
   SpatFldPtr<FieldT> temporary = SpatialFieldStore::get<FieldT>(*temperature_);
@@ -326,7 +326,7 @@ evaluate()
   }
 
   for( size_t k=0; k!=nSpec_; ++k){
-    result<<=result + *massFracs_[k] * ( *sqrtSpeciesVis[k] * *sqrtSpeciesVis[k] ) / ( *phivec[k] * molecularWeights_[k] ); // mixing rule
+    mixVis <<= mixVis + *massFracs_[k] * ( *sqrtSpeciesVis[k] * *sqrtSpeciesVis[k] ) / ( *phivec[k] * molecularWeights_[k] ); // mixing rule
   }
 # endif
 
