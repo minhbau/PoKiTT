@@ -179,7 +179,7 @@ HeatCapacity_Cv( const Expr::Tag& tTag,
                  const Expr::Tag& massFracTag )
   : Expr::Expression<FieldT>(),
     tTag_( tTag ),
-    tPowerTags_( Temperature<FieldT>::temperature_powers_tags() )
+    tPowerTags_( Temperature<FieldT>::temperature_powers_tags() ) // temperature powers are auto-generated
 {
   this->set_gpu_runnable( true );
 
@@ -196,9 +196,9 @@ HeatCapacity_Cv( const Expr::Tag& tTag,
 
   const std::vector<double> molecularWeights = gasMix->molecularWeights();
   std::vector<double> c(15,0); //vector of Cantera's coefficients
-  int polyType;
-  double minT;
-  double maxT;
+  int polyType; // type of polynomial - const_cp, shomate, or NASA
+  double minT; // minimum temperature polynomial is valid
+  double maxT; // maximum temperature polynomial is valid
   double refPressure;
 
   for( size_t n=0; n<nSpec_; ++n ){
@@ -301,6 +301,9 @@ evaluate()
       cv <<= cv + *massFracs_[n] * c[3];
       break;
     case NASA2:
+      /* polynomials are applicable in two temperature ranges - high and low
+       * If the temperature is out of range, the value is set to the value at the min or max temp
+       */
       cv <<= cv + *massFracs_[n] * cond( *t_ <= c[0] && *t_ >= minT, c[1] + c[2] * *t_ + c[ 3] * t2 + c[ 4] * t3 + c[ 5] * t4) // if low temp
                                        ( *t_ >  c[0] && *t_ <= maxT, c[8] + c[9] * *t_ + c[10] * t2 + c[11] * t3 + c[12] * t4)  // else if high temp
                                        ( *t_ < minT, c[1] + c[2] * minT + c[ 3] * minT * minT + c[ 4] * pow(minT,3) + c[ 5] * pow(minT,4))  // else if out of bounds - low
@@ -345,7 +348,7 @@ SpeciesHeatCapacity_Cv( const Expr::Tag& tTag,
                         const int n )
   : Expr::Expression<FieldT>(),
     tTag_( tTag ),
-    tPowerTags_( Temperature<FieldT>::temperature_powers_tags() ),
+    tPowerTags_( Temperature<FieldT>::temperature_powers_tags() ), // temperature powers are auto-generated
     n_ ( n )
 {
   this->set_gpu_runnable( true );
@@ -438,6 +441,9 @@ evaluate()
       cv <<= c_[3];
       break;
     case NASA2:
+      /* polynomials are applicable in two temperature ranges - high and low
+       * If the temperature is out of range, the value is set to the value at the min or max temp
+       */
       cv <<= cond( *t_ <= c_[0] && *t_ >= minT_, c_[1] + c_[2] * *t_ + c_[ 3] * t2 + c_[ 4] * t3 + c_[ 5] * t4 ) // if low temp
                  ( *t_ >  c_[0] && *t_ <= maxT_, c_[8] + c_[9] * *t_ + c_[10] * t2 + c_[11] * t3 + c_[12] * t4 )  // else if high temp
                  ( *t_ < minT_, c_[1] + c_[2] * minT_ + c_[ 3] * minT_ * minT_ + c_[ 4] * pow(minT_,3) + c_[ 5] * pow(minT_,4) )  // else if out of bounds - low

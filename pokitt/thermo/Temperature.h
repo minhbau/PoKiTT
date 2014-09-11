@@ -228,14 +228,14 @@ Temperature( const Expr::Tag& massFracTag,
 
   const std::vector<double> molecularWeights = gasMix->molecularWeights();
   std::vector<double> c(15,0); //vector of Cantera's coefficients
-  int polyType;
-  double minT;
-  double maxT;
+  int polyType; // type of polynomial - const_cp, shomate, or NASA
+  double minT; // minimum temperature polynomial is valid
+  double maxT; // maximum temperature polynomial is valid
   double refPressure;
 
   for( size_t n=0; n<nSpec_; ++n ){
     spThermo.reportParams(n, polyType, &c[0], minT, maxT, refPressure);
-    switch( polyType ){
+    switch( polyType ){ // check to ensure that we're using a supported polynomial
     case NASA2   : nasaFlag_    = true; break;
     case SHOMATE2: shomateFlag_ = true; break;
     case SIMPLE  :                      break;
@@ -354,7 +354,7 @@ evaluate()
       const std::vector<double>& c = cVec_[n];
       const double minT = minTVec_[n];
       const double maxT = maxTVec_[n];
-#     ifndef ENABLE_CUDA // optimization benefits only the CPU
+#     ifndef ENABLE_CUDA // optimization benefits only the CPU - cond performs betters with if/else than with if/elif/elif/else
       if( nebo_max(temp) <= maxT && nebo_min(temp) >= minT){ // if true, temperature can only be either high or low
         switch (polyType) {
         case SIMPLE: // constant cp
@@ -371,7 +371,7 @@ evaluate()
         case SHOMATE2:
           delH <<= delH - *massFracs_[n] * cond( temp <= c[0], c[ 6] + c[1] * temp*1e-3 + c[2]/2 * t2*1e-6 + c[ 3]/3 * t3*1e-9 + c[ 4]/4 * t4*1e-12 - c[ 5] * recipT*1e3 ) // if low temp
                                                (               c[13] + c[8] * temp*1e-3 + c[9]/2 * t2*1e-6 + c[10]/3 * t3*1e-9 + c[11]/4 * t4*1e-12 - c[12] * recipT*1e3 ); // else if high range
-
+                              // factor of 1e-3 is for units conversion
           dhdT <<= dhdT + *massFracs_[n] * 1e-3 * cond( temp <= c[0], c[1] + c[2] * temp*1e-3 + c[ 3] * t2*1e-6 + c[ 4] * t3*1e-9 + c[ 5] * recipRecipT*1e6 ) // if low temp
                                                       (               c[8] + c[9] * temp*1e-3 + c[10] * t2*1e-6 + c[11] * t3*1e-9 + c[12] * recipRecipT*1e6 ); // else if high range
           break;
@@ -405,7 +405,7 @@ evaluate()
                                                ( temp >  c[0] && temp <= maxT, c[13] + c[8] * temp*1e-3 + c[9]/2 * t2*1e-6 + c[10]/3 * t3*1e-9 + c[11]/4 * t4*1e-12 - c[12] * recipT*1e3 )  // else if high temp
                                                ( temp < minT, c[1] * temp*1e-3 + c[2] * minT*1e-3 * (temp*1e-3 - minT*1e-3/2) + c[ 3] * minT*1e-3 * minT*1e-3 * (temp*1e-3 - 2*minT*1e-3/3) + c[ 4]*pow(minT*1e-3,3) * (temp*1e-3 - 3*minT*1e-3/4) - c[ 5]*pow(minT*1e-3,-1) * (-temp*1e-3 / minT*1e-3 + 2) + c[ 6] ) // else if out of bounds - low
                                                (              c[8] * temp*1e-3 + c[9] * maxT*1e-3 * (temp*1e-3 - maxT*1e-3/2) + c[10] * maxT*1e-3 * maxT*1e-3 * (temp*1e-3 - 2*maxT*1e-3/3) + c[11]*pow(maxT*1e-3,3) * (temp*1e-3 - 3*maxT*1e-3/4) - c[12]*pow(maxT*1e-3,-1) * (-temp*1e-3 / maxT*1e-3 + 2) + c[13] ); // else out of bounds - high
-
+                              // factor of 1e-3 is for units conversion
           dhdT <<= dhdT + *massFracs_[n] * 1e-3 * cond( temp <= c[0] && temp >= minT, c[1] + c[2] * temp*1e-3 + c[ 3] * t2*1e-6 + c[ 4] * t3*1e-9 + c[ 5] * recipRecipT*1e6 ) // if low temp
                                                       ( temp >  c[0] && temp <= maxT, c[8] + c[9] * temp*1e-3 + c[10] * t2*1e-6 + c[11] * t3*1e-9 + c[12] * recipRecipT*1e6 )  // else if high temp
                                                       ( temp < minT, c[1] + c[2] * minT*1e-3 + c[ 3] * minT*1e-3 * minT*1e-3 + c[ 4] * pow(minT*1e-3,3) + c[ 5] * pow(minT*1e-3,-2) )  // else if out of bounds - low
@@ -498,13 +498,13 @@ TemperatureFromE0( const Expr::Tag& massFracTag,
 
   const std::vector<double> molecularWeights = gasMix->molecularWeights();
   std::vector<double> c(15,0); //vector of Cantera's coefficients
-  int polyType;
-  double minT;
-  double maxT;
+  int polyType; // type of polynomial - const_cp, shomate, or NASA
+  double minT; // minimum temperature polynomial is valid
+  double maxT; // maximum temperature polynomial is valid
   double refPressure;
   for( size_t n=0; n<nSpec_; ++n ){
     spThermo.reportParams(n, polyType, &c[0], minT, maxT, refPressure);
-    switch( polyType ){
+    switch( polyType ){ // check to ensure that we are using a supported polynomial type
     case NASA2   : nasaFlag_    = true; break;
     case SHOMATE2: shomateFlag_ = true; break;
     case SIMPLE  :                      break;
@@ -630,7 +630,7 @@ evaluate()
       const std::vector<double>& c = cVec_[n];
       const double minT = minTVec_[n];
       const double maxT = maxTVec_[n];
-#     ifndef ENABLE_CUDA // optimization benefits only the CPU
+#     ifndef ENABLE_CUDA // optimization benefits only the CPU - cond performs betters with if/else than with if/elif/elif/else
       if( nebo_max(temp) <= maxT && nebo_min(temp) >= minT){ // if true, temperature can only be either high or low
         switch (polyType) {
           case SIMPLE: // constant cv
@@ -647,7 +647,7 @@ evaluate()
           case SHOMATE2:
             delE0 <<= delE0 - *massFracs_[n] * cond( temp <= c[0], c[ 6] + c[1] * temp*1e-3 + c[2]/2 * t2*1e-6 + c[ 3]/3 * t3*1e-9 + c[ 4]/4 * t4*1e-12 - c[ 5] * recipT*1e3 ) // if low temp
                                                    (               c[13] + c[8] * temp*1e-3 + c[9]/2 * t2*1e-6 + c[10]/3 * t3*1e-9 + c[11]/4 * t4*1e-12 - c[12] * recipT*1e3 ); // else if high range
-            // 1e-3 is a factor for units conversion
+                                            // 1e-3 is a factor for units conversion
             dE0dT <<= dE0dT + *massFracs_[n] * 1e-3 * cond( temp <= c[0], c[1] + c[2] * temp*1e-3 + c[ 3] * t2*1e-6 + c[ 4] * t3*1e-9 + c[ 5] * recipRecipT*1e6 ) // if low temp
                                                           (               c[8] + c[9] * temp*1e-3 + c[10] * t2*1e-6 + c[11] * t3*1e-9 + c[12] * recipRecipT*1e6 ); // else if high range
             break;
@@ -682,7 +682,7 @@ evaluate()
                                                    ( temp >  c[0] && temp <= maxT, c[13] + c[8] * temp*1e-3 + c[9]/2 * t2*1e-6 + c[10]/3 * t3*1e-9 + c[11]/4 * t4*1e-12 - c[12] * recipT*1e3 )  // else if high temp
                                                    ( temp < minT, c[1] * temp*1e-3 + c[2] * minT*1e-3 * (temp*1e-3 - minT*1e-3/2) + c[ 3] * minT*1e-3 * minT*1e-3 * (temp*1e-3 - 2*minT*1e-3/3) + c[ 4]*pow(minT*1e-3,3) * (temp*1e-3 - 3*minT*1e-3/4) - c[ 5]*pow(minT*1e-3,-1) * (-temp*1e-3 / minT*1e-3 + 2) + c[ 6] ) // else if out of bounds - low
                                                    (              c[8] * temp*1e-3 + c[9] * maxT*1e-3 * (temp*1e-3 - maxT*1e-3/2) + c[10] * maxT*1e-3 * maxT*1e-3 * (temp*1e-3 - 2*maxT*1e-3/3) + c[11]*pow(maxT*1e-3,3) * (temp*1e-3 - 3*maxT*1e-3/4) - c[12]*pow(maxT*1e-3,-1) * (-temp*1e-3 / maxT*1e-3 + 2) + c[13] ); // else out of bounds - high
-            // 1e-3 is a factor for units conversion
+                                            // 1e-3 is a factor for units conversion
             dE0dT <<= dE0dT + *massFracs_[n] * 1e-3 * cond( temp <= c[0] && temp >= minT, c[1] + c[2] * temp*1e-3 + c[ 3] * t2*1e-6 + c[ 4] * t3*1e-9 + c[ 5] * recipRecipT*1e6 ) // if low temp
                                                           ( temp >  c[0] && temp <= maxT, c[8] + c[9] * temp*1e-3 + c[10] * t2*1e-6 + c[11] * t3*1e-9 + c[12] * recipRecipT*1e6 )  // else if high temp
                                                           ( temp < minT, c[1] + c[2] * minT*1e-3 + c[ 3] * minT*1e-3 * minT*1e-3 + c[ 4] * pow(minT*1e-3,3) + c[ 5] * pow(minT*1e-3,-2) )  // else if out of bounds - low

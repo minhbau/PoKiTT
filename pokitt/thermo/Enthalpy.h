@@ -159,7 +159,7 @@ Enthalpy( const Expr::Tag& tTag,
           const Expr::Tag& massFracTag )
   : Expr::Expression<FieldT>(),
     tTag_( tTag ),
-    tPowerTags_( Temperature<FieldT>::temperature_powers_tags() )
+    tPowerTags_( Temperature<FieldT>::temperature_powers_tags() ) // temperature powers are auto-generated
 {
   this->set_gpu_runnable( true );
 
@@ -176,9 +176,9 @@ Enthalpy( const Expr::Tag& tTag,
 
   const std::vector<double> molecularWeights = gasMix->molecularWeights();
   std::vector<double> c(15,0); //vector of Cantera's coefficients
-  int polyType;
-  double minT;
-  double maxT;
+  int polyType; // type of polynomial - const_cp, shomate, or NASA
+  double minT; // minimum temperature polynomial is valid
+  double maxT; // maximum temperature polynomial is valid
   double refPressure;
 
   for( size_t n=0; n<nSpec_; ++n ){
@@ -274,6 +274,9 @@ evaluate()
     double minT = minTVec_[n];
     double maxT = maxTVec_[n];
     switch (polyType) {
+    /* polynomial can be out of bounds low, low temp, high temp, or out of bounds high
+     * if out of bounds, enthalpy is interpolated from min or max temp using a constant cp
+     */
     case SIMPLE: // constant heat capacity
       h <<= h + *massFracs_[n] * ( c[1] + c[3] * (*t_ - c[0]) );
       break;
@@ -322,7 +325,7 @@ SpeciesEnthalpy( const Expr::Tag& tTag,
                  const int n )
     : Expr::Expression<FieldT>(),
       tTag_( tTag ),
-      tPowerTags_( Temperature<FieldT>::temperature_powers_tags() ),
+      tPowerTags_( Temperature<FieldT>::temperature_powers_tags() ), // temperature powers are auto-generated
       n_ ( n )
 {
   this->set_gpu_runnable( true );
@@ -408,6 +411,9 @@ evaluate()
   const FieldT& recipT = *tPowers_[4]; // t^-1
 
   switch (polyType_) {
+  /* polynomial can be out of bounds low, low temp, high temp, or out of bounds high
+   * if out of bounds, enthalpy is interpolated from min or max temp using a constant cp
+   */
   case SIMPLE:
     h <<= c_[1] + c_[3] * (*t_ - c_[0]);
     break;
