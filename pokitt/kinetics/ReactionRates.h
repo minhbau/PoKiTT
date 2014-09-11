@@ -92,18 +92,23 @@ class ReactionRates
 
   std::vector<const FieldT*> massFracs_;
 
-  Cantera_CXX::IdealGasMix* const gasMix_;
+  std::vector<Cantera::ReactionData> rxnDataVec_;
 
-  const double pressure_;
-
-  const int nSpec_; // number of species in the mechanism
-  const int nRxns_; // number of reactions in the mechanism
+  int nSpec_; // number of species in the mechanism
+  int nRxns_; // number of reactions in the mechanism
 
   std::vector<int> dOrder_; // difference between the forward reaction order and backwards reaction order
+  std::vector<std::vector<int> > rStoich_; // reactant stoich coeffs, stores ints instead of the doubles from Cantera
+  std::vector<std::vector<int> > pStoich_; // product stoich coeffs, stores ints instead of the doubles from Cantera
 
-  std::vector<std::vector<int> > rstoich_; // reactant stoich coeffs, stores ints instead of the doubles from Cantera
-  std::vector<std::vector<int> > pstoich_; // product stoich coeffs, stores ints instead of the doubles from Cantera
+  std::vector< double > molecularWeights_; // molecular weights
+  std::vector< double > molecularWeightsInv_; // inverse of molecular weights (dividing by MW is expensive)
 
+  typedef std::vector<double> PolyVals; // values used for polynomial
+  PolyVals minTVec_; // vector of minimum temperatures for polynomial evaluations
+  PolyVals maxTVec_; // vector of maximum temperatures for polynomial evaluations
+  std::vector< PolyVals > cVec_; // vector of polynomial coefficients
+  std::vector<int> polyTypeVec_; // vector of polynomial types
 
   ReactionRates( const Expr::Tag& tTag,
                  const Expr::Tag& pTag,
@@ -160,75 +165,107 @@ ReactionRates( const Expr::Tag& tTag,
                const Expr::Tag& mmwTag )
   : Expr::Expression<FieldT>(),
     tTag_( tTag ),
-    tPowerTags_( Temperature<FieldT>::temperature_powers_tags() ),
+    tPowerTags_( Temperature<FieldT>::temperature_powers_tags() ), // temperature powers are auto-generated
     pTag_( pTag ),
-    mmwTag_( mmwTag ),
-    gasMix_( CanteraObjects::get_gasmix() ),
-    pressure_( gasMix_->pressure() ),
-    nSpec_( gasMix_->nSpecies() ),
-    nRxns_( gasMix_->getReactionData().size() )
+    mmwTag_( mmwTag )
 {
   this->set_gpu_runnable( true );
+  Cantera_CXX::IdealGasMix* const gasMix = CanteraObjects::get_gasmix();
 
+  nSpec_ = gasMix->nSpecies();
   massFracTags_.clear();
   for( size_t n=0; n<nSpec_; ++n ){
     std::ostringstream name;
     name << massFracTag.name() << "_" << n;
     massFracTags_.push_back( Expr::Tag(name.str(),massFracTag.context()) );
   }
-
-  const std::vector<Cantera::ReactionData>& rxnDataVec = gasMix_->getReactionData(); // contains kinetics data for each reaction
+  rxnDataVec_ = gasMix->getReactionData(); // contains kinetics data for each reaction
+  nRxns_ = rxnDataVec_.size();
+  molecularWeights_ = gasMix->molecularWeights();
+  molecularWeightsInv_.resize(nSpec_);
+  for( size_t n=0; n<nSpec_; ++n )
+    molecularWeightsInv_[n] = 1 / molecularWeights_[n];
   for( size_t r=0; r<nRxns_; ++r){
-    const Cantera::ReactionData& rxnData = rxnDataVec[r]; // ReactionData for reaction r
+    const Cantera::ReactionData& rxnData = rxnDataVec_[r]; // ReactionData for reaction r
 
     /* here we are reading Cantera's product and reactant stoichiometric coefficients and storing them as ints
      * This speeds up evaluating the product (multiplication) of concentrations when evaluating reaction rates of progress
+     * only elementary reactions are supported
      */
-    std::vector<int> pstoich;
-    std::vector<int> rstoich;
-    const std::vector<double>& reactantStoich = rxnData.rstoich;
-    const std::vector<double>& productStoich = rxnData.pstoich;
+    std::vector<int> pStoich;
+    std::vector<int> rStoich;
+    const std::vector<double>& canteraRStoich = rxnData.rstoich;
+    const std::vector<double>& canteraPStoich  = rxnData.pstoich;
 
     // dOrder is the difference between forward and reverse order, this is used in evaluating reverse rate constant
-    double dOrder=0.0;
-
-    std::vector<double>::const_iterator sit;
-    for( sit = reactantStoich.begin(); sit!=reactantStoich.end(); ++sit){
-      if( fabs(*sit-1) <1e-4 )
-        rstoich.push_back(1);
-      else if( fabs(*sit-2) < 1e-4 )
-        rstoich.push_back(2);
-      else if( fabs(*sit-3) < 1e-4 )
-        rstoich.push_back(3);
+    int dOrder=0;
+    std::vector<double>::const_iterator iStoich;
+    for( iStoich = canteraRStoich.begin(); iStoich!=canteraRStoich.end(); ++iStoich ){
+      if( fabs(*iStoich-1) <1e-2 )
+        rStoich.push_back(1);
+      else if( fabs(*iStoich-2) < 1e-2 )
+        rStoich.push_back(2);
+      else if( fabs(*iStoich-3) < 1e-2 )
+        rStoich.push_back(3);
       else{
         std::cout << "Error in ReactionRates" << std::endl
             <<" Non-integer reactant stoichiometric coefficient" << std::endl
-            <<" Reaction # "<< r <<", stoichiometric coefficient = " << *sit << std::endl;
+            <<" Reaction # "<< r <<", stoichiometric coefficient = " << *iStoich << std::endl;
         throw std::runtime_error("Problems in ReactionRates expression.");
       }
-      dOrder+=*sit;
+      dOrder += *iStoich;
     }
-
-    for( sit = productStoich.begin(); sit!=productStoich.end(); ++sit){
-      if( fabs(*sit-1) <1e-4 )
-        pstoich.push_back(1);
-      else if( fabs(*sit-2) < 1e-4 )
-        pstoich.push_back(2);
-      else if( fabs(*sit-3) < 1e-4 )
-        pstoich.push_back(3);
+    for( iStoich = canteraPStoich.begin(); iStoich!=canteraPStoich.end(); ++iStoich ){
+      if( fabs(*iStoich-1) <1e-2 )
+        pStoich.push_back(1);
+      else if( fabs(*iStoich-2) < 1e-2 )
+        pStoich.push_back(2);
+      else if( fabs(*iStoich-3) < 1e-2 )
+        pStoich.push_back(3);
       else{
         std::cout << "Error in ReactionRates" << std::endl
             <<" Non-integer product stoichiometric coefficient" << std::endl
-            <<" Reaction # "<< r <<", stoichiometric coefficient = " << *sit << std::endl;
+            <<" Reaction # "<< r <<", stoichiometric coefficient = " << *iStoich << std::endl;
         throw std::runtime_error("Problems in ReactionRates expression.");
       }
-      dOrder-=*sit;
+      dOrder -= *iStoich;
     }
 
-    rstoich_.push_back(rstoich); // store stoich coeffs for each reaction
-    pstoich_.push_back(pstoich);
+    rStoich_.push_back(rStoich); // store stoich coeffs for each reaction
+    pStoich_.push_back(pStoich);
     dOrder_.push_back(dOrder); // store dOrder for each reaction
   }
+
+  // collect polynomial coefficients for evaluating the gibbs energy function
+  const Cantera::SpeciesThermo& spThermo = gasMix->speciesThermo();
+  std::vector<double> c(15,0); //vector of Cantera's coefficients
+  int polyType;
+  double minT;
+  double maxT;
+  double refPressure;
+
+  for( size_t n=0; n<nSpec_; ++n ){
+    spThermo.reportParams(n, polyType, &c[0], minT, maxT, refPressure);
+    polyTypeVec_.push_back(polyType); // vector of polynomial types
+    minTVec_.push_back(minT); // vector of minimum temperatures for polynomial evaluations
+    maxTVec_.push_back(maxT); // vector of maximum temperatures for polynomial evaluations
+    switch (polyType) {
+    case SIMPLE: break;
+    case NASA2:
+      for( std::vector<double>::iterator ic = c.begin() + 1; ic!=c.end(); ++ic)
+        *ic *= Cantera::GasConstant; // dimensionalize the coefficients
+      break;
+    default:{
+      std::ostringstream msg;
+      msg << "Error in " __FILE__ << " : " << __LINE__ << std::endl
+          <<" Thermo type not supported, type = " << polyType << std::endl
+          <<" See <cantera/kernel/SpeciesThermoInterpType.h> for type definition" << std::endl;
+      throw std::runtime_error( msg.str() );
+    }
+    }
+    cVec_.push_back(c); // vector of polynomial coefficients
+  }
+  CanteraObjects::restore_gasmix(gasMix);
 }
 
 //--------------------------------------------------------------------
@@ -237,7 +274,7 @@ template< typename FieldT >
 ReactionRates<FieldT>::
 ~ReactionRates()
 {
-  CanteraObjects::restore_gasmix(gasMix_);
+
 }
 
 //--------------------------------------------------------------------
@@ -299,11 +336,11 @@ evaluate()
   SpatFldPtr<FieldT> kPtr       = SpatialFieldStore::get<FieldT>(t); // forward rate constant
   SpatFldPtr<FieldT> krPtr      = SpatialFieldStore::get<FieldT>(t); // reverse rate constant
 
-  SpatFldPtr<FieldT> trecipPtr  = SpatialFieldStore::get<FieldT>(t); // t^-1
-  SpatFldPtr<FieldT> logtPtr    = SpatialFieldStore::get<FieldT>(t); // log(t)
+  SpatFldPtr<FieldT> tRecipPtr  = SpatialFieldStore::get<FieldT>(t); // t^-1
+  SpatFldPtr<FieldT> logTPtr    = SpatialFieldStore::get<FieldT>(t); // log(t)
 
-  SpatFldPtr<FieldT> dgPtr = SpatialFieldStore::get<FieldT>(t); // delta gibbs energy for a reaction
-  std::vector<SpatFldPtr<FieldT> > gPtrvec; // gibbs energy for each species
+  SpatFldPtr<FieldT> dgPtr      = SpatialFieldStore::get<FieldT>(t); // delta gibbs energy for a reaction
+  std::vector< SpatFldPtr<FieldT> > gPtrvec; // gibbs energy for each species
   for( size_t n=0; n<nSpec_; ++n)
     gPtrvec.push_back( SpatialFieldStore::get<FieldT>(t) );
 
@@ -311,128 +348,100 @@ evaluate()
   FieldT& conc2   = *conc2Ptr;
   FieldT& logConc = *logConcPtr;
 
-  FieldT& k  = *kPtr;
-  FieldT& kr = *krPtr;
+  FieldT& k       = *kPtr;
+  FieldT& kr      = *krPtr;
 
-  FieldT& trecip = *trecipPtr;
-  FieldT& logt   = *logtPtr;
+  FieldT& tRecip  = *tRecipPtr;
+  FieldT& logT    = *logTPtr;
 
-  FieldT& dg = *dgPtr;
+  FieldT& dg      = *dgPtr;
 
-  trecip  <<= 1/ t;
-  logt    <<= log(t);
-  conc    <<= trecip * p / GasConstant; // molar concentration
+  tRecip  <<= *tPowers_[4]; // t^-1
+  logT    <<= log(t); // log(t)
+  conc    <<= tRecip * p / GasConstant; // molar concentration
   logConc <<= log(conc);
   conc    <<= conc * *mmw_; // mass concentration
 
-  { // add scope resolution so that fields of powers of t go out of scope after evaluation of gibbs energy polynomial
-    // pre-compute powers of t used in gibbs energy polynomial for each species
-    SpatFldPtr<FieldT> tlogtPtr = SpatialFieldStore::get<FieldT>(t); // t * log(t)
-
+  { // calculate the delta gibbs energy for each species for use in evaluating reversible rate constants
     const FieldT& t2 = *tPowers_[0]; // t^2
     const FieldT& t3 = *tPowers_[1]; // t^3
     const FieldT& t4 = *tPowers_[2]; // t^4
     const FieldT& t5 = *tPowers_[3]; // t^5
-    FieldT& tlogt    = *tlogtPtr;
 
-    tlogt <<= t * logt;
-
-    const Cantera::SpeciesThermo& spThermo = gasMix_->speciesThermo();
-    std::vector<double> c(15,0); // vector of Cantera's polynomial coefficients
-    int polyType; // type of polynomial
-    double minT; // minimum temperature where polynomial is valid
-    double maxT; // maximum temperature where polynomial is valid
-    double refPressure;
+    SpatFldPtr<FieldT> tlogTPtr = SpatialFieldStore::get<FieldT>(t); // t * log(t)
+    FieldT&            tlogT    = *tlogTPtr;
+    tlogT <<= t * logT;
 
     for( size_t n=0; n<nSpec_; ++n ){
-      spThermo.reportParams(n, polyType, &c[0], minT, maxT, refPressure);
+      const int polyType = polyTypeVec_[n];
+      const std::vector<double>& c = cVec_[n];
+      const double minT = minTVec_[n];
+      const double maxT = maxTVec_[n];
       switch ( polyType ){
         case SIMPLE:
           *gPtrvec[n] <<=        c[1] + c[3] * ( t    - c[0]        ) // H
-                         - t * ( c[2] + c[3] * ( logt - log(c[0]) ) ); // -TS
+                         - t * ( c[2] + c[3] * ( logT - log(c[0]) ) ); // -TS
           break;
         case NASA2:{
           /* polynomials are applicable in two temperature ranges - high and low
-           * If the temperature is out of range, the value is set to the value at the min or max temp
+           * If the temperature is out of range, properties are evaluated using constant cp
            */
-          std::vector<double>::iterator ic    = c.begin() + 1;
-          std::vector<double>::iterator icend = c.end();
-          for( ; ic != icend; ++ic)
-            *ic *= GasConstant; // dimensionalize the coefficients
-          *gPtrvec[n] <<= cond( t <= c[0], c[ 6] + (c[1] - c[ 7]) * t - c[2]/2 * t2 - c[ 3]/6 * t3 - c[ 4]/12 * t4 - c[ 5]/20 * t5 - c[1] * tlogt ) // if low temp
-                              (            c[13] + (c[8] - c[14]) * t - c[9]/2 * t2 - c[10]/6 * t3 - c[11]/12 * t4 - c[12]/20 * t5 - c[8] * tlogt ); // else if high temp
+          *gPtrvec[n] <<= cond( t <= c[0], c[ 6] + (c[1] - c[ 7]) * t - c[2]/2 * t2 - c[ 3]/6 * t3 - c[ 4]/12 * t4 - c[ 5]/20 * t5 - c[1] * tlogT ) // if low temp
+                              (            c[13] + (c[8] - c[14]) * t - c[9]/2 * t2 - c[10]/6 * t3 - c[11]/12 * t4 - c[12]/20 * t5 - c[8] * tlogT ); // else if high temp
           break;
         }
-        default:{
-          std::ostringstream msg;
-          msg << "Error in " __FILE__ << " : " << __LINE__ << std::endl
-              <<" Thermo type not supported, type = " << polyType << std::endl
-              <<" See <cantera/kernel/SpeciesThermoInterpType.h> for type definition" << std::endl;
-          throw std::runtime_error( msg.str() );
-        }
-      }
-    }
-  } // powers of t now go out of scope and free the associated memory
+      } // switch
+    } // species loop
+  }
 
   for( size_t n=0; n<nSpec_; ++n )
     *rRates[n] <<= 0.0; // set net rates of production to 0.0 before starting summation over reactions
 
-  const std::vector<Cantera::ReactionData>& rxnDataVec = gasMix_->getReactionData(); // vector of ReactionData for every reaction
-
-  const std::vector<double>& molecularWeights = gasMix_->molecularWeights();
-
-  std::vector<double> molecularWeightsInv(nSpec_);
-  for( size_t n=0; n<nSpec_; ++n )
-    molecularWeightsInv[n] = 1 / molecularWeights[n];
-
   for( size_t r=0; r<nRxns_; ++r ){
-
-    const Cantera::ReactionData& rxnData = rxnDataVec[r]; // ReactionData for reaction r
+    const Cantera::ReactionData& rxnData = rxnDataVec_[r]; // ReactionData for reaction r
 
     const std::vector<double>& arrhenius = rxnData.rateCoeffParameters;
-
-    if( fabs( arrhenius[1] ) < 1e-6 && fabs( arrhenius[2] ) < 1e-6 ) // evaluation of forward rate constant
+    // evaluation of forward rate constant
+    if( fabs( arrhenius[1] ) < 1e-6 && fabs( arrhenius[2] ) < 1e-6 ) // rate constant does not depend on temp
       k <<= arrhenius[0];
     else
-      k <<= arrhenius[0] * exp( arrhenius[1] * logt - arrhenius[2] * trecip );
+      k <<= arrhenius[0] * exp( arrhenius[1] * logT - arrhenius[2] * tRecip );
 
     if( rxnData.reactionType == THREE_BODY_RXN || rxnData.reactionType == FALLOFF_RXN ){ // third body
       SpatFldPtr<FieldT> mPtr  = SpatialFieldStore::get<FieldT>(t); // third body enhancement factor
       FieldT& m = *mPtr;
 
       m <<= rxnData.default_3b_eff * conc / *mmw_; // evaluate default third body enhancement
-      for( std::map<int, double>::const_iterator miter = rxnData.thirdBodyEfficiencies.begin(); miter!= rxnData.thirdBodyEfficiencies.end(); ++miter)
-        m <<= m + *massFracs_[miter->first] * conc * ( miter->second - rxnData.default_3b_eff ) * molecularWeightsInv[miter->first]; // correct for non-default species;
+      for( std::map<int, double>::const_iterator iEff = rxnData.thirdBodyEfficiencies.begin(); iEff!= rxnData.thirdBodyEfficiencies.end(); ++iEff)
+        m <<= m + *massFracs_[iEff->first] * conc * ( iEff->second - rxnData.default_3b_eff ) * molecularWeightsInv_[iEff->first]; // correct for non-default species;
 
       const int fallType = rxnData.falloffType;
       if( fallType == 0 ) // no falloff
         k <<= k * m;
       else{
-        SpatFldPtr<FieldT> prPtr       = SpatialFieldStore::get<FieldT>(t); // reduced pressure for falloff
-        SpatFldPtr<FieldT> logPrPtr    = SpatialFieldStore::get<FieldT>(t); // log10(Pr)
-        SpatFldPtr<FieldT> fCentPtr    = SpatialFieldStore::get<FieldT>(t); // "Fcent" factor for falloff evaluation
-        SpatFldPtr<FieldT> logFCentPtr = SpatialFieldStore::get<FieldT>(t); // log10(Fcent)
-        SpatFldPtr<FieldT> f1Ptr       = SpatialFieldStore::get<FieldT>(t); // "f1" factor for falloff evaluation
+        SpatFldPtr<FieldT> prPtr = SpatialFieldStore::get<FieldT>(t); // reduced pressure for falloff
+        FieldT&            pr    = *prPtr;
 
-        FieldT& pr       = *prPtr;
-        FieldT& logPr    = *logPrPtr;
-        FieldT& fCent    = *fCentPtr;
-        FieldT& logFCent = *logFCentPtr;
-        FieldT& f1       = *f1Ptr;
-
-        const std::vector<double>& auxparam = rxnData.auxRateCoeffParameters;
-
-        pr <<= auxparam[0] * exp( auxparam[1] * logt - auxparam[2] * trecip ) * m / k;
+        const std::vector<double>& auxParam = rxnData.auxRateCoeffParameters;
+        pr <<= auxParam[0] * exp( auxParam[1] * logT - auxParam[2] * tRecip ) * m / k;
 
         switch( fallType ){
-
           case SIMPLE_FALLOFF: //Lindemann
             k <<= k * pr / (1 + pr);
             break;
-
           // Troe
           case TROE3_FALLOFF:  // fall through
           case TROE4_FALLOFF:{
+            SpatFldPtr<FieldT> logPrPtr    = SpatialFieldStore::get<FieldT>(t); // log10(Pr)
+            SpatFldPtr<FieldT> fCentPtr    = SpatialFieldStore::get<FieldT>(t); // "Fcent" factor for falloff evaluation
+            SpatFldPtr<FieldT> logFCentPtr = SpatialFieldStore::get<FieldT>(t); // log10(Fcent)
+            SpatFldPtr<FieldT> f1Ptr       = SpatialFieldStore::get<FieldT>(t); // "f1" factor for falloff evaluation
+
+            FieldT& logPr    = *logPrPtr;
+            FieldT& fCent    = *fCentPtr;
+            FieldT& logFCent = *logFCentPtr;
+            FieldT& f1       = *f1Ptr;
+
             const std::vector<double>& troe = rxnData.falloffParameters;
 
             if( fallType == TROE3_FALLOFF ) // Troe3 uses 3 parameters and has two terms
@@ -441,18 +450,18 @@ evaluate()
             else // Troe4 uses 4 parameters and has three terms
               logFCent <<= log10( cond( fabs(troe[1]) > 1e-8, (1-troe[0]) * exp( -t      / troe[1] ) ) (0.0) // if troe[1] is 0, this term is set to 0
                                 + cond( fabs(troe[2]) > 1e-8,    troe[0]  * exp( -t      / troe[2] ) ) (0.0) // if troe[2] is 0, this term is set to 0
-                                +                                    1.0  * exp( -trecip * troe[3] )        );
+                                +                                    1.0  * exp( -tRecip * troe[3] )        );
 
             logPr <<= log10(pr);
 #           define CTROE -0.4 - 0.67 * logFCent // macros to make f1 evaluation easier to read
 #           define NTROE 0.75 - 1.27 * logFCent
-            f1 <<= (logPr+CTROE) / ( NTROE - 0.14 * (logPr+CTROE) ); // calculate the "f1" factor
+            f1 <<= ( logPr + CTROE ) / ( NTROE - 0.14 * (logPr +CTROE) ); // calculate the "f1" factor
 
             fCent <<= pow(10, logFCent / (1 + f1*f1) ); // calculate the "Fcent" factor
             k <<= fCent * k * pr / (1+pr);
 
-            break;  // Troe
-          }
+            break;
+          } // Troe
           default:{
             std::ostringstream msg;
             msg << "Error in " __FILE__ << " : " << __LINE__ << std::endl
@@ -464,70 +473,70 @@ evaluate()
       } // falloff
     } // third body
 
-    const std::vector<int>& rstoich = rstoich_[r]; // integer stoich. coefficients stored when expression was built
-    const std::vector<int>& pstoich = pstoich_[r];
+    const std::vector<int>& rStoich = rStoich_[r]; // integer stoich. coefficients stored when expression was built
+    const std::vector<int>& pStoich = pStoich_[r];
 
     const std::vector<int>& reactants = rxnData.reactants; // species index for each reactant or product
-    const std::vector<int>& products = rxnData.products;
+    const std::vector<int>& products  = rxnData.products;
 
-    std::vector<int>::const_iterator sit;
-    std::vector<int>::const_iterator rit;
+    std::vector<int>::const_iterator iStoich; // stoichiometric coefficient
+    std::vector<int>::const_iterator iSpec; // species index
 
     if( rxnData.reversible == true ){
       dg <<= 0.0; // set value to 0 before summation
 
-      sit = rstoich.begin();
-      for( rit = reactants.begin(); rit!=reactants.end(); ++rit, ++sit)
-        dg <<= dg - *sit * *gPtrvec[*rit];
-      sit = pstoich.begin();
-      for( rit = products.begin(); rit!=products.end(); ++rit, ++sit)
-        dg <<= dg + *sit * *gPtrvec[*rit];
+      iStoich = rStoich.begin();
+      for( iSpec = reactants.begin(); iSpec!=reactants.end(); ++iSpec, ++iStoich)
+        dg <<= dg - *iStoich * *gPtrvec[*iSpec];
+      iStoich = pStoich.begin();
+      for( iSpec = products.begin(); iSpec!=products.end(); ++iSpec, ++iStoich)
+        dg <<= dg + *iStoich * *gPtrvec[*iSpec];
 
-      kr <<= k * exp( dg * trecip / GasConstant + dOrder_[r] * logConc ); // reversible rate constant
+      kr <<= k * exp( dg * tRecip / GasConstant + dOrder_[r] * logConc ); // reversible rate constant
     }
     else
       kr <<= 0.0; // 0 if not reversible
 
-    sit = rstoich.begin();
-      for( rit=reactants.begin(); rit!=reactants.end(); ++rit, ++sit){
-        switch ( *sit ){
+    iStoich = rStoich.begin();
+      for( iSpec=reactants.begin(); iSpec!=reactants.end(); ++iSpec, ++iStoich){ // calculate r_f = k*C_i^stoich
+        switch ( *iStoich ){
           case 1:
-            k <<= k * *massFracs_[*rit] * conc * molecularWeightsInv[*rit];
+            k <<= k * *massFracs_[*iSpec] * conc * molecularWeightsInv_[*iSpec];
             break;
           case 2:
-            k <<= k * *massFracs_[*rit] * *massFracs_[*rit] * conc * molecularWeightsInv[*rit] * conc * molecularWeightsInv[*rit];
+            k <<= k * *massFracs_[*iSpec] * *massFracs_[*iSpec] * conc * molecularWeightsInv_[*iSpec] * conc * molecularWeightsInv_[*iSpec];
             break;
           case 3:
-            k <<= k * *massFracs_[*rit] * conc * molecularWeightsInv[*rit] * *massFracs_[*rit] * conc * molecularWeightsInv[*rit] * *massFracs_[*rit] * conc * molecularWeightsInv[*rit];
+            k <<= k * *massFracs_[*iSpec] * conc * molecularWeightsInv_[*iSpec] * *massFracs_[*iSpec] * conc * molecularWeightsInv_[*iSpec] * *massFracs_[*iSpec] * conc * molecularWeightsInv_[*iSpec];
             break;
           default:{
             std::ostringstream msg;
             msg << "Error in " << __FILE__ << " : " << __LINE__ << std::endl
                 <<" Non-integer reactant stoichiometric coefficient" << std::endl
-                <<" Reaction # "<< r <<", stoichiometric coefficient = " << *sit << std::endl;
+                <<" Reaction # "<< r <<", stoichiometric coefficient = " << *iStoich << std::endl;
             throw std::runtime_error( msg.str() );
           }
         }
       }
 
       if( rxnData.reversible == true){
-        sit = pstoich.begin();
-          for( rit=products.begin(); rit!=products.end(); ++rit, ++sit ){
-            switch ( *sit ){
+        iStoich = pStoich.begin();
+          for( iSpec=products.begin(); iSpec!=products.end(); ++iSpec, ++iStoich ){ // calculate r_r = kr*C_i^stoich
+            switch ( *iStoich ){
               case 1:
-                kr <<= kr * *massFracs_[*rit] * conc * molecularWeightsInv[*rit];
+                kr <<= kr * *massFracs_[*iSpec] * conc * molecularWeightsInv_[*iSpec];
                 break;
               case 2:
-                kr <<= kr * *massFracs_[*rit] * *massFracs_[*rit] * conc * molecularWeightsInv[*rit] * conc * molecularWeightsInv[*rit];
+                kr <<= kr * *massFracs_[*iSpec] * *massFracs_[*iSpec] * conc * molecularWeightsInv_[*iSpec] * conc * molecularWeightsInv_[*iSpec];
                 break;
               case 3:
-                kr <<= kr * *massFracs_[*rit] * conc * molecularWeightsInv[*rit] * *massFracs_[*rit] * conc * molecularWeightsInv[*rit] * *massFracs_[*rit] * conc * molecularWeightsInv[*rit];
+                kr <<= kr * *massFracs_[*iSpec] * conc * molecularWeightsInv_[*iSpec] * *massFracs_[*iSpec] * conc * molecularWeightsInv_[*iSpec] * *massFracs_[*iSpec] * conc * molecularWeightsInv_[*iSpec];
                 break;
               default:{
                 std::ostringstream msg;
                 msg << "Error in " << __FILE__ << " : " << __LINE__ << std::endl
                     <<" Non-integer product stoichiometric coefficient" << std::endl
-                    <<" Reaction # "<< r <<", stoichiometric coefficient = " << *sit << std::endl;
+                    <<" Reaction # "<< r <<", stoichiometric coefficient = " << *iStoich << std::endl;
                 throw std::runtime_error( msg.str() );
               }
             }
@@ -535,13 +544,13 @@ evaluate()
       }
 
 
-    sit = rstoich.begin();
-    for( rit = reactants.begin(); rit!=reactants.end(); ++rit, ++sit )
-      *rRates[*rit] <<= *rRates[*rit] - *sit * (k - kr) * molecularWeights[*rit]; // sum rate of progress into species rates of production
+    iStoich = rStoich.begin();
+    for( iSpec = reactants.begin(); iSpec!=reactants.end(); ++iSpec, ++iStoich )
+      *rRates[*iSpec] <<= *rRates[*iSpec] - *iStoich * (k - kr) * molecularWeights_[*iSpec]; // sum rate of progress into species rates of production
 
-    sit = pstoich.begin();
-    for( rit = products.begin(); rit!=products.end(); ++rit, ++sit )
-      *rRates[*rit] <<= *rRates[*rit] + *sit * (k - kr) * molecularWeights[*rit];
+    iStoich = pStoich.begin();
+    for( iSpec = products.begin(); iSpec!=products.end(); ++iSpec, ++iStoich )
+      *rRates[*iSpec] <<= *rRates[*iSpec] + *iStoich * (k - kr) * molecularWeights_[*iSpec];
 
   }
 }
