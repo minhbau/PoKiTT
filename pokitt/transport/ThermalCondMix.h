@@ -39,8 +39,12 @@ class ThermalConductivity
   const FieldT* temperature_;
   const FieldT* mmw_; // mixture molecular weight, needed to convert from mass to mole fractions
   std::vector<const FieldT*> massFracs_;
-  Cantera::MixTransport* const trans_; // transport for mixture to be evaluated
-  const int nSpec_; //number of species to iterate over
+
+  int nSpec_; //number of species to iterate over
+  std::vector< std::vector<double> > tCondCoefs_;
+  int modelType_; // type of model used by Cantera to estimate pure viscosity
+  std::vector<double> molecularWeights_; // molecular weights
+  std::vector<double> molecularWeightsInv_; // inverse of molecular weights (diving by MW is expensive)
 
   ThermalConductivity( const Expr::Tag& temperatureTag,
                        const Expr::Tag& massFracTag,
@@ -92,11 +96,11 @@ ThermalConductivity( const Expr::Tag& temperatureTag,
                      const Expr::Tag& mmwTag )
   : Expr::Expression<FieldT>(),
     temperatureTag_( temperatureTag ),
-    mmwTag_( mmwTag ),
-    trans_( dynamic_cast<Cantera::MixTransport*>( CanteraObjects::get_transport() )),
-    nSpec_( trans_->thermo().nSpecies() )
+    mmwTag_( mmwTag )
 {
   this->set_gpu_runnable( true );
+  Cantera::MixTransport* trans = dynamic_cast<Cantera::MixTransport*>( CanteraObjects::get_transport() ); // cast gas transport object as mix transport
+  nSpec_ = trans->thermo().nSpecies();
 
   massFracTags_.clear();
   for( size_t n=0; n<nSpec_; ++n ){
@@ -104,6 +108,16 @@ ThermalConductivity( const Expr::Tag& temperatureTag,
     name << massFracTag.name() << "_" << n;
     massFracTags_.push_back( Expr::Tag(name.str(),massFracTag.context()) );
   }
+
+  tCondCoefs_ = trans->getConductivityCoefficients();
+  modelType_ = trans->model();
+
+  molecularWeights_ = trans->thermo().molecularWeights();
+  molecularWeightsInv_.resize(nSpec_);
+  for( size_t n=0; n<nSpec_; ++n)
+    molecularWeightsInv_[n] = 1 / molecularWeights_[n];
+
+  CanteraObjects::restore_transport( trans );
 }
 
 //--------------------------------------------------------------------
@@ -112,7 +126,7 @@ template< typename FieldT >
 ThermalConductivity<FieldT>::
 ~ThermalConductivity()
 {
-  CanteraObjects::restore_transport( trans_ );
+
 }
 
 //--------------------------------------------------------------------
@@ -152,63 +166,56 @@ evaluate()
 {
   using namespace SpatialOps;
 
-  FieldT& result = this->value();
+  FieldT& mixTCond = this->value();
 
   // pre-compute powers of temperature used in polynomial evaluations
   SpatFldPtr<FieldT> logtPtr   = SpatialFieldStore::get<FieldT>(*temperature_); // log(t)
   SpatFldPtr<FieldT> logttPtr  = SpatialFieldStore::get<FieldT>(*temperature_); // log(t)*log(t)
   SpatFldPtr<FieldT> logtttPtr = SpatialFieldStore::get<FieldT>(*temperature_); // log(t)*log(t)*log(t)
-  SpatFldPtr<FieldT> sqrtTPtr; // sqrt(t)
-  SpatFldPtr<FieldT> logt4Ptr; // pow( log(t),4 )
-  if( trans_->model() == Cantera::cMixtureAveraged ) { // as opposed to CK mode
-    logt4Ptr = SpatialFieldStore::get<FieldT>(*temperature_);
-    sqrtTPtr = SpatialFieldStore::get<FieldT>(*temperature_);
-  }
-
-  SpatFldPtr<FieldT> speciesTCondPtr  = SpatialFieldStore::get<FieldT>(*temperature_); // temporary to store the thermal conductivity for an individual species
-
-  SpatFldPtr<FieldT> sumPtr  = SpatialFieldStore::get<FieldT>(*temperature_); // for mixing rule
-  SpatFldPtr<FieldT> inverseSumPtr  = SpatialFieldStore::get<FieldT>(*temperature_);
-
-  FieldT& speciesTCond = *speciesTCondPtr;
 
   FieldT& logt   = *logtPtr;
   FieldT& logtt  = *logttPtr;
   FieldT& logttt = *logtttPtr;
-  FieldT& logt4  = *logt4Ptr;
-  FieldT& sqrtT  = *sqrtTPtr;
-
-  FieldT& sum = *sumPtr;
-  FieldT& inverseSum = *inverseSumPtr;
 
   logt   <<= log( *temperature_ );
   logtt  <<= logt * logt;
   logttt <<= logtt * logt;
-  if( trans_->model() == Cantera::cMixtureAveraged ) {
-    logt4 <<= logttt * logt;
-    sqrtT <<= sqrt( *temperature_ );
-  }
 
-  const std::vector< std::vector<double> >& conductivityCoefs = trans_->getConductivityCoefficients();
+  SpatFldPtr<FieldT> speciesTCondPtr = SpatialFieldStore::get<FieldT>(*temperature_); // temporary to store the thermal conductivity for an individual species
+  SpatFldPtr<FieldT> sumPtr          = SpatialFieldStore::get<FieldT>(*temperature_); // for mixing rule
+  SpatFldPtr<FieldT> inverseSumPtr   = SpatialFieldStore::get<FieldT>(*temperature_); // 1/sum()
 
-  const std::vector<double>& molecularWeights = trans_->thermo().molecularWeights();
-
-  std::vector<double> molecularWeightsInv(nSpec_);
-  for( size_t n=0; n<nSpec_; ++n)
-    molecularWeightsInv[n] = 1 / molecularWeights[n];
+  FieldT& speciesTCond = *speciesTCondPtr;
+  FieldT& sum          = *sumPtr;
+  FieldT& inverseSum   = *inverseSumPtr;
 
   sum <<= 0.0; // set sum to 0 before loop
   inverseSum <<= 0.0; // set inverse sum to 0 before loop
-  for( size_t n = 0; n < nSpec_; ++n){
-    if( trans_->model() == Cantera::cMixtureAveraged ) // Cantera uses a 5 coefficient polynomial in temperature
-      speciesTCond <<= sqrtT * ( conductivityCoefs[n][0] + conductivityCoefs[n][1] * logt + conductivityCoefs[n][2] * logtt + conductivityCoefs[n][3] * logttt + conductivityCoefs[n][4] * logt4 );
-    else // CK mode
-      speciesTCond <<= exp ( conductivityCoefs[n][0] + conductivityCoefs[n][1] * logt + conductivityCoefs[n][2] * logtt + conductivityCoefs[n][3] * logttt );
-    sum <<= sum + *massFracs_[n] * speciesTCond * molecularWeightsInv[n];
-    inverseSum <<= inverseSum + *massFracs_[n] / speciesTCond * molecularWeightsInv[n];
+
+  if( modelType_ == Cantera::cMixtureAveraged ) { // as opposed to CK mode
+    SpatFldPtr<FieldT> logt4Ptr = SpatialFieldStore::get<FieldT>(*temperature_);
+    SpatFldPtr<FieldT> sqrtTPtr = SpatialFieldStore::get<FieldT>(*temperature_);
+    FieldT& logt4 = *logt4Ptr;
+    FieldT& sqrtT = *sqrtTPtr;
+
+    logt4 <<= logttt * logt;
+    sqrtT <<= sqrt( *temperature_ );
+
+    for( size_t n = 0; n < nSpec_; ++n){
+      speciesTCond <<= sqrtT * ( tCondCoefs_[n][0] + tCondCoefs_[n][1] * logt + tCondCoefs_[n][2] * logtt + tCondCoefs_[n][3] * logttt + tCondCoefs_[n][4] * logt4 );
+      sum        <<= sum        + *massFracs_[n] * speciesTCond * molecularWeightsInv_[n];
+      inverseSum <<= inverseSum + *massFracs_[n] / speciesTCond * molecularWeightsInv_[n];
+    }
+  }
+  else{
+    for( size_t n = 0; n < nSpec_; ++n){
+      speciesTCond <<= exp ( tCondCoefs_[n][0] + tCondCoefs_[n][1] * logt + tCondCoefs_[n][2] * logtt + tCondCoefs_[n][3] * logttt );
+      sum        <<= sum        + *massFracs_[n] * speciesTCond * molecularWeightsInv_[n];
+      inverseSum <<= inverseSum + *massFracs_[n] / speciesTCond * molecularWeightsInv_[n];
+    }
   }
 
-  result <<= 0.5 * ( sum * *mmw_ + 1 / (inverseSum * *mmw_) ); // mixing rule
+  mixTCond <<= 0.5 * ( sum * *mmw_ + 1 / (inverseSum * *mmw_) ); // mixing rule
 }
 
 //--------------------------------------------------------------------
