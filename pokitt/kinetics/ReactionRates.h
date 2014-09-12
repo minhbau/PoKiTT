@@ -336,7 +336,6 @@ evaluate()
   SpatFldPtr<FieldT> kPtr       = SpatialFieldStore::get<FieldT>(t); // forward rate constant
   SpatFldPtr<FieldT> krPtr      = SpatialFieldStore::get<FieldT>(t); // reverse rate constant
 
-  SpatFldPtr<FieldT> tRecipPtr  = SpatialFieldStore::get<FieldT>(t); // t^-1
   SpatFldPtr<FieldT> logTPtr    = SpatialFieldStore::get<FieldT>(t); // log(t)
 
   SpatFldPtr<FieldT> dgPtr      = SpatialFieldStore::get<FieldT>(t); // delta gibbs energy for a reaction
@@ -348,16 +347,14 @@ evaluate()
   FieldT& conc2   = *conc2Ptr;
   FieldT& logConc = *logConcPtr;
 
-  FieldT& k       = *kPtr;
-  FieldT& kr      = *krPtr;
+  FieldT& k  = *kPtr;
+  FieldT& kr = *krPtr;
 
-  FieldT& tRecip  = *tRecipPtr;
-  FieldT& logT    = *logTPtr;
+  FieldT& logT   = *logTPtr;
+  FieldT& dg = *dgPtr;
 
-  FieldT& dg      = *dgPtr;
-
-  tRecip  <<= *tPowers_[4]; // t^-1
-  logT    <<= log(t); // log(t)
+  const FieldT& tRecip = *tPowers_[4];
+  logT    <<= log(t);
   conc    <<= tRecip * p / GasConstant; // molar concentration
   logConc <<= log(conc);
   conc    <<= conc * *mmw_; // mass concentration
