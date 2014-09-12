@@ -191,7 +191,7 @@ evaluate()
   FieldT& sum          = *sumPtr;
   FieldT& inverseSum   = *inverseSumPtr;
 
-  sum <<= 0.0; // set sum to 0 before loop
+  sum        <<= 0.0; // set sum to 0 before loop
   inverseSum <<= 0.0; // set inverse sum to 0 before loop
 
   if( modelType_ == Cantera::cMixtureAveraged ) { // as opposed to CK mode
@@ -203,10 +203,11 @@ evaluate()
   }
 
   for( size_t n = 0; n < nSpec_; ++n){
+    const std::vector<double>& tCondCoefs = tCondCoefs_[n];
     if( modelType_ == Cantera::cMixtureAveraged )
-      speciesTCond <<= *sqrtTPtr * ( tCondCoefs_[n][0] + tCondCoefs_[n][1] * logt + tCondCoefs_[n][2] * logtt + tCondCoefs_[n][3] * logttt + tCondCoefs_[n][4] * *logt4Ptr );
+      speciesTCond <<= *sqrtTPtr * ( tCondCoefs[0] + tCondCoefs[1] * logt + tCondCoefs[2] * logtt + tCondCoefs[3] * logttt + tCondCoefs[4] * *logt4Ptr );
     else
-      speciesTCond <<= exp ( tCondCoefs_[n][0] + tCondCoefs_[n][1] * logt + tCondCoefs_[n][2] * logtt + tCondCoefs_[n][3] * logttt );
+      speciesTCond <<=         exp ( tCondCoefs[0] + tCondCoefs[1] * logt + tCondCoefs[2] * logtt + tCondCoefs[3] * logttt );
     sum        <<= sum        + *massFracs_[n] * speciesTCond * molecularWeightsInv_[n];
     inverseSum <<= inverseSum + *massFracs_[n] / speciesTCond * molecularWeightsInv_[n];
   }

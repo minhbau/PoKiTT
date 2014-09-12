@@ -235,7 +235,7 @@ evaluate()
         if( modelType_ == Cantera::cMixtureAveraged )
           d <<= *massFracs_[j] / ( *tThreeHalvesPtr * ( coefs[0] + coefs[1] * logt + coefs[2] * logtt + coefs[3] * logttt + coefs[4] * *logt4Ptr ) ); // polynomial in t for binary diffusion coefficients
         else
-          d <<= *massFracs_[j] / ( exp( coefs[0] + coefs[1] * logt + coefs[2] * logtt + coefs[3] * logttt ) );
+          d <<= *massFracs_[j] / (                exp ( coefs[0] + coefs[1] * logt + coefs[2] * logtt + coefs[3] * logttt ) );
         sum1 <<= sum1 + d * molecularWeightsInv_[j];
         sum2 <<= sum2 + d;
       }

@@ -7,6 +7,7 @@
 
 #include <cantera/transport.h>
 
+// viscosity can be calculated using either n temporary fields or 2n temporary fields (default)
 //#define NFIELDS
 
 /**
@@ -263,9 +264,11 @@ evaluate()
     sqrtSpeciesVis.push_back(SpatialFieldStore::get<FieldT>(*temperature_));
 
   // pre-compute power of log(t) for the species viscosity polynomial
+  SpatFldPtr<FieldT> tOneFourthPtr; // t^(1/4)
   SpatFldPtr<FieldT> logtPtr   = SpatialFieldStore::get<FieldT>(*temperature_);
   SpatFldPtr<FieldT> logttPtr  = SpatialFieldStore::get<FieldT>(*temperature_);
   SpatFldPtr<FieldT> logtttPtr = SpatialFieldStore::get<FieldT>(*temperature_);
+  SpatFldPtr<FieldT> logt4Ptr; // log(t)*log(t)*log(t)*log(t)
 
   FieldT& logt   = *logtPtr;
   FieldT& logtt  = *logttPtr;
@@ -276,20 +279,19 @@ evaluate()
   logttt <<= logtt * logt;
 
   if( modelType_ == Cantera::cMixtureAveraged ) { // as opposed to CK mode
-    SpatFldPtr<FieldT> logt4Ptr      = SpatialFieldStore::get<FieldT>(*temperature_);
-    SpatFldPtr<FieldT> tOneFourthPtr = SpatialFieldStore::get<FieldT>(*temperature_);
-    FieldT& logt4      = *logt4Ptr;
-    FieldT& tOneFourth = *tOneFourthPtr;
+    logt4Ptr      = SpatialFieldStore::get<FieldT>(*temperature_);
+    tOneFourthPtr = SpatialFieldStore::get<FieldT>(*temperature_);
 
-    tOneFourth <<= pow( *temperature_, 0.25 );
-    logt4      <<= logttt * logt;
-
-    for( size_t n = 0; n<nSpec_; ++n )
-      *sqrtSpeciesVis[n] <<= *tOneFourthPtr * ( viscosityCoefs_[n][0] + viscosityCoefs_[n][1] * logt + viscosityCoefs_[n][2] * logtt + viscosityCoefs_[n][3] * logttt + viscosityCoefs_[n][4] * *logt4Ptr );
+    *tOneFourthPtr <<= pow( *temperature_, 0.25 );
+    *logt4Ptr      <<= logttt * logt;
   }
-  else{
-    for( size_t n = 0; n<nSpec_; ++n )
-      *sqrtSpeciesVis[n] <<= exp ( 0.5 * (viscosityCoefs_[n][0] + viscosityCoefs_[n][1] * logt + viscosityCoefs_[n][2] * logtt + viscosityCoefs_[n][3] * logttt) );
+
+  for( size_t n = 0; n<nSpec_; ++n ){
+    const std::vector<double>& viscCoefs = viscosityCoefs_[n];
+    if( modelType_ == Cantera::cMixtureAveraged )
+      *sqrtSpeciesVis[n] <<= *tOneFourthPtr * ( viscCoefs[0] + viscCoefs[1] * logt + viscCoefs[2] * logtt + viscCoefs[3] * logttt + viscCoefs[4] * *logt4Ptr );
+    else
+      *sqrtSpeciesVis[n] <<=      exp ( 0.5 * ( viscCoefs[0] + viscCoefs[1] * logt + viscCoefs[2] * logtt + viscCoefs[3] * logttt ) );
   }
 
   mixVis <<= 0.0; // set result to 0 before summing species contributions
