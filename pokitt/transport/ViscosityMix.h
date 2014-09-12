@@ -184,7 +184,7 @@ Viscosity( const Expr::Tag& temperatureTag,
 
   for( size_t n=0; n!=nSpec_; ++n){
     molecularWeightRatios_.push_back( std::vector<double>(nSpec_,0.0) ); // nSpec_ by nSpec_ vector of vectors
-    denominator_.push_back( std::vector<double>(nSpec_,0.0) );
+    denominator_.push_back( std::vector<double>(nSpec_,0.0) ); // nSpec_ by nSpec_ vector of vectors
   }
 
 # ifdef NFIELDS // evaluation requires nSpec_ temporary fields

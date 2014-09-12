@@ -47,7 +47,7 @@ class DiffusionCoeff
   int modelType_; // type of model used by Cantera to estimate pure viscosity
   std::vector<double> molecularWeights_; // molecular weights
   std::vector<double> molecularWeightsInv_; // inverse of molecular weights (diving by MW is expensive)
-  std::vector< std::vector<double> > binaryDCoefs_;
+  std::vector< std::vector<double> > binaryDCoefs_; // coefficients used by Cantera to calculate binary diffusino coefficients
   /* Cantera uses a polynomial in temperature to evaluate the binary diffusion coefficient of each pair [i][j] = [j][i]
    * indicies_[i][j] stores the index of the set of polynomial coefficients for the pair [i][j]
    * This is to simplify bookkeeping and does not affect the evaluation itself
@@ -114,7 +114,7 @@ DiffusionCoeff( const Expr::Tag& temperatureTag,
 {
   this->set_gpu_runnable( true );
   Cantera::MixTransport* trans = dynamic_cast<Cantera::MixTransport*>( CanteraObjects::get_transport() ); // cast gas transport object as mix transport
-    nSpec_ = trans->thermo().nSpecies();
+  nSpec_ = trans->thermo().nSpecies();
 
   massFracTags_.clear();
   for( size_t n=0; n<nSpec_; ++n ){
@@ -131,7 +131,7 @@ DiffusionCoeff( const Expr::Tag& temperatureTag,
   for( size_t n=0; n<nSpec_; ++n)
     molecularWeightsInv_[n] = 1 / molecularWeights_[n];
 
-  for( size_t n=0; n<nSpec_; ++n)
+  for( size_t n=0; n<nSpec_; ++n) // nSpec_ by nSpec_ vector of vectors
     indices_.push_back(std::vector<int>(nSpec_));
 
   size_t ij=0;
@@ -141,6 +141,7 @@ DiffusionCoeff( const Expr::Tag& temperatureTag,
       indices_[j][i]=ij;
     }
   }
+  CanteraObjects::restore_transport( trans );
 }
 
 //--------------------------------------------------------------------
@@ -196,9 +197,9 @@ evaluate()
 
   // pre-compute power of log(t) for the species viscosity polynomial
   SpatFldPtr<FieldT> tThreeHalvesPtr; // t^(3/2)
-  SpatFldPtr<FieldT> logtPtr   = SpatialFieldStore::get<FieldT>(*temperature_);
-  SpatFldPtr<FieldT> logttPtr  = SpatialFieldStore::get<FieldT>(*temperature_);
-  SpatFldPtr<FieldT> logtttPtr = SpatialFieldStore::get<FieldT>(*temperature_);
+  SpatFldPtr<FieldT> logtPtr   = SpatialFieldStore::get<FieldT>(*temperature_); // log(t)
+  SpatFldPtr<FieldT> logttPtr  = SpatialFieldStore::get<FieldT>(*temperature_); // log(t)*log(t)
+  SpatFldPtr<FieldT> logtttPtr = SpatialFieldStore::get<FieldT>(*temperature_); // log(t)*log(t)*log(t)
   SpatFldPtr<FieldT> logt4Ptr; // log(t)*log(t)*log(t)*log(t)
 
   FieldT& logt   = *logtPtr;
@@ -239,7 +240,6 @@ evaluate()
         sum2 <<= sum2 + d;
       }
     }
-    const std::vector<double>& coefs = binaryDCoefs_[indices_[i][i]];
     *mixD[i] <<= 1 / ( p * *mmw_ * ( sum1 + sum2 * *massFracs_[i] / ( molecularWeights_[i] - molecularWeights_[i] * *massFracs_[i] ) ) ); // mixing rule
   }
 
