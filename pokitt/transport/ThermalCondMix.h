@@ -169,9 +169,11 @@ evaluate()
   FieldT& mixTCond = this->value();
 
   // pre-compute powers of temperature used in polynomial evaluations
+  SpatFldPtr<FieldT> sqrtTPtr;
   SpatFldPtr<FieldT> logtPtr   = SpatialFieldStore::get<FieldT>(*temperature_); // log(t)
   SpatFldPtr<FieldT> logttPtr  = SpatialFieldStore::get<FieldT>(*temperature_); // log(t)*log(t)
   SpatFldPtr<FieldT> logtttPtr = SpatialFieldStore::get<FieldT>(*temperature_); // log(t)*log(t)*log(t)
+  SpatFldPtr<FieldT> logt4Ptr; // log(t)*log(t)*log(t)*log(t)
 
   FieldT& logt   = *logtPtr;
   FieldT& logtt  = *logttPtr;
@@ -193,26 +195,20 @@ evaluate()
   inverseSum <<= 0.0; // set inverse sum to 0 before loop
 
   if( modelType_ == Cantera::cMixtureAveraged ) { // as opposed to CK mode
-    SpatFldPtr<FieldT> logt4Ptr = SpatialFieldStore::get<FieldT>(*temperature_);
-    SpatFldPtr<FieldT> sqrtTPtr = SpatialFieldStore::get<FieldT>(*temperature_);
-    FieldT& logt4 = *logt4Ptr;
-    FieldT& sqrtT = *sqrtTPtr;
+    logt4Ptr = SpatialFieldStore::get<FieldT>(*temperature_);
+    sqrtTPtr = SpatialFieldStore::get<FieldT>(*temperature_);
 
-    logt4 <<= logttt * logt;
-    sqrtT <<= sqrt( *temperature_ );
-
-    for( size_t n = 0; n < nSpec_; ++n){
-      speciesTCond <<= sqrtT * ( tCondCoefs_[n][0] + tCondCoefs_[n][1] * logt + tCondCoefs_[n][2] * logtt + tCondCoefs_[n][3] * logttt + tCondCoefs_[n][4] * logt4 );
-      sum        <<= sum        + *massFracs_[n] * speciesTCond * molecularWeightsInv_[n];
-      inverseSum <<= inverseSum + *massFracs_[n] / speciesTCond * molecularWeightsInv_[n];
-    }
+    *logt4Ptr <<= logttt * logt;
+    *sqrtTPtr <<= sqrt( *temperature_ );
   }
-  else{
-    for( size_t n = 0; n < nSpec_; ++n){
+
+  for( size_t n = 0; n < nSpec_; ++n){
+    if( modelType_ == Cantera::cMixtureAveraged )
+      speciesTCond <<= *sqrtTPtr * ( tCondCoefs_[n][0] + tCondCoefs_[n][1] * logt + tCondCoefs_[n][2] * logtt + tCondCoefs_[n][3] * logttt + tCondCoefs_[n][4] * *logt4Ptr );
+    else
       speciesTCond <<= exp ( tCondCoefs_[n][0] + tCondCoefs_[n][1] * logt + tCondCoefs_[n][2] * logtt + tCondCoefs_[n][3] * logttt );
-      sum        <<= sum        + *massFracs_[n] * speciesTCond * molecularWeightsInv_[n];
-      inverseSum <<= inverseSum + *massFracs_[n] / speciesTCond * molecularWeightsInv_[n];
-    }
+    sum        <<= sum        + *massFracs_[n] * speciesTCond * molecularWeightsInv_[n];
+    inverseSum <<= inverseSum + *massFracs_[n] / speciesTCond * molecularWeightsInv_[n];
   }
 
   mixTCond <<= 0.5 * ( sum * *mmw_ + 1 / (inverseSum * *mmw_) ); // mixing rule

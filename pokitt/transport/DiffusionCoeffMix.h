@@ -195,9 +195,11 @@ evaluate()
   const FieldT& p = *p_;
 
   // pre-compute power of log(t) for the species viscosity polynomial
+  SpatFldPtr<FieldT> tThreeHalvesPtr; // t^(3/2)
   SpatFldPtr<FieldT> logtPtr   = SpatialFieldStore::get<FieldT>(*temperature_);
   SpatFldPtr<FieldT> logttPtr  = SpatialFieldStore::get<FieldT>(*temperature_);
   SpatFldPtr<FieldT> logtttPtr = SpatialFieldStore::get<FieldT>(*temperature_);
+  SpatFldPtr<FieldT> logt4Ptr; // log(t)*log(t)*log(t)*log(t)
 
   FieldT& logt   = *logtPtr;
   FieldT& logtt  = *logttPtr;
@@ -216,28 +218,29 @@ evaluate()
   FieldT& sum2 = *sum2Ptr;
 
   if( modelType_ == Cantera::cMixtureAveraged ) { // as opposed to CK mode
-    SpatFldPtr<FieldT> logt4Ptr        = SpatialFieldStore::get<FieldT>(*temperature_);
-    SpatFldPtr<FieldT> tThreeHalvesPtr = SpatialFieldStore::get<FieldT>(*temperature_);
-    FieldT& logt4        = *logt4Ptr;
-    FieldT& tThreeHalves = *tThreeHalvesPtr;
+    logt4Ptr        = SpatialFieldStore::get<FieldT>(*temperature_);
+    tThreeHalvesPtr = SpatialFieldStore::get<FieldT>(*temperature_);
 
-    logt4        <<= logttt * logt;
-    tThreeHalves <<= pow( *temperature_, 1.5 );
+    *logt4Ptr        <<= logttt * logt;
+    *tThreeHalvesPtr <<= pow( *temperature_, 1.5 );
+  }
 
-    for( size_t i=0; i<nSpec_; ++i){
-      sum1 <<= 0.0;
-      sum2 <<= 0.0;
-      for( size_t j=0; j<nSpec_; ++j){
-        if( j != i){
-          const std::vector<double>& coefs = binaryDCoefs_[indices_[i][j]]; // coefficients for pair [i][j]
-          d <<= *massFracs_[j] / ( tThreeHalves * (coefs[0] + coefs[1] * logt + coefs[2] * logtt + coefs[3] * logttt + coefs[4] * logt4) ); // polynomial in t for binary diffusion coefficients
-          sum1 <<= sum1 + d * molecularWeightsInv_[j];
-          sum2 <<= sum2 + d;
-        }
+  for( size_t i=0; i<nSpec_; ++i){
+    sum1 <<= 0.0;
+    sum2 <<= 0.0;
+    for( size_t j=0; j<nSpec_; ++j){
+      if( j != i){
+        const std::vector<double>& coefs = binaryDCoefs_[indices_[i][j]]; // coefficients for pair [i][j]
+        if( modelType_ == Cantera::cMixtureAveraged )
+          d <<= *massFracs_[j] / ( *tThreeHalvesPtr * ( coefs[0] + coefs[1] * logt + coefs[2] * logtt + coefs[3] * logttt + coefs[4] * *logt4Ptr ) ); // polynomial in t for binary diffusion coefficients
+        else
+          d <<= *massFracs_[j] / ( exp( coefs[0] + coefs[1] * logt + coefs[2] * logtt + coefs[3] * logttt ) );
+        sum1 <<= sum1 + d * molecularWeightsInv_[j];
+        sum2 <<= sum2 + d;
       }
-      const std::vector<double>& coefs = binaryDCoefs_[indices_[i][i]];
-      *mixD[i] <<= 1 / ( p * *mmw_ * ( sum1 + sum2 * *massFracs_[i] / ( molecularWeights_[i] - molecularWeights_[i] * *massFracs_[i] ) ) ); // mixing rule
     }
+    const std::vector<double>& coefs = binaryDCoefs_[indices_[i][i]];
+    *mixD[i] <<= 1 / ( p * *mmw_ * ( sum1 + sum2 * *massFracs_[i] / ( molecularWeights_[i] - molecularWeights_[i] * *massFracs_[i] ) ) ); // mixing rule
   }
 
 }
