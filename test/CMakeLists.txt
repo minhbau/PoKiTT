@@ -9,10 +9,6 @@ file( COPY ${XML_FILES} DESTINATION ${CMAKE_CURRENT_BINARY_DIR} )
 
 include_directories( ${CMAKE_SOURCE_DIR} )
 
-nebo_add_executable( diff_coef_test DiffusionCoeff_test.cpp )
-target_link_libraries( diff_coef_test pokitt )
-add_test( diff_coef_test diff_coef_test )
-
 nebo_add_executable( rxn_test ReactionRates_test.cpp )
 target_link_libraries( rxn_test pokitt )
 add_test( NAME rxn_test_h2      COMMAND rxn_test --xml-input-file=h2o2.xml         )
@@ -24,14 +20,6 @@ target_link_libraries( temperature_test pokitt )
 add_test( NAME temperature_test         COMMAND temperature_test --xml-input-file=poly_tester.xml)
 add_test( NAME temperature_test_shomate COMMAND temperature_test --xml-input-file=poly_tester.xml --phase=shomate)
 add_test( NAME temperature_test_GRI     COMMAND temperature_test --xml-input-file=gri30.xml)
-
-nebo_add_executable( therm_cond_test ThermalCondMix_test.cpp )
-target_link_libraries( therm_cond_test pokitt )
-add_test( therm_cond_test therm_cond_test )
-
-nebo_add_executable( viscosity_test ViscosityMix_test.cpp )
-target_link_libraries( viscosity_test pokitt )
-add_test( viscosity_test viscosity_test )
 
 nebo_add_executable( thermo_test Thermo_test.cpp )
 target_link_libraries( thermo_test pokitt )
