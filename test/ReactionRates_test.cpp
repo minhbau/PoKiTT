@@ -195,7 +195,7 @@ bool driver( bool timings )
     boost::timer rxnTimer;
     tree.execute_tree();
 
-    if( timings ) std::cout << "PoKiTT time " << rxnTimer.elapsed() << std::endl;
+    if( timings ) std::cout << "PoKiTT  reaction rate time " << rxnTimer.elapsed() << std::endl;
 
 #   ifdef ENABLE_CUDA
     BOOST_FOREACH( Expr::Tag rTag, rTags){
