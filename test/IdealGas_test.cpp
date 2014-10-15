@@ -234,6 +234,10 @@ bool driver( bool timings,
 
     if( timings ) std::cout << "PoKiTT  " + property_name(gasQuantity) + " time " << gasTimer.elapsed() << std::endl;
 
+#ifdef ENABLE_CUDA
+    gasField.set_device_as_active( CPU_INDEX );
+#endif
+
     SpatFldPtr<CellField> canteraResult = get_cantera_result( timings, gasQuantity, *gasMix, *iPts, temp, xcoord );
 
     status( field_equal(gasField, *canteraResult, 1e-12), gasTag.name() );
