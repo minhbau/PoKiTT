@@ -11,6 +11,7 @@
 #include "TestHelper.h"
 
 #include <pokitt/thermo/Density.h>
+#include <pokitt/thermo/Pressure.h>
 #include <pokitt/MixtureMolWeight.h>
 
 #include <expression/ExprLib.h>
@@ -34,6 +35,21 @@ namespace po = boost::program_options;
 
 //==============================================================================
 
+enum GasQuantity{
+  P,
+  RHO
+};
+
+std::string property_name( const GasQuantity q )
+{
+  switch(q){
+    case P  : return "pressure";
+    case RHO: return "density";
+  }
+}
+
+//==============================================================================
+
 const std::vector< std::vector<double> > mass_fracs(const int nPts, const int nSpec){
   std::vector< std::vector<double> > massfracs;
   for( size_t i=0; i<nPts+2; ++i){
@@ -54,6 +70,7 @@ const std::vector< std::vector<double> > mass_fracs(const int nPts, const int nS
 
 So::SpatFldPtr<CellField>
 get_cantera_result( const bool timings,
+                    const GasQuantity gasQuantity,
                     Cantera_CXX::IdealGasMix& gasMix,
                     const int nPts,
                     CellField& temp,
@@ -64,25 +81,38 @@ get_cantera_result( const bool timings,
   xcoord.set_device_as_active( CPU_INDEX );
 # endif
   const int nSpec=gasMix.nSpecies();
-  const double refPressure=gasMix.pressure();
+  double refQuantity;
+  switch( gasQuantity ){
+  case P: refQuantity = gasMix.density(); break;
+  case RHO: refQuantity = gasMix.pressure(); break;
+  }
 
   const std::vector< std::vector<double> > massFracs = mass_fracs( nPts, nSpec);
   So::SpatFldPtr<CellField> canteraResult = So::SpatialFieldStore::get<CellField>(temp, CPU_INDEX);
 
   std::vector< std::vector<double> >::const_iterator iMass = massFracs.begin();
   CellField::const_iterator iTemp = temp.begin();
-  boost::timer rhoTime;
+  boost::timer gasTime;
   for(CellField::iterator iCant = canteraResult->begin(); iCant!=canteraResult->end(); ++iTemp, ++iMass, ++iCant){
-    gasMix.setState_TPY( *iTemp, refPressure, &(*iMass)[0]);
-    *iCant=gasMix.density();
+    switch( gasQuantity ){
+    case P:
+      gasMix.setState_TRY( *iTemp, refQuantity, &(*iMass)[0]);
+      *iCant=gasMix.pressure();
+      break;
+    case RHO:
+      gasMix.setState_TPY( *iTemp, refQuantity, &(*iMass)[0]);
+      *iCant=gasMix.density();
+      break;
+    }
   }
-  if( timings ) std::cout << "Cantera density time " << rhoTime.elapsed() << std::endl;
+  if( timings ) std::cout << "Cantera " + property_name(gasQuantity) + " time " << gasTime.elapsed() << std::endl;
   return canteraResult;
 }
 
 //==============================================================================
 
-bool driver( bool timings )
+bool driver( bool timings,
+             const GasQuantity gasQuantity )
 {
   TestHelper status( !timings );
   Cantera_CXX::IdealGasMix* const gasMix = CanteraObjects::get_gasmix();
@@ -90,16 +120,20 @@ bool driver( bool timings )
   const int nSpec = gasMix->nSpecies();
   const std::vector<double>& molecularWeights = gasMix->molecularWeights();
   size_t n;
-  const double refPressure=gasMix->pressure();
+
+  double refQuantity;
+  switch( gasQuantity ){
+  case P: refQuantity = gasMix->density(); break;
+  case RHO: refQuantity = gasMix->pressure(); break;
+  }
 
   typedef Expr::PlaceHolder <CellField> Temperature;
-  typedef Expr::PlaceHolder <CellField> Pressure;
+  typedef Expr::PlaceHolder <CellField> RefQuantity;
   typedef Expr::PlaceHolder <CellField> MassFracs;
   typedef MixtureMolWeight  <CellField> MixtureMolWeight;
-  typedef Density           <CellField> Density;
 
   const Expr::Tag tTag ( "Temperature", Expr::STATE_NONE);
-  const Expr::Tag pTag  ( "Pressure", Expr::STATE_NONE);
+  const Expr::Tag refTag  ( "Reference Quantity", Expr::STATE_NONE);
   const Expr::Tag yiTag ( "yi",          Expr::STATE_NONE );
   Expr::TagList yiTags;
   for( n=0; n<nSpec; ++n ){
@@ -108,19 +142,26 @@ bool driver( bool timings )
     yiTags.push_back( Expr::Tag(name.str(),yiTag.context()) );
   }
   const Expr::Tag mmwTag ("Mixture Molecular Weight", Expr::STATE_NONE);
-  const Expr::Tag rhoTag ("Density", Expr::STATE_NONE);
+  const Expr::Tag gasTag (property_name(gasQuantity), Expr::STATE_NONE);
 
   Expr::ExpressionFactory exprFactory;
 
   exprFactory.register_expression( new Temperature::Builder (tTag) );
-  exprFactory.register_expression( new Pressure::Builder (pTag) );
+  exprFactory.register_expression( new RefQuantity::Builder (refTag) );
   BOOST_FOREACH( Expr::Tag yiTag, yiTags){
     exprFactory.register_expression( new MassFracs      ::Builder( yiTag ) );
   }
   exprFactory.register_expression( new MixtureMolWeight ::Builder( mmwTag, yiTag, molecularWeights));
 
-  Expr::ExpressionID rho_id;
-  rho_id = exprFactory.register_expression( new Density::Builder (rhoTag, tTag, pTag, mmwTag) );
+  Expr::ExpressionID gas_id;
+  switch( gasQuantity ){
+  case P:
+    gas_id = exprFactory.register_expression( new Pressure<CellField>::Builder (gasTag, tTag, refTag, mmwTag) );
+    break;
+  case RHO:
+    gas_id = exprFactory.register_expression( new Density<CellField>::Builder (gasTag, tTag, refTag, mmwTag) );
+    break;
+  }
 
   std::vector<int> ptvec;
   if( timings ){
@@ -136,10 +177,10 @@ bool driver( bool timings )
 
   for( std::vector<int>::iterator iPts = ptvec.begin(); iPts!= ptvec.end(); ++iPts){
 
-    Expr::ExpressionTree rhoTree( rho_id , exprFactory, 0 );
+    Expr::ExpressionTree gasTree( gas_id , exprFactory, 0 );
     {
-      std::ofstream rhoGraph( "Density.dot" );
-      rhoTree.write_tree( rhoGraph );
+      std::ofstream gasGraph( "IdealGas.dot" );
+      gasTree.write_tree( gasGraph );
     }
 
     So::IntVec npts(*iPts,1,1);
@@ -157,20 +198,20 @@ bool driver( bool timings )
 
     Expr::FieldManagerList fml;
 
-    rhoTree.register_fields( fml );
+    gasTree.register_fields( fml );
     fml.allocate_fields( Expr::FieldAllocInfo( npts, 0, 0, false, false, false ) );
-    rhoTree.bind_fields( fml );
+    gasTree.bind_fields( fml );
 
     using namespace SpatialOps;
     Expr::FieldMgrSelector<CellField>::type& cellFM = fml.field_manager< CellField>();
 
-    CellField& temp    = cellFM.field_ref( tTag );
-    CellField& p       = cellFM.field_ref( pTag );
-    CellField& mixMW   = cellFM.field_ref( mmwTag );
-    CellField& density = cellFM.field_ref( rhoTag );
+    CellField& temp        = cellFM.field_ref( tTag );
+    CellField& refField = cellFM.field_ref( refTag );
+    CellField& mixMW       = cellFM.field_ref( mmwTag );
+    CellField& gasField = cellFM.field_ref( gasTag );
 
     temp <<= 500.0 + 1000 * xcoord;
-    p <<= refPressure;
+    refField <<= refQuantity;
 
     SpatFldPtr<CellField> sum  = SpatialFieldStore::get<CellField>(temp);
     *sum<<=0.0;
@@ -184,18 +225,18 @@ bool driver( bool timings )
       yi <<= yi / *sum;
     }
 
-    rhoTree.lock_fields( fml );  // prevent fields from being deallocated so that we can get them after graph execution.
+    gasTree.lock_fields( fml );  // prevent fields from being deallocated so that we can get them after graph execution.
 
-    if( timings ) std::cout << std::endl << "Density test - " << *iPts << std::endl;
+    if( timings ) std::cout << std::endl << property_name(gasQuantity) + " test - " << *iPts << std::endl;
 
-    boost::timer rhoTimer;
-    rhoTree.execute_tree();
+    boost::timer gasTimer;
+    gasTree.execute_tree();
 
-    if( timings ) std::cout << "PoKiTT  density time " << rhoTimer.elapsed() << std::endl;
+    if( timings ) std::cout << "PoKiTT  " + property_name(gasQuantity) + " time " << gasTimer.elapsed() << std::endl;
 
-    SpatFldPtr<CellField> canteraResult = get_cantera_result( timings, *gasMix, *iPts, temp, xcoord );
+    SpatFldPtr<CellField> canteraResult = get_cantera_result( timings, gasQuantity, *gasMix, *iPts, temp, xcoord );
 
-    status( field_equal(density, *canteraResult, 1e-12), rhoTag.name() );
+    status( field_equal(gasField, *canteraResult, 1e-12), gasTag.name() );
 
   }
   return status.ok();
@@ -245,9 +286,11 @@ int main( int iarg, char* carg[] )
     const CanteraObjects::Setup setup( "Mix", inputFileName, inpGroup );
     CanteraObjects::setup_cantera( setup );
 
-    const bool pass = driver( timings );
+    TestHelper status( false );
+    status( driver( timings, RHO ) );
+    status( driver( timings, P   ) );
 
-    if( pass ){
+    if( status.ok() ){
       std::cout << "\nPASS\n";
       return 0;
     }
