@@ -306,7 +306,7 @@ bool driver( const bool timings,
 #   ifdef ENABLE_CUDA
     BOOST_FOREACH( Expr::Tag thermoTag, thermoTags){
       CellField& thermo = fml.field_manager<CellField>().field_ref(thermoTag);
-      thermo.add_device(CPU_INDEX);
+      thermo.set_device_as_active(CPU_INDEX);
     }
     temp.set_device_as_active( CPU_INDEX );
 #   endif
@@ -321,7 +321,17 @@ bool driver( const bool timings,
     std::vector< SpatFldPtr<CellField> >::const_iterator iCantera = canteraResults.begin();
     BOOST_FOREACH( const Expr::Tag& thermoTag, thermoTags ){
       CellField& thermo = cellFM.field_ref(thermoTag);
-      status( field_equal( thermo, **iCantera, 1e-14 ), thermoTag.name() );
+      switch( thermoQuantity ){
+        case CP  :
+        case CV  : {
+          status( field_equal( thermo, **iCantera, 1e-14 ) || field_equal_abs( thermo, **iCantera, 1e-11 ), thermoTag.name() );
+          break;
+        }
+        case ENTH: {
+          status( field_equal( thermo, **iCantera, 1e-11 ) || field_equal_abs( thermo, **iCantera, 1e-8 ), thermoTag.name() );
+          break;
+        }
+      }
       ++iCantera;
     }
 
