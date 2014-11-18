@@ -12,4 +12,7 @@ install( FILES
   PERMISSIONS OWNER_READ GROUP_READ WORLD_READ
  )
  
-install( TARGETS pokitt EXPORT pokitt DESTINATION lib/pokitt ) 
+install( TARGETS pokitt 
+         EXPORT PoKiTT
+         DESTINATION lib/pokitt )
+install( EXPORT PoKiTT DESTINATION lib/pokitt )

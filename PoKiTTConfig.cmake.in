@@ -15,6 +15,6 @@ set( PoKiTT_INCLUDE_DIR @PoKiTT_INCLUDE@ @TPL_INCLUDE_DIRS@ )
 set( PoKiTT_TPL_LIBS @TPL_LIBRARIES@ )
 
 find_package( SpatialOps PATHS @SpatialOps_DIR@ )
-find_package( ExprLib PATHS @ExprLib_DIR@ )
+find_package( ExprLib    PATHS @ExprLib_DIR@    )
 
-include( @CMAKE_INSTALL_PREFIX@/lib/expression/PoKiTT.cmake )
+include( @CMAKE_INSTALL_PREFIX@/lib/pokitt/PoKiTT.cmake )

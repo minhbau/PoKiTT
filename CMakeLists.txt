@@ -5,8 +5,11 @@ project( PoKiTT CXX C )
 #-------------------------------- CONFIGURATION --------------------------------
 #-------------------------------------------------------------------------------
 
-option( BUILD_UPSTREAM_LIBS "Auto-build ExprLib and SpatialOps" OFF )
+option( BUILD_UPSTREAM_LIBS "Auto-build ExprLib and SpatialOps (not recommended when linking to downstream apps)" OFF )
 option( ENABLE_TESTS "Enable tests" ON )
+
+set( Cantera_DIR "" CACHE PATH "Location where cantera was installed" )
+
 
 # default to release builds
 if( NOT CMAKE_BUILD_TYPE )
@@ -18,10 +21,16 @@ endif( NOT CMAKE_BUILD_TYPE )
 #-- Set the location for the installation.  Comment this out to install to /usr/local
 if( CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT )
   set (CMAKE_INSTALL_PREFIX
-    ${CMAKE_CURRENT_BINARY_DIR}/install/pokitt
-    CACHE PATH "" FORCE
+    ${CMAKE_CURRENT_BINARY_DIR}/install
+    CACHE PATH "Installation directory" FORCE
     )
 endif( CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT )
+
+set( PoKiTT_CONFIG_INSTALL
+  ${CMAKE_INSTALL_PREFIX}/share
+    CACHE PATH
+  "Location to install configuration files"
+  )
 
 #-------------------------------------------------------------------------------
 #------------------------------------- GIT -------------------------------------
@@ -72,13 +81,22 @@ configure_file(
 if( BUILD_UPSTREAM_LIBS )
 
   set( TPL_DIR ${PROJECT_BINARY_DIR}/tpl )
+  option( ENABLE_CUDA "Enable GPU backend in SpatialOps" OFF )
+  option( ENABLE_THREADS "Enable multicore backend in SpatialOps" OFF )
+  option( NTHREADS "Number of threads if ENABLE_THREADS is ON" 1 )
 
   # Build SpatialOps
   file( MAKE_DIRECTORY ${TPL_DIR}/build/spatialops )
   execute_process( COMMAND ${GIT_EXECUTABLE} clone --depth 1 git://software.crsim.utah.edu/SpatialOps.git
                    WORKING_DIRECTORY ${TPL_DIR}
                    RESULT_VARIABLE result  )
-  execute_process( COMMAND ${CMAKE_COMMAND} -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} -DENABLE_TESTS=OFF -DENABLE_THREADS=OFF -DENABLE_EXAMPLES=OFF -DCMAKE_INSTALL_PREFIX=${TPL_DIR} ${TPL_DIR}/SpatialOps
+  execute_process( COMMAND ${CMAKE_COMMAND} -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+                   -DENABLE_THREADS=${ENABLE_THREADS}
+                   -DENABLE_CUDA=${ENABLE_CUDA}
+                   -DENABLE_TESTS=OFF
+                   -DENABLE_EXAMPLES=OFF
+                   -DCMAKE_INSTALL_PREFIX=${TPL_DIR} 
+                   ${TPL_DIR}/SpatialOps
                    WORKING_DIRECTORY ${TPL_DIR}/build/spatialops
                    RESULT_VARIABLE result  )
   execute_process( COMMAND make -j4 install
@@ -89,19 +107,26 @@ if( BUILD_UPSTREAM_LIBS )
   execute_process( COMMAND ${GIT_EXECUTABLE} clone --depth 1 git://software.crsim.utah.edu/ExprLib.git
                    WORKING_DIRECTORY ${TPL_DIR}
                    RESULT_VARIABLE result )
-  execute_process( COMMAND ${CMAKE_COMMAND} -DENABLE_TESTS=OFF -DSpatialOps_DIR=${TPL_DIR}/share -DCMAKE_INSTALL_PREFIX=${TPL_DIR} -DENABLE_OUTPUT=OFF -DBUILD_GUI=OFF ${TPL_DIR}/ExprLib
+  execute_process( COMMAND ${CMAKE_COMMAND}
+                   -DENABLE_TESTS=OFF
+                   -DSpatialOps_DIR=${TPL_DIR}/share
+                   -DCMAKE_INSTALL_PREFIX=${TPL_DIR}
+                   -DENABLE_OUTPUT=OFF
+                   -DBUILD_GUI=OFF
+                   ${TPL_DIR}/ExprLib
                    WORKING_DIRECTORY ${TPL_DIR}/build/exprlib
                    RESULT_VARIABLE result )
   execute_process( COMMAND make -j4 install
                    WORKING_DIRECTORY ${TPL_DIR}/build/exprlib )
   
   find_package( ExprLib REQUIRED PATHS ${TPL_DIR}/share )
+  
   unset( TPL_DIR )
 
 else( BUILD_UPSTREAM_LIBS )
 
   find_package( ExprLib REQUIRED )
-
+  
 endif( BUILD_UPSTREAM_LIBS )
 
 set( TPL_INCLUDES ${TPL_INCLUDES} ${ExprLib_INCLUDE_DIR} )
@@ -113,8 +138,8 @@ set( TPL_LIBRARIES ${TPL_LIBRARIES} exprlib )
 #-------------------------------------------------------------------------------
 
 find_package( Cantera )
-set( TPL_LIBRARIES ${TPL_LIBRARIES} ${Cantera_LIBRARIES} )
-set( TPL_INCLUDES ${TPL_INCLUDES} ${Cantera_INCLUDE_DIR} )
+set( TPL_LIBRARIES ${TPL_LIBRARIES} ${Cantera_LIBRARIES}   )
+set( TPL_INCLUDES  ${TPL_INCLUDES}  ${Cantera_INCLUDE_DIR} )
 
 
 #-------------------------------------------------------------------------------
@@ -142,7 +167,7 @@ configure_file(
 
 install( FILES
   ${CMAKE_BINARY_DIR}/config/PoKiTTConfig.cmake
-  DESTINATION ${CMAKE_INSTALL_PREFIX}/share
+  DESTINATION ${PoKiTT_CONFIG_INSTALL}
   )
 
 install( FILES
