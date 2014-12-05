@@ -37,7 +37,8 @@ namespace po = boost::program_options;
 //==============================================================================
 
 enum TransportQuantity{
-  DIFF,
+  DIFF_MASS,
+  DIFF_MOL,
   TCOND,
   VISC
 };
@@ -45,7 +46,8 @@ enum TransportQuantity{
 std::string transport_name( const TransportQuantity q )
 {
   switch(q){
-    case DIFF : return "Diffusion Coefficient";
+    case DIFF_MASS : return "Diffusion Coefficient Mass";
+    case DIFF_MOL : return "Diffusion Coefficient Mol";
     case TCOND: return "Thermal Conductivity";
     case VISC : return "Viscosity";
   }
@@ -56,9 +58,13 @@ std::string transport_name( const TransportQuantity q )
 const Expr::TagList make_trans_tags( TransportQuantity transportQuantity, const int nSpec ){
   Expr::TagList transTags;
   switch( transportQuantity ){
-  case DIFF:
+  case DIFF_MASS:
     for( size_t n=0; n<nSpec; ++n )
-      transTags.push_back( Expr::Tag( "Di" + boost::lexical_cast<std::string>(n), Expr::STATE_NONE ) );
+      transTags.push_back( Expr::Tag( "DiMass" + boost::lexical_cast<std::string>(n), Expr::STATE_NONE ) );
+    break;
+  case DIFF_MOL:
+    for( size_t n=0; n<nSpec; ++n )
+      transTags.push_back( Expr::Tag( "DiMol" + boost::lexical_cast<std::string>(n), Expr::STATE_NONE ) );
     break;
   case TCOND:
     transTags.push_back(   Expr::Tag( "Thermal Conductivity Mix",                 Expr::STATE_NONE ) );
@@ -100,7 +106,12 @@ get_cantera_results( const bool timings,
 
   std::vector< SpatFldPtr<CellField> > canteraResults;
   switch( transportQuantity ){
-  case DIFF:
+  case DIFF_MASS:
+    for( size_t n=0; n < nSpec; ++n){
+      canteraResults.push_back(SpatialFieldStore::get<CellField>(temp));
+    }
+    break;
+  case DIFF_MOL:
     for( size_t n=0; n < nSpec; ++n){
       canteraResults.push_back(SpatialFieldStore::get<CellField>(temp));
     }
@@ -113,13 +124,23 @@ get_cantera_results( const bool timings,
   std::vector< std::vector<double> >::iterator iMass = massFracs.begin();
   boost::timer transportTimer;
 
-  if( transportQuantity == DIFF){
+  if( transportQuantity == DIFF_MASS || transportQuantity == DIFF_MOL){
     std::vector<double> d_result(nSpec,0.0);
     for( size_t i=0; i<nPts+2; ++iTemp, ++iMass, ++i){
       canteraThermo.setState_TPY( *iTemp, refPressure, &(*iMass)[0]);
+      switch(transportQuantity ){
+      case DIFF_MASS:
       mixTrans.getMixDiffCoeffsMass(&d_result[0]);
       for( size_t n=0; n<nSpec; ++n){
         (*canteraResults[n])[i] = d_result[n];
+      }
+      break;
+      case DIFF_MOL:
+      mixTrans.getMixDiffCoeffs(&d_result[0]);
+      for( size_t n=0; n<nSpec; ++n){
+        (*canteraResults[n])[i] = d_result[n];
+      }
+      break;
       }
     }
   }
@@ -191,9 +212,13 @@ bool driver( const bool timings,
   exprFactory.register_expression( new MixtureMolWeight::Builder( mmwTag, yiTag, molecularWeights));
   Expr::ExpressionID transportID;
   switch( transportQuantity ){
-  case DIFF:
+  case DIFF_MASS:
     typedef DiffusionCoeff <CellField> DiffusionCoeffMix;
     transportID = exprFactory.register_expression( new DiffusionCoeffMix::Builder (transportTags, tTag, pTag ,yiTag, mmwTag) );
+    break;
+  case DIFF_MOL:
+    typedef DiffusionCoeffMol <CellField> DiffusionCoeffMixMol;
+    transportID = exprFactory.register_expression( new DiffusionCoeffMixMol::Builder (transportTags, tTag, pTag ,yiTag, mmwTag) );
     break;
   case TCOND:
     typedef ThermalConductivity <CellField> ThermalConductivityMix;
@@ -224,7 +249,7 @@ bool driver( const bool timings,
     Expr::ExpressionTree transportTree( transportID, exprFactory, 0 );
 
     {
-      std::ofstream fout( (transport_name(DIFF ) + ".dot").c_str() );
+      std::ofstream fout( (transport_name(transportQuantity) + ".dot").c_str() );
       transportTree.write_tree(fout);
     }
 
@@ -253,7 +278,7 @@ bool driver( const bool timings,
     CellField& temp = cellFM.field_ref(tTag);
     temp <<= 500.0 + 1000.0 * xcoord;
 
-    if( transportQuantity == DIFF ){
+    if( transportQuantity == DIFF_MASS || transportQuantity == DIFF_MOL ){
       CellField& p = cellFM.field_ref(pTag);
       p <<= refPressure;
     }
@@ -350,7 +375,8 @@ int main( int iarg, char* carg[] )
     CanteraObjects::setup_cantera( setup );
 
     TestHelper status( !timings );
-    status( driver( timings, DIFF  ), transport_name(DIFF ) );
+    status( driver( timings, DIFF_MASS  ), transport_name(DIFF_MASS ) );
+    status( driver( timings, DIFF_MOL  ), transport_name(DIFF_MOL ) );
     status( driver( timings, TCOND ), transport_name(TCOND) );
     status( driver( timings, VISC  ), transport_name(VISC ) );
 
