@@ -11,7 +11,7 @@
 #   include_directories_( ${PoKiTT_INCLUDE_DIR} )
 #
 
-set( PoKiTT_INCLUDE_DIR @CMAKE_INSTALL_PREFIX@/include/pokitt @TPL_INCLUDE_DIRS@ )
+set( PoKiTT_INCLUDE_DIR @CMAKE_INSTALL_PREFIX@/include @TPL_INCLUDE_DIRS@ )
 set( PoKiTT_TPL_LIBS @TPL_LIBRARIES@ )
 
 find_package( SpatialOps PATHS @SpatialOps_DIR@ )
