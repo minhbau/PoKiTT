@@ -8,11 +8,11 @@
 
 #include <cantera/kernel/ct_defs.h> // contains value of Cantera::GasConstant
 #include <cantera/kernel/speciesThermoTypes.h> // contains definitions for which polynomial is being used
-#include <cantera/IdealGasMix.h>
 
 #include <exception>
 
-namespace Cantera_CXX{ class IdealGasMix; } // location of polynomial coefficients
+
+namespace pokitt{
 
 /**
  *  \class  HeatCapacity_Cv
@@ -481,5 +481,7 @@ Builder::build() const
 {
   return new SpeciesHeatCapacity_Cv<FieldT>( tTag_, n_ );
 }
+
+} // namespace pokitt
 
 #endif // HeatCapacity_Cv_Expr_h

@@ -7,6 +7,8 @@
 
 #include <cantera/kernel/ct_defs.h> // contains value of gas constant
 
+namespace pokitt{
+
 /**
  *  \class  Pressure
  *  \author Nathan Yonkee
@@ -158,5 +160,7 @@ Builder::build() const
 {
   return new Pressure<FieldT>( tTag_, rhoTag_, mmwTag_);
 }
+
+} // namespace pokitt
 
 #endif // Pressure_Expr_h

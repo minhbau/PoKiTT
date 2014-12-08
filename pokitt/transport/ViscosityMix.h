@@ -5,7 +5,7 @@
 
 #include <pokitt/CanteraObjects.h> //include cantera wrapper
 
-#include <cantera/transport.h>
+namespace pokitt{
 
 // viscosity can be calculated using either n temporary fields or 2n temporary fields (default)
 //#define NFIELDS
@@ -447,5 +447,7 @@ build() const
 {
   return new SutherlandViscosity<FieldT>(c_,mu0_,t0_,tTag_);
 }
+
+} // namespace pokitt
 
 #endif // Viscosity_Expr_h

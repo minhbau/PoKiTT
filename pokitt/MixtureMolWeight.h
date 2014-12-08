@@ -3,6 +3,8 @@
 
 #include <expression/Expression.h>
 
+namespace pokitt{
+
 /**
  *  \class MixtureMolWeight
  */
@@ -141,5 +143,6 @@ Builder::build() const
   return new MixtureMolWeight<FieldT>( massFracTag_, specMW_ );
 }
 
+} // namespace pokitt
 
 #endif // MixtureMolWeight_Expr_h

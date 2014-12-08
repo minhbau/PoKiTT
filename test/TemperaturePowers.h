@@ -8,6 +8,8 @@
 #include <cantera/kernel/speciesThermoTypes.h> // contains definitions for which polynomial is being used
 #include <cantera/IdealGasMix.h>
 
+namespace pokitt{
+
 /**
  *  \class TemperaturePowers
  */
@@ -142,5 +144,6 @@ Builder::build() const
   return new TemperaturePowers<FieldT>( tTag_ );
 }
 
+} // namespace pokitt
 
 #endif // TemperaturePowers_Expr_h

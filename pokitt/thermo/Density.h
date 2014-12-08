@@ -7,6 +7,8 @@
 
 #include <cantera/kernel/ct_defs.h> // contains value of gas constant
 
+namespace pokitt{
+
 /**
  *  \class  Density
  *  \author Nathan Yonkee
@@ -158,5 +160,7 @@ Builder::build() const
 {
   return new Density<FieldT>( tTag_, pTag_, mmwTag_);
 }
+
+} // namespace pokitt
 
 #endif // Density_Expr_h

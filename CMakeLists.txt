@@ -80,12 +80,13 @@ configure_file(
 #
 if( BUILD_UPSTREAM_LIBS )
 
-  set( TPL_DIR ${PROJECT_BINARY_DIR}/tpl )
-  option( ENABLE_CUDA "Enable GPU backend in SpatialOps" OFF )
+  option( ENABLE_CUDA    "Enable GPU backend in SpatialOps"       OFF )
   option( ENABLE_THREADS "Enable multicore backend in SpatialOps" OFF )
-  option( NTHREADS "Number of threads if ENABLE_THREADS is ON" 1 )
+  
+  set( NTHREADS 1 CACHE STRING "Number of threads if ENABLE_THREADS is ON" )
 
   # Build SpatialOps
+  set( TPL_DIR ${PROJECT_BINARY_DIR}/tpl )
   file( MAKE_DIRECTORY ${TPL_DIR}/build/spatialops )
   execute_process( COMMAND ${GIT_EXECUTABLE} clone --depth 1 git://software.crsim.utah.edu/SpatialOps.git
                    WORKING_DIRECTORY ${TPL_DIR}

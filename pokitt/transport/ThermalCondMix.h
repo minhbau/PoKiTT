@@ -5,7 +5,7 @@
 
 #include <pokitt/CanteraObjects.h> //include cantera wrapper
 
-#include <cantera/transport.h>
+namespace pokitt{
 
 /**
  *  \class  ThermalConductivity
@@ -239,5 +239,6 @@ Builder::build() const
   return new ThermalConductivity<FieldT>( temperatureTag_, massFracTag_, mmwTag_ );
 }
 
+} // namespace pokitt
 
 #endif // ThermalConductivity_Expr_h

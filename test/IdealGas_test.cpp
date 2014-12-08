@@ -33,6 +33,8 @@ namespace Cantera_CXX{ class IdealGasMix; }
 
 namespace po = boost::program_options;
 
+using namespace pokitt;
+
 //==============================================================================
 
 enum GasQuantity{

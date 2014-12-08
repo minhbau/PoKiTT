@@ -9,9 +9,9 @@
 #include <cantera/kernel/ct_defs.h> // contains value of gas constant
 #include <cantera/kernel/reaction_defs.h> // reaction type definitions
 #include <cantera/kernel/speciesThermoTypes.h> // contains definitions for which polynomial is being used
-#include <cantera/IdealGasMix.h>
 
-namespace Cantera_CXX{ class IdealGasMix; } // location of polynomial coefficients for gibbs energy
+
+namespace pokitt{
 
 /**
  *  \class  ReactionRates
@@ -578,5 +578,6 @@ Builder::build() const
   return new ReactionRates<FieldT>( tTag_, pTag_, massFracTag_, mmwTag_ );
 }
 
+} // namespace pokitt
 
 #endif // ReactionRates_Expr_h

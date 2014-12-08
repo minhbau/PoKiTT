@@ -10,11 +10,11 @@
 #include <fstream>
 #include "TestHelper.h"
 
+#include <expression/ExprLib.h>
+
 #include <test/TemperaturePowers.h>
 #include <pokitt/MixtureMolWeight.h>
 #include <pokitt/kinetics/ReactionRates.h>
-
-#include <expression/ExprLib.h>
 
 #include <spatialops/structured/Grid.h>
 #include <spatialops/structured/FieldComparisons.h>
@@ -32,6 +32,8 @@ namespace So = SpatialOps;
 typedef   So::SVolField   CellField;
 
 namespace po = boost::program_options;
+
+using namespace pokitt;
 
 //==============================================================================
 

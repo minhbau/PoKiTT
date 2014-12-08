@@ -5,11 +5,10 @@
 
 #include <cantera/kernel/ct_defs.h> // contains value of gas constant
 #include <cantera/kernel/speciesThermoTypes.h> // contains definitions for which polynomial is being used
-#include <cantera/IdealGasMix.h>
 
 #include <pokitt/CanteraObjects.h> // include Cantera wrapper
 
-namespace Cantera_CXX{ class IdealGasMix; } // location of polynomial coefficients
+namespace pokitt{
 
 /**
  *  \class  Temperature
@@ -734,4 +733,7 @@ Builder::build() const
   return new TemperatureFromE0<FieldT>( massFracTag_, e0Tag_, keTag_ );
 }
 
+} // namespace pokitt
+
 #endif // Temperature_Expr_h
+

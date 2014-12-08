@@ -8,9 +8,8 @@
 
 #include <cantera/kernel/ct_defs.h> // contains value of gas constant
 #include <cantera/kernel/SpeciesThermoInterpType.h> // contains definitions for which polynomial is being used
-#include <cantera/IdealGasMix.h>
 
-namespace Cantera_CXX{ class IdealGasMix; } //location of polynomial
+namespace pokitt{
 
 /**
  *  \class  Enthalpy
@@ -454,6 +453,6 @@ Builder::build() const
   return new SpeciesEnthalpy<FieldT>( tTag_, n_ );
 }
 
-
+} // namespace pokitt
 
 #endif // Enthalpy_Expr_h

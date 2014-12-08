@@ -3,10 +3,6 @@
 
 #include "CanteraObjects.h"
 
-#include <cantera/Cantera.h>
-#include <cantera/transport.h>
-#include <cantera/IdealGasMix.h>
-
 
 #ifdef EXPRESSION_THREADS
 

@@ -6,8 +6,9 @@
 
 #include <boost/bimap.hpp>
 
-namespace Cantera_CXX{ class IdealGasMix; }
-namespace Cantera    { class Transport;   }
+#include <cantera/Cantera.h>
+#include <cantera/transport.h>
+#include <cantera/IdealGasMix.h>
 
 //====================================================================
 

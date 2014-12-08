@@ -5,7 +5,7 @@
 
 #include <pokitt/CanteraObjects.h> //include cantera wrapper
 
-#include <cantera/transport.h>
+namespace pokitt{
 
 /**
  *  \class  DiffusionCoeff
@@ -534,5 +534,6 @@ Builder::build() const
   return new DiffusionCoeffMol<FieldT>( temperatureTag_, pTag_, massFracTag_, mmwTag_ );
 }
 
+} // namespace pokitt
 
 #endif // DiffusionCoeff_Expr_h

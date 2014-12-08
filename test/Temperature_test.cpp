@@ -34,6 +34,8 @@ namespace Cantera_CXX{ class IdealGasMix; } //location of polynomial
 
 namespace po = boost::program_options;
 
+using namespace pokitt;
+
 //==============================================================================
 
 enum EnergyType{
