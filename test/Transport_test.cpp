@@ -198,7 +198,6 @@ bool driver( const bool timings,
 
   const Expr::Tag tTag ( "Temperature", Expr::STATE_NONE );
   const Expr::Tag pTag ( "Pressure"   , Expr::STATE_NONE);
-  const Expr::Tag yiTag ( "yi", Expr::STATE_NONE );
   Expr::TagList yiTags;
   for( n=0; n<nSpec; ++n ){
     std::ostringstream name;
@@ -212,27 +211,27 @@ bool driver( const bool timings,
 
   exprFactory.register_expression( new Temp::Builder(tTag) );
   exprFactory.register_expression( new Pressure ::Builder (pTag                 ) );
-  BOOST_FOREACH( Expr::Tag yiTag, yiTags){
+  BOOST_FOREACH( const Expr::Tag& yiTag, yiTags){
     exprFactory.register_expression( new MassFracs::Builder (yiTag) );
   }
-  exprFactory.register_expression( new MixtureMolWeight::Builder( mmwTag, yiTag, molecularWeights));
+  exprFactory.register_expression( new MixtureMolWeight::Builder( mmwTag, yiTags, molecularWeights));
   Expr::ExpressionID transportID;
   switch( transportQuantity ){
   case DIFF_MASS:
     typedef DiffusionCoeff <CellField> DiffusionCoeffMix;
-    transportID = exprFactory.register_expression( new DiffusionCoeffMix::Builder (transportTags, tTag, pTag ,yiTag, mmwTag) );
+    transportID = exprFactory.register_expression( new DiffusionCoeffMix::Builder(transportTags, tTag, pTag, yiTags, mmwTag) );
     break;
   case DIFF_MOL:
     typedef DiffusionCoeffMol <CellField> DiffusionCoeffMixMol;
-    transportID = exprFactory.register_expression( new DiffusionCoeffMixMol::Builder (transportTags, tTag, pTag ,yiTag, mmwTag) );
+    transportID = exprFactory.register_expression( new DiffusionCoeffMixMol::Builder(transportTags, tTag, pTag, yiTags, mmwTag) );
     break;
   case TCOND:
     typedef ThermalConductivity <CellField> ThermalConductivityMix;
-    transportID = exprFactory.register_expression( new ThermalConductivityMix::Builder (transportTags[0] ,tTag ,yiTag, mmwTag) );
+    transportID = exprFactory.register_expression( new ThermalConductivityMix::Builder(transportTags[0], tTag, yiTags, mmwTag) );
     break;
   case VISC:
     typedef Viscosity <CellField> ViscosityMix;
-    transportID = exprFactory.register_expression( new ViscosityMix::Builder (transportTags[0] ,tTag ,yiTag) );
+    transportID = exprFactory.register_expression( new ViscosityMix::Builder(transportTags[0], tTag, yiTags) );
     break;
   }
 
@@ -296,7 +295,7 @@ bool driver( const bool timings,
       yi <<= n + 1 + xcoord;
       *sum <<= *sum + yi;
     }
-    BOOST_FOREACH( Expr::Tag yiTag, yiTags){
+    BOOST_FOREACH( const Expr::Tag& yiTag, yiTags){
       CellField& yi = cellFM.field_ref(yiTag);
       yi <<= yi / *sum;
     }
@@ -313,7 +312,7 @@ bool driver( const bool timings,
     if( timings ) std::cout << "PoKiTT  " + transport_name(transportQuantity) + " time " << transportTimer.elapsed_time() << std::endl;
 
 #   ifdef ENABLE_CUDA
-    BOOST_FOREACH( Expr::Tag transportTag, transportTags){
+    BOOST_FOREACH( const Expr::Tag& transportTag, transportTags){
       CellField& trans = fml.field_manager<CellField>().field_ref(transportTag);
       trans.add_device(CPU_INDEX);
     }

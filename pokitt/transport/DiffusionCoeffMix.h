@@ -36,7 +36,7 @@ class DiffusionCoeff
 {
   const Expr::Tag temperatureTag_;
   const Expr::Tag pTag_;
-  Expr::TagList massFracTags_;
+  const Expr::TagList massFracTags_;
   const Expr::Tag mmwTag_;
   const FieldT* temperature_;
   const FieldT* p_;
@@ -56,7 +56,7 @@ class DiffusionCoeff
 
   DiffusionCoeff( const Expr::Tag& temperatureTag,
                   const Expr::Tag& pTag,
-                  const Expr::Tag& massFracTag,
+                  const Expr::TagList& massFracTags,
                   const Expr::Tag& mmwTag );
 public:
   class Builder : public Expr::ExpressionBuilder
@@ -67,13 +67,13 @@ public:
      *  @param resultTags the tags for the diffusion coefficient of each species, ordering is consistent with Cantera input file
      *  @param temperatureTag temperature
      *  @param pTag pressure
-     *  @param massFracTag tag for mass fractions of each species, ordering is consistent with Cantera input
+     *  @param massFracTags tag for mass fractions of each species, ordering is consistent with Cantera input
      *  @param mmwTag tag for mixture molecular weight
      */
     Builder( const Expr::TagList& resultTags,
              const Expr::Tag& temperatureTag,
              const Expr::Tag& pTag,
-             const Expr::Tag& massFracTag,
+             const Expr::TagList& massFracTags,
              const Expr::Tag& mmwTag );
 
     Expr::ExpressionBase* build() const;
@@ -81,11 +81,11 @@ public:
   private:
     const Expr::Tag temperatureTag_;
     const Expr::Tag pTag_;
-    const Expr::Tag massFracTag_;
+    const Expr::TagList massFracTags_;
     const Expr::Tag mmwTag_;
   };
 
-  ~DiffusionCoeff();
+  ~DiffusionCoeff(){}
   void advertise_dependents( Expr::ExprDeps& exprDeps );
   void bind_fields( const Expr::FieldManagerList& fml );
   void evaluate();
@@ -124,7 +124,7 @@ class DiffusionCoeffMol
 {
   const Expr::Tag temperatureTag_;
   const Expr::Tag pTag_;
-  Expr::TagList massFracTags_;
+  const Expr::TagList massFracTags_;
   const Expr::Tag mmwTag_;
   const FieldT* temperature_;
   const FieldT* p_;
@@ -144,7 +144,7 @@ class DiffusionCoeffMol
 
   DiffusionCoeffMol( const Expr::Tag& temperatureTag,
                      const Expr::Tag& pTag,
-                     const Expr::Tag& massFracTag,
+                     const Expr::TagList& massFracTags,
                      const Expr::Tag& mmwTag );
 public:
   class Builder : public Expr::ExpressionBuilder
@@ -155,13 +155,13 @@ public:
      *  @param resultTags the tags for the diffusion coefficient of each species, ordering is consistent with Cantera input file
      *  @param temperatureTag temperature
      *  @param pTag pressure
-     *  @param massFracTag tag for mass fractions of each species, ordering is consistent with Cantera input
+     *  @param massFracTags tag for mass fractions of each species, ordering is consistent with Cantera input
      *  @param mmwTag tag for mixture molecular weight
      */
     Builder( const Expr::TagList& resultTags,
              const Expr::Tag& temperatureTag,
              const Expr::Tag& pTag,
-             const Expr::Tag& massFracTag,
+             const Expr::TagList& massFracTags,
              const Expr::Tag& mmwTag );
 
     Expr::ExpressionBase* build() const;
@@ -169,11 +169,11 @@ public:
   private:
     const Expr::Tag temperatureTag_;
     const Expr::Tag pTag_;
-    const Expr::Tag massFracTag_;
+    const Expr::TagList massFracTags_;
     const Expr::Tag mmwTag_;
   };
 
-  ~DiffusionCoeffMol();
+  ~DiffusionCoeffMol(){}
   void advertise_dependents( Expr::ExprDeps& exprDeps );
   void bind_fields( const Expr::FieldManagerList& fml );
   void evaluate();
@@ -193,23 +193,17 @@ template< typename FieldT >
 DiffusionCoeff<FieldT>::
 DiffusionCoeff( const Expr::Tag& temperatureTag,
                 const Expr::Tag& pTag,
-                const Expr::Tag& massFracTag,
+                const Expr::TagList& massFracTags,
                 const Expr::Tag& mmwTag )
   : Expr::Expression<FieldT>(),
     temperatureTag_( temperatureTag ),
     pTag_( pTag ),
+    massFracTags_( massFracTags ),
     mmwTag_( mmwTag )
 {
   this->set_gpu_runnable( true );
   Cantera::MixTransport* trans = dynamic_cast<Cantera::MixTransport*>( CanteraObjects::get_transport() ); // cast gas transport object as mix transport
   nSpec_ = trans->thermo().nSpecies();
-
-  massFracTags_.clear();
-  for( size_t n=0; n<nSpec_; ++n ){
-    std::ostringstream name;
-    name << massFracTag.name() << "_" << n;
-    massFracTags_.push_back( Expr::Tag(name.str(),massFracTag.context()) );
-  }
 
   binaryDCoefs_ = trans->getDiffusionPolyCoefficients();
   modelType_ = trans->model();
@@ -230,15 +224,6 @@ DiffusionCoeff( const Expr::Tag& temperatureTag,
     }
   }
   CanteraObjects::restore_transport( trans );
-}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-DiffusionCoeff<FieldT>::
-~DiffusionCoeff()
-{
-
 }
 
 //--------------------------------------------------------------------
@@ -340,12 +325,12 @@ DiffusionCoeff<FieldT>::
 Builder::Builder( const Expr::TagList& resultTags,
                   const Expr::Tag& temperatureTag,
                   const Expr::Tag& pTag,
-                  const Expr::Tag& massFracTag,
+                  const Expr::TagList& massFracTags,
                   const Expr::Tag& mmwTag )
 : ExpressionBuilder( resultTags ),
   temperatureTag_( temperatureTag ),
   pTag_( pTag ),
-  massFracTag_( massFracTag ),
+  massFracTags_( massFracTags ),
   mmwTag_( mmwTag )
 {}
 
@@ -356,7 +341,7 @@ Expr::ExpressionBase*
 DiffusionCoeff<FieldT>::
 Builder::build() const
 {
-  return new DiffusionCoeff<FieldT>( temperatureTag_, pTag_, massFracTag_, mmwTag_ );
+  return new DiffusionCoeff<FieldT>( temperatureTag_, pTag_, massFracTags_, mmwTag_ );
 }
 
 
@@ -372,23 +357,17 @@ template< typename FieldT >
 DiffusionCoeffMol<FieldT>::
 DiffusionCoeffMol( const Expr::Tag& temperatureTag,
                    const Expr::Tag& pTag,
-                   const Expr::Tag& massFracTag,
+                   const Expr::TagList& massFracTags,
                    const Expr::Tag& mmwTag )
   : Expr::Expression<FieldT>(),
     temperatureTag_( temperatureTag ),
     pTag_( pTag ),
+    massFracTags_( massFracTags ),
     mmwTag_( mmwTag )
 {
   this->set_gpu_runnable( true );
   Cantera::MixTransport* trans = dynamic_cast<Cantera::MixTransport*>( CanteraObjects::get_transport() ); // cast gas transport object as mix transport
   nSpec_ = trans->thermo().nSpecies();
-
-  massFracTags_.clear();
-  for( size_t n=0; n<nSpec_; ++n ){
-    std::ostringstream name;
-    name << massFracTag.name() << "_" << n;
-    massFracTags_.push_back( Expr::Tag(name.str(),massFracTag.context()) );
-  }
 
   binaryDCoefs_ = trans->getDiffusionPolyCoefficients();
   modelType_ = trans->model();
@@ -414,23 +393,14 @@ DiffusionCoeffMol( const Expr::Tag& temperatureTag,
 //--------------------------------------------------------------------
 
 template< typename FieldT >
-DiffusionCoeffMol<FieldT>::
-~DiffusionCoeffMol()
-{
-
-}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
 void
 DiffusionCoeffMol<FieldT>::
 advertise_dependents( Expr::ExprDeps& exprDeps )
 {
   exprDeps.requires_expression( temperatureTag_ );
-  exprDeps.requires_expression( pTag_ );
-  exprDeps.requires_expression( massFracTags_ );
-  exprDeps.requires_expression( mmwTag_ );
+  exprDeps.requires_expression( pTag_           );
+  exprDeps.requires_expression( massFracTags_   );
+  exprDeps.requires_expression( mmwTag_         );
 }
 
 //--------------------------------------------------------------------
@@ -477,7 +447,7 @@ evaluate()
   logtt  <<= logt * logt;
   logttt <<= logtt * logt;
 
-  SpatFldPtr<FieldT> dInvPtr    = SpatialFieldStore::get<FieldT>(*temperature_);
+  SpatFldPtr<FieldT> dInvPtr = SpatialFieldStore::get<FieldT>(*temperature_);
   SpatFldPtr<FieldT> sum1Ptr = SpatialFieldStore::get<FieldT>(*temperature_);
 
   FieldT& dInv    = *dInvPtr;
@@ -515,12 +485,12 @@ DiffusionCoeffMol<FieldT>::
 Builder::Builder( const Expr::TagList& resultTags,
                   const Expr::Tag& temperatureTag,
                   const Expr::Tag& pTag,
-                  const Expr::Tag& massFracTag,
+                  const Expr::TagList& massFracTags,
                   const Expr::Tag& mmwTag )
 : ExpressionBuilder( resultTags ),
   temperatureTag_( temperatureTag ),
   pTag_( pTag ),
-  massFracTag_( massFracTag ),
+  massFracTags_( massFracTags ),
   mmwTag_( mmwTag )
 {}
 
@@ -531,7 +501,7 @@ Expr::ExpressionBase*
 DiffusionCoeffMol<FieldT>::
 Builder::build() const
 {
-  return new DiffusionCoeffMol<FieldT>( temperatureTag_, pTag_, massFracTag_, mmwTag_ );
+  return new DiffusionCoeffMol<FieldT>( temperatureTag_, pTag_, massFracTags_, mmwTag_ );
 }
 
 } // namespace pokitt

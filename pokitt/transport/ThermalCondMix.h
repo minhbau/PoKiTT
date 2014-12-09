@@ -34,7 +34,7 @@ class ThermalConductivity
     : public Expr::Expression<FieldT>
 {
   const Expr::Tag temperatureTag_;
-  Expr::TagList massFracTags_;
+  const Expr::TagList massFracTags_;
   const Expr::Tag mmwTag_;
   const FieldT* temperature_;
   const FieldT* mmw_; // mixture molecular weight, needed to convert from mass to mole fractions
@@ -47,7 +47,7 @@ class ThermalConductivity
   std::vector<double> molecularWeightsInv_; // inverse of molecular weights (diving by MW is expensive)
 
   ThermalConductivity( const Expr::Tag& temperatureTag,
-                       const Expr::Tag& massFracTag,
+                       const Expr::TagList& massFracTags,
                        const Expr::Tag& mmwTag );
 public:
   class Builder : public Expr::ExpressionBuilder
@@ -62,14 +62,14 @@ public:
      */
     Builder( const Expr::Tag& resultTag,
              const Expr::Tag& temperatureTag,
-             const Expr::Tag& massFracTag,
+             const Expr::TagList& massFracTags,
              const Expr::Tag& mmwTag);
 
     Expr::ExpressionBase* build() const;
 
   private:
     const Expr::Tag temperatureTag_;
-    const Expr::Tag massFracTag_;
+    const Expr::TagList massFracTags_;
     const Expr::Tag mmwTag_;
   };
 
@@ -92,22 +92,16 @@ public:
 template< typename FieldT >
 ThermalConductivity<FieldT>::
 ThermalConductivity( const Expr::Tag& temperatureTag,
-                     const Expr::Tag& massFracTag,
+                     const Expr::TagList& massFracTags,
                      const Expr::Tag& mmwTag )
   : Expr::Expression<FieldT>(),
     temperatureTag_( temperatureTag ),
+    massFracTags_( massFracTags ),
     mmwTag_( mmwTag )
 {
   this->set_gpu_runnable( true );
   Cantera::MixTransport* trans = dynamic_cast<Cantera::MixTransport*>( CanteraObjects::get_transport() ); // cast gas transport object as mix transport
   nSpec_ = trans->thermo().nSpecies();
-
-  massFracTags_.clear();
-  for( size_t n=0; n<nSpec_; ++n ){
-    std::ostringstream name;
-    name << massFracTag.name() << "_" << n;
-    massFracTags_.push_back( Expr::Tag(name.str(),massFracTag.context()) );
-  }
 
   tCondCoefs_ = trans->getConductivityCoefficients();
   modelType_ = trans->model();
@@ -123,11 +117,7 @@ ThermalConductivity( const Expr::Tag& temperatureTag,
 //--------------------------------------------------------------------
 
 template< typename FieldT >
-ThermalConductivity<FieldT>::
-~ThermalConductivity()
-{
-
-}
+ThermalConductivity<FieldT>::~ThermalConductivity(){}
 
 //--------------------------------------------------------------------
 
@@ -137,8 +127,8 @@ ThermalConductivity<FieldT>::
 advertise_dependents( Expr::ExprDeps& exprDeps )
 {
   exprDeps.requires_expression( temperatureTag_ );
-  exprDeps.requires_expression( massFracTags_ );
-  exprDeps.requires_expression( mmwTag_ );
+  exprDeps.requires_expression( massFracTags_   );
+  exprDeps.requires_expression( mmwTag_         );
 }
 
 //--------------------------------------------------------------------
@@ -221,11 +211,11 @@ template< typename FieldT >
 ThermalConductivity<FieldT>::
 Builder::Builder( const Expr::Tag& resultTag,
                   const Expr::Tag& temperatureTag,
-                  const Expr::Tag& massFracTag,
+                  const Expr::TagList& massFracTags,
                   const Expr::Tag& mmwTag )
 : ExpressionBuilder( resultTag ),
   temperatureTag_( temperatureTag ),
-  massFracTag_( massFracTag ),
+  massFracTags_( massFracTags ),
   mmwTag_( mmwTag )
 {}
 
@@ -236,7 +226,7 @@ Expr::ExpressionBase*
 ThermalConductivity<FieldT>::
 Builder::build() const
 {
-  return new ThermalConductivity<FieldT>( temperatureTag_, massFracTag_, mmwTag_ );
+  return new ThermalConductivity<FieldT>( temperatureTag_, massFracTags_, mmwTag_ );
 }
 
 } // namespace pokitt

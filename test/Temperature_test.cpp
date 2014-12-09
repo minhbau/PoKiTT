@@ -146,7 +146,7 @@ bool TPowers_equal( TestHelper& status, So::SpatFldPtr<CellField> canteraResult,
 
   So::SpatFldPtr<CellField> canteraTPower = So::SpatialFieldStore::get<CellField>(*canteraResult, CPU_INDEX);
 # ifdef ENABLE_CUDA
-  BOOST_FOREACH( Expr::Tag tPowerTag, tPowerTags){
+  BOOST_FOREACH( const Expr::Tag& tPowerTag, tPowerTags){
     CellField& tpow = cellFM.field_ref(tPowerTag);
     tpow.set_device_as_active( CPU_INDEX );
   }
@@ -188,28 +188,26 @@ bool driver( bool timings, EnergyType energyType)
 
   const int nSpec=gasMix->nSpecies();
   const std::vector<double>& molecularWeights = gasMix->molecularWeights();
-  size_t n;
 
   typedef Expr::PlaceHolder <CellField> MassFracs;
   typedef Expr::PlaceHolder <CellField> Energy;
   typedef Expr::PlaceHolder <CellField> KineticEnergy;
 
-  const Expr::Tag yiTag ( "yi", Expr::STATE_NONE );
   Expr::TagList yiTags;
   for( size_t n=0; n<nSpec; ++n ){
     std::ostringstream name;
-    name << yiTag.name() << "_" << n;
-    yiTags.push_back( Expr::Tag(name.str(),yiTag.context()) );
+    name << "yi_" << n;
+    yiTags.push_back( Expr::Tag(name.str(),Expr::STATE_NONE) );
   }
-  const Expr::Tag energyTag  ( energy_name(energyType) , Expr::STATE_NONE);
-  const Expr::Tag keTag  ( "kinetic energy", Expr::STATE_NONE);
+  const Expr::Tag energyTag( energy_name(energyType) , Expr::STATE_NONE);
+  const Expr::Tag keTag( "kinetic energy", Expr::STATE_NONE);
   Expr::TagList tPowerTags;
-  const Expr::Tag tTag ( "Temperature", Expr::STATE_NONE);
+  const Expr::Tag tTag( "Temperature", Expr::STATE_NONE);
 
   Expr::ExpressionFactory exprFactory;
 
-  BOOST_FOREACH( Expr::Tag yiTag, yiTags){
-    exprFactory.register_expression( new MassFracs::Builder (yiTag) );
+  BOOST_FOREACH( const Expr::Tag& yiTag, yiTags){
+    exprFactory.register_expression( new MassFracs::Builder(yiTag) );
   }
   exprFactory.register_expression( new Energy::Builder (energyTag) );
 
@@ -217,13 +215,13 @@ bool driver( bool timings, EnergyType energyType)
   switch( energyType ){
   case H:
     typedef Temperature <CellField> Temperature;
-    temp_id = exprFactory.register_expression( new Temperature ::Builder (tTag, yiTag, energyTag) );
+    temp_id = exprFactory.register_expression( new Temperature ::Builder (tTag, yiTags, energyTag) );
     tPowerTags = Temperature::temperature_powers_tags();
     break;
   case E0:
     typedef TemperatureFromE0 <CellField> TemperatureE0;
     exprFactory.register_expression( new KineticEnergy::Builder (keTag) );
-    temp_id = exprFactory.register_expression( new TemperatureE0 ::Builder (tTag, yiTag, energyTag, keTag) );
+    temp_id = exprFactory.register_expression( new TemperatureE0 ::Builder (tTag, yiTags, energyTag, keTag) );
     tPowerTags = TemperatureE0::temperature_powers_tags();
     break;
   }
@@ -275,12 +273,12 @@ bool driver( bool timings, EnergyType energyType)
 
     SpatFldPtr<CellField> sum  = SpatialFieldStore::get<CellField>(temp);
     *sum<<=0.0;
-    for( n=0; n<nSpec; ++n ){
+    for( size_t n=0; n<nSpec; ++n ){
       CellField& yi = cellFM.field_ref(yiTags[n]);
       yi <<= n + 1 + xcoord;
       *sum <<= *sum + yi;
     }
-    BOOST_FOREACH( Expr::Tag yiTag, yiTags){
+    BOOST_FOREACH( const Expr::Tag& yiTag, yiTags){
       CellField& yi = cellFM.field_ref(yiTag);
       yi <<= yi / *sum;
     }

@@ -12,13 +12,12 @@ template< typename FieldT >
 class MixtureMolWeight
  : public Expr::Expression<FieldT>
 {
+  const Expr::TagList massFracTags_;
   const std::vector<double> specMW_;
   const int nSpec_;
-
-  Expr::TagList massFracTags_;
   std::vector<const FieldT*> massFracs_;
 
-  MixtureMolWeight( const Expr::Tag& massFracTag,
+  MixtureMolWeight( const Expr::TagList& massFracTags,
                     const std::vector<double>& specMw  );
 public:
   class Builder : public Expr::ExpressionBuilder
@@ -27,21 +26,21 @@ public:
     /**
      *  @brief Build a MixtureMolWeight expression
      *  @param resultTag the tag for mixture molecular weight
-     *  @param massFracTag tag for mass fractions of each species, ordering is consistent with specMW
+     *  @param massFracTags tag for mass fractions of each species, ordering is consistent with specMW
      *  @param specMW vector of species molecular weights
      */
     Builder( const Expr::Tag& resultTag,
-             const Expr::Tag& massFracTag,
+             const Expr::TagList& massFracTags,
              const std::vector<double>& specMW );
 
     Expr::ExpressionBase* build() const;
 
   private:
-    const Expr::Tag massFracTag_;
+    const Expr::TagList massFracTags_;
     const std::vector<double> specMW_;
   };
 
-  ~MixtureMolWeight();
+  ~MixtureMolWeight(){}
   void advertise_dependents( Expr::ExprDeps& exprDeps );
   void bind_fields( const Expr::FieldManagerList& fml );
   void evaluate();
@@ -59,25 +58,12 @@ public:
 
 template< typename FieldT >
 MixtureMolWeight<FieldT>::
-MixtureMolWeight( const Expr::Tag& massFracTag,
+MixtureMolWeight( const Expr::TagList& massFracTags,
                   const std::vector<double>& specMW )
   : Expr::Expression<FieldT>(),
+    massFracTags_( massFracTags ),
     specMW_(specMW),
     nSpec_( specMW.size() )
-{
-  massFracTags_.clear();
-  for( size_t n=0; n<nSpec_; ++n ){
-    std::ostringstream name;
-    name << massFracTag.name() << "_" << n;
-    massFracTags_.push_back( Expr::Tag(name.str(),massFracTag.context()) );
-  }
-}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-MixtureMolWeight<FieldT>::
-~MixtureMolWeight()
 {}
 
 //--------------------------------------------------------------------
@@ -126,10 +112,10 @@ evaluate()
 template< typename FieldT >
 MixtureMolWeight<FieldT>::
 Builder::Builder( const Expr::Tag& resultTag,
-                  const Expr::Tag& massFracTag,
+                  const Expr::TagList& massFracTags,
                   const std::vector<double>& specMW )
   : ExpressionBuilder( resultTag ),
-    massFracTag_( massFracTag ),
+    massFracTags_( massFracTags ),
     specMW_( specMW )
 {}
 
@@ -140,7 +126,7 @@ Expr::ExpressionBase*
 MixtureMolWeight<FieldT>::
 Builder::build() const
 {
-  return new MixtureMolWeight<FieldT>( massFracTag_, specMW_ );
+  return new MixtureMolWeight<FieldT>( massFracTags_, specMW_ );
 }
 
 } // namespace pokitt

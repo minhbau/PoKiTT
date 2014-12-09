@@ -95,7 +95,6 @@ bool driver( bool timings )
   Cantera_CXX::IdealGasMix* const gasMix = CanteraObjects::get_gasmix();
 
   const int nSpec=gasMix->nSpecies();
-  size_t n;
   const double refPressure=gasMix->pressure();
   const std::vector<double>& molecularWeights = gasMix->molecularWeights();
 
@@ -109,15 +108,13 @@ bool driver( bool timings )
   const Expr::Tag tTag  ( "Temperature", Expr::STATE_NONE);
   const Expr::Tag pTag  ( "Pressure",    Expr::STATE_NONE);
   const Expr::Tag mmwTag( "mmw",         Expr::STATE_NONE);
-  const Expr::Tag yiTag ( "yi",          Expr::STATE_NONE );
+
   Expr::TagList yiTags;
-  for( n=0; n<nSpec; ++n ){
-    std::ostringstream name;
-    name << yiTag.name() << "_" << n;
-    yiTags.push_back( Expr::Tag(name.str(),yiTag.context()) );
+  for( size_t n=0; n<nSpec; ++n ){
+    yiTags.push_back( Expr::Tag( "yi_" + boost::lexical_cast<std::string>(n), Expr::STATE_NONE ) );
   }
   Expr::TagList rTags;
-  for( n=0; n<nSpec; ++n )
+  for( size_t n=0; n<nSpec; ++n )
     rTags.push_back( Expr::Tag( "ri" + boost::lexical_cast<std::string>(n), Expr::STATE_NONE ) );
 
   Expr::ExpressionFactory exprFactory;
@@ -128,8 +125,8 @@ bool driver( bool timings )
   BOOST_FOREACH( Expr::Tag yiTag, yiTags){
     exprFactory.register_expression( new MassFracs      ::Builder( yiTag ) );
   }
-  exprFactory.register_expression( new MixtureMolWeight ::Builder( mmwTag, yiTag, molecularWeights));
-  Expr::ExpressionID rRate_id = exprFactory.register_expression( new ReactionRate::Builder (rTags, tTag, pTag, yiTag, mmwTag) );
+  exprFactory.register_expression( new MixtureMolWeight ::Builder( mmwTag, yiTags, molecularWeights));
+  Expr::ExpressionID rRate_id = exprFactory.register_expression( new ReactionRate::Builder(rTags, tTag, pTag, yiTags, mmwTag) );
 
   std::vector<int> ptvec;
   if( timings ){
@@ -182,7 +179,7 @@ bool driver( bool timings )
 
     SpatFldPtr<CellField> sum  = SpatialFieldStore::get<CellField>(temp);
     *sum<<=0.0;
-    for( n=0; n<nSpec; ++n ){
+    for( size_t n=0; n<nSpec; ++n ){
       CellField& yi = fml.field_manager<CellField>().field_ref(yiTags[n]);
       yi <<= n + 1 + xcoord;
       *sum <<= *sum + yi;

@@ -83,7 +83,7 @@ class ReactionRates
   const Expr::TagList tPowerTags_;
   const Expr::Tag pTag_;
   const Expr::Tag mmwTag_;
-  Expr::TagList massFracTags_;
+  const Expr::TagList massFracTags_;
 
   const FieldT* t_;
   std::vector<const FieldT*> tPowers_;
@@ -112,7 +112,7 @@ class ReactionRates
 
   ReactionRates( const Expr::Tag& tTag,
                  const Expr::Tag& pTag,
-                 const Expr::Tag& massFracTag,
+                 const Expr::TagList& massFracTags,
                  const Expr::Tag& mmwTag );
 public:
   class Builder : public Expr::ExpressionBuilder
@@ -123,13 +123,13 @@ public:
      *  @param resultTags tags for the net rate of production of each species
      *  @param tTag temperature
      *  @param pTag pressure
-     *  @param massFracTag tag for the mass fraction of each species
+     *  @param massFracTags tag for the mass fraction of each species
      *  @param mmwTag tag for mixture molecular weight
      */
     Builder( const Expr::TagList& resultTags,
              const Expr::Tag& tTag,
              const Expr::Tag& pTag,
-             const Expr::Tag& massFracTag,
+             const Expr::TagList& massFracTags,
              const Expr::Tag& mmwTag );
 
     Expr::ExpressionBase* build() const;
@@ -137,11 +137,11 @@ public:
   private:
     const Expr::Tag tTag_;
     const Expr::Tag pTag_;
-    const Expr::Tag massFracTag_;
+    const Expr::TagList massFracTags_;
     const Expr::Tag mmwTag_;
   };
 
-  ~ReactionRates();
+  ~ReactionRates(){}
   void advertise_dependents( Expr::ExprDeps& exprDeps );
   void bind_fields( const Expr::FieldManagerList& fml );
   void evaluate();
@@ -161,24 +161,20 @@ template< typename FieldT >
 ReactionRates<FieldT>::
 ReactionRates( const Expr::Tag& tTag,
                const Expr::Tag& pTag,
-               const Expr::Tag& massFracTag,
+               const Expr::TagList& massFracTags,
                const Expr::Tag& mmwTag )
   : Expr::Expression<FieldT>(),
     tTag_( tTag ),
     tPowerTags_( Temperature<FieldT>::temperature_powers_tags() ), // temperature powers are auto-generated
     pTag_( pTag ),
+    massFracTags_( massFracTags ),
     mmwTag_( mmwTag )
 {
   this->set_gpu_runnable( true );
   Cantera_CXX::IdealGasMix* const gasMix = CanteraObjects::get_gasmix();
 
   nSpec_ = gasMix->nSpecies();
-  massFracTags_.clear();
-  for( size_t n=0; n<nSpec_; ++n ){
-    std::ostringstream name;
-    name << massFracTag.name() << "_" << n;
-    massFracTags_.push_back( Expr::Tag(name.str(),massFracTag.context()) );
-  }
+
   rxnDataVec_ = gasMix->getReactionData(); // contains kinetics data for each reaction
   nRxns_ = rxnDataVec_.size();
   molecularWeights_ = gasMix->molecularWeights();
@@ -271,24 +267,15 @@ ReactionRates( const Expr::Tag& tTag,
 //--------------------------------------------------------------------
 
 template< typename FieldT >
-ReactionRates<FieldT>::
-~ReactionRates()
-{
-
-}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
 void
 ReactionRates<FieldT>::
 advertise_dependents( Expr::ExprDeps& exprDeps )
 {
-  exprDeps.requires_expression( tTag_ );
-  exprDeps.requires_expression( tPowerTags_ );
-  exprDeps.requires_expression( pTag_ );
+  exprDeps.requires_expression( tTag_         );
+  exprDeps.requires_expression( tPowerTags_   );
+  exprDeps.requires_expression( pTag_         );
   exprDeps.requires_expression( massFracTags_ );
-  exprDeps.requires_expression( mmwTag_ );
+  exprDeps.requires_expression( mmwTag_       );
 }
 
 //--------------------------------------------------------------------
@@ -559,12 +546,12 @@ ReactionRates<FieldT>::
 Builder::Builder( const Expr::TagList& resultTags,
                   const Expr::Tag& tTag,
                   const Expr::Tag& pTag,
-                  const Expr::Tag& massFracTag,
+                  const Expr::TagList& massFracTags,
                   const Expr::Tag& mmwTag )
 : ExpressionBuilder( resultTags ),
   tTag_( tTag ),
   pTag_( pTag ),
-  massFracTag_( massFracTag ),
+  massFracTags_( massFracTags ),
   mmwTag_( mmwTag )
 {}
 
@@ -575,7 +562,7 @@ Expr::ExpressionBase*
 ReactionRates<FieldT>::
 Builder::build() const
 {
-  return new ReactionRates<FieldT>( tTag_, pTag_, massFracTag_, mmwTag_ );
+  return new ReactionRates<FieldT>( tTag_, pTag_, massFracTags_, mmwTag_ );
 }
 
 } // namespace pokitt

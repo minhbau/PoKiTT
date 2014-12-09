@@ -123,12 +123,11 @@ bool driver( bool timings,
 
   const int nSpec = gasMix->nSpecies();
   const std::vector<double>& molecularWeights = gasMix->molecularWeights();
-  size_t n;
 
   double refQuantity;
   switch( gasQuantity ){
-  case P: refQuantity = gasMix->density(); break;
-  case RHO: refQuantity = gasMix->pressure(); break;
+    case P: refQuantity = gasMix->density(); break;
+    case RHO: refQuantity = gasMix->pressure(); break;
   }
 
   typedef Expr::PlaceHolder <CellField> Temperature;
@@ -136,31 +135,29 @@ bool driver( bool timings,
   typedef Expr::PlaceHolder <CellField> MassFracs;
   typedef MixtureMolWeight  <CellField> MixtureMolWeight;
 
-  const Expr::Tag tTag ( "Temperature", Expr::STATE_NONE);
-  const Expr::Tag refTag  ( "Reference Quantity", Expr::STATE_NONE);
-  const Expr::Tag yiTag ( "yi",          Expr::STATE_NONE );
+  const Expr::Tag tTag( "Temperature", Expr::STATE_NONE );
+  const Expr::Tag refTag( "Reference Quantity", Expr::STATE_NONE );
+
   Expr::TagList yiTags;
-  for( n=0; n<nSpec; ++n ){
-    std::ostringstream name;
-    name << yiTag.name() << "_" << n;
-    yiTags.push_back( Expr::Tag(name.str(),yiTag.context()) );
+  for( size_t n=0; n<nSpec; ++n ){
+    yiTags.push_back( Expr::Tag( "yi_" + boost::lexical_cast<std::string>(n), Expr::STATE_NONE ) );
   }
   const Expr::Tag mmwTag ("Mixture Molecular Weight", Expr::STATE_NONE);
   const Expr::Tag gasTag (property_name(gasQuantity), Expr::STATE_NONE);
 
   Expr::ExpressionFactory exprFactory;
 
-  exprFactory.register_expression( new Temperature::Builder (tTag) );
-  exprFactory.register_expression( new RefQuantity::Builder (refTag) );
-  BOOST_FOREACH( Expr::Tag yiTag, yiTags){
+  BOOST_FOREACH( const Expr::Tag& yiTag, yiTags){
     exprFactory.register_expression( new MassFracs::Builder( yiTag ) );
   }
-  exprFactory.register_expression( new MixtureMolWeight ::Builder( mmwTag, yiTag, molecularWeights));
+  exprFactory.register_expression( new Temperature::Builder(tTag  ) );
+  exprFactory.register_expression( new RefQuantity::Builder(refTag) );
+  exprFactory.register_expression( new MixtureMolWeight ::Builder( mmwTag, yiTags, molecularWeights) );
 
   Expr::ExpressionID gas_id;
   switch( gasQuantity ){
   case P:
-    gas_id = exprFactory.register_expression( new Pressure<CellField>::Builder (gasTag, tTag, refTag, mmwTag) );
+    gas_id = exprFactory.register_expression( new Pressure<CellField>::Builder(gasTag, tTag, refTag, mmwTag) );
     break;
   case RHO:
     gas_id = exprFactory.register_expression( new Density<CellField>::Builder (gasTag, tTag, refTag, mmwTag) );
@@ -209,22 +206,22 @@ bool driver( bool timings,
     using namespace SpatialOps;
     Expr::FieldMgrSelector<CellField>::type& cellFM = fml.field_manager< CellField>();
 
-    CellField& temp        = cellFM.field_ref( tTag );
+    CellField& temp     = cellFM.field_ref( tTag   );
     CellField& refField = cellFM.field_ref( refTag );
-    CellField& mixMW       = cellFM.field_ref( mmwTag );
+    CellField& mixMW    = cellFM.field_ref( mmwTag );
     CellField& gasField = cellFM.field_ref( gasTag );
 
     temp <<= 500.0 + 1000 * xcoord;
     refField <<= refQuantity;
 
-    SpatFldPtr<CellField> sum  = SpatialFieldStore::get<CellField>(temp);
+    SpatFldPtr<CellField> sum = SpatialFieldStore::get<CellField>(temp);
     *sum<<=0.0;
-    for( n=0; n<nSpec; ++n ){ //normalize the mass fractions
+    for( size_t n=0; n<nSpec; ++n ){ //normalize the mass fractions
       CellField& yi = fml.field_manager<CellField>().field_ref(yiTags[n]);
       yi <<= n + 1 + xcoord;
       *sum <<= *sum + yi;
     }
-    BOOST_FOREACH( Expr::Tag yiTag, yiTags){
+    BOOST_FOREACH( const Expr::Tag& yiTag, yiTags){
       CellField& yi = cellFM.field_ref(yiTag);
       yi <<= yi / *sum;
     }

@@ -42,7 +42,7 @@ class Viscosity
     : public Expr::Expression<FieldT>
 {
   const Expr::Tag temperatureTag_;
-  Expr::TagList massFracTags_;
+  const Expr::TagList massFracTags_;
   const FieldT* temperature_;
   std::vector<const FieldT*> massFracs_;
 
@@ -54,8 +54,8 @@ class Viscosity
   std::vector< std::vector<double> > molecularWeightRatios_; // pre-compute ratios of molecular weights to reduce evaluation time
   std::vector< std::vector<double> > denominator_; // pre-compute the denominator of the mixing rule to reduce evaluation time
 
-  Viscosity ( const Expr::Tag& temperatureTag,
-              const Expr::Tag& massFracTag );
+  Viscosity( const Expr::Tag& temperatureTag,
+             const Expr::TagList& massFracTags );
 public:
   class Builder : public Expr::ExpressionBuilder
   {
@@ -64,20 +64,20 @@ public:
      *  @brief Build a Viscosity expression
      *  @param resultTag tag for the mixture averaged viscosity
      *  @param temperatureTag temperature
-     *  @param massFracTag tag for mass fraction of each species, ordering must be consistent with Cantera input
+     *  @param massFracTags tag for mass fraction of each species, ordering must be consistent with Cantera input
      */
     Builder( const Expr::Tag& resultTag,
              const Expr::Tag& temperatureTag,
-             const Expr::Tag& massFracTag );
+             const Expr::TagList& massFracTags );
 
     Expr::ExpressionBase* build() const;
 
   private:
     const Expr::Tag temperatureTag_;
-    const Expr::Tag massFracTag_;
+    const Expr::TagList massFracTags_;
   };
 
-  ~Viscosity();
+  ~Viscosity(){}
   void advertise_dependents( Expr::ExprDeps& exprDeps );
   void bind_fields( const Expr::FieldManagerList& fml );
   void evaluate();
@@ -160,20 +160,15 @@ public:
 template< typename FieldT >
 Viscosity<FieldT>::
 Viscosity( const Expr::Tag& temperatureTag,
-           const Expr::Tag& massFracTag )
+           const Expr::TagList& massFracTags )
   : Expr::Expression<FieldT>(),
-    temperatureTag_( temperatureTag )
+    temperatureTag_( temperatureTag ),
+    massFracTags_( massFracTags )
 {
   this->set_gpu_runnable( true );
+
   Cantera::MixTransport* trans = dynamic_cast<Cantera::MixTransport*>( CanteraObjects::get_transport() ); // cast gas transport object as mix transport
   nSpec_ = trans->thermo().nSpecies();
-
-  massFracTags_.clear();
-  for( size_t n=0; n<nSpec_; ++n ){
-    std::ostringstream name;
-    name << massFracTag.name() << "_" << n;
-    massFracTags_.push_back( Expr::Tag(name.str(),massFracTag.context()) );
-  }
 
   viscosityCoefs_ = trans->getViscosityCoefficients();
   modelType_ = trans->model();
@@ -211,15 +206,6 @@ Viscosity( const Expr::Tag& temperatureTag,
   }
 # endif
   CanteraObjects::restore_transport( trans );
-}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-Viscosity<FieldT>::
-~Viscosity()
-{
-
 }
 
 //--------------------------------------------------------------------
@@ -340,10 +326,10 @@ template< typename FieldT >
 Viscosity<FieldT>::
 Builder::Builder( const Expr::Tag& resultTag,
                   const Expr::Tag& temperatureTag,
-                  const Expr::Tag& massFracTag )
+                  const Expr::TagList& massFracTags )
 : ExpressionBuilder( resultTag ),
   temperatureTag_( temperatureTag ),
-  massFracTag_( massFracTag )
+  massFracTags_( massFracTags )
 {}
 
 //--------------------------------------------------------------------
@@ -353,7 +339,7 @@ Expr::ExpressionBase*
 Viscosity<FieldT>::
 Builder::build() const
 {
-  return new Viscosity<FieldT>( temperatureTag_, massFracTag_ );
+  return new Viscosity<FieldT>( temperatureTag_, massFracTags_ );
 }
 
 //====================================================================

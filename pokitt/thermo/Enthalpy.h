@@ -359,11 +359,7 @@ SpeciesEnthalpy( const Expr::Tag& tTag,
 //--------------------------------------------------------------------
 
 template< typename FieldT >
-SpeciesEnthalpy<FieldT>::
-~SpeciesEnthalpy()
-{
-
-}
+SpeciesEnthalpy<FieldT>::~SpeciesEnthalpy(){}
 
 //--------------------------------------------------------------------
 

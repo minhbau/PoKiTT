@@ -49,7 +49,7 @@ class Temperature
   typedef std::vector<FieldT*> SpecT;
   typedef std::vector<double> PolyVals; // values used for polynomial
   const Expr::Tag enthTag_;
-  Expr::TagList massFracTags_;
+  const Expr::TagList massFracTags_;
   const FieldT* enth_;
   std::vector<const FieldT*> massFracs_;
 
@@ -62,7 +62,7 @@ class Temperature
   bool shomateFlag_; // flag if shomate polynomial is present
 
 
-  Temperature( const Expr::Tag& massFracTag,
+  Temperature( const Expr::TagList& massFracTags,
                const Expr::Tag& enthTag );
 public:
 
@@ -74,21 +74,21 @@ public:
     /**
      *  @brief Build a Temperature expression
      *  @param resultTag the tag for the temperature of the mixture
-     *  @param massFracTag tag for the mass fraction of each species, ordering is consistent with Cantera input file
+     *  @param massFracTags tag for the mass fraction of each species, ordering is consistent with Cantera input file
      *  @param enthTag tag for the enthalpy of the mixture
      */
     Builder( const Expr::Tag& resultTag,
-             const Expr::Tag& massFracTag,
+             const Expr::TagList& massFracTags,
              const Expr::Tag& enthTag  );
 
     Expr::ExpressionBase* build() const;
 
   private:
     const Expr::Tag enthTag_;
-    const Expr::Tag massFracTag_;
+    const Expr::TagList massFracTags_;
   };
 
-  ~Temperature();
+  ~Temperature(){}
   void advertise_dependents( Expr::ExprDeps& exprDeps );
   void bind_fields( const Expr::FieldManagerList& fml );
   void evaluate();
@@ -134,7 +134,7 @@ class TemperatureFromE0
   typedef std::vector<double> PolyVals; // values used for polynomial
   const Expr::Tag e0Tag_;
   const Expr::Tag keTag_;
-  Expr::TagList massFracTags_;
+  const Expr::TagList massFracTags_;
   const FieldT* e0_;
   const FieldT* ke_;
   std::vector<const FieldT*> massFracs_;
@@ -147,7 +147,7 @@ class TemperatureFromE0
   bool nasaFlag_; // flag if NASA polynomial is present
   bool shomateFlag_; // flag if Shomate polynomial is present
 
-  TemperatureFromE0( const Expr::Tag& massFracTag,
+  TemperatureFromE0( const Expr::TagList& massFracTag,
                      const Expr::Tag& e0Tag,
                      const Expr::Tag& keTag );
 public:
@@ -160,12 +160,12 @@ public:
     /**
      *  @brief Build a TemperatureFromE0 expression
      *  @param resultTag the tag for the temperature of the mixture
-     *  @param massFracTag tag for the mass fraction of each species, ordering is consistent with Cantera input file
+     *  @param massFracTags tag for the mass fraction of each species, ordering is consistent with Cantera input file
      *  @param e0Tag tag for the total energy of the mixture
      *  @param keTag tag for kinetic energy of the mixture
      */
     Builder( const Expr::Tag& resultTag,
-             const Expr::Tag& massFracTag,
+             const Expr::TagList& massFracTags,
              const Expr::Tag& e0Tag,
              const Expr::Tag& keTag );
 
@@ -173,11 +173,11 @@ public:
 
   private:
     const Expr::Tag e0Tag_;
-    const Expr::Tag massFracTag_;
+    const Expr::TagList massFracTags_;
     const Expr::Tag keTag_;
   };
 
-  ~TemperatureFromE0();
+  ~TemperatureFromE0(){}
   void advertise_dependents( Expr::ExprDeps& exprDeps );
   void bind_fields( const Expr::FieldManagerList& fml );
   void evaluate();
@@ -206,10 +206,11 @@ Temperature<FieldT>::temperature_powers_tags()
 
 template< typename FieldT >
 Temperature<FieldT>::
-Temperature( const Expr::Tag& massFracTag,
+Temperature( const Expr::TagList& massFracTags,
              const Expr::Tag& enthTag )
   : Expr::Expression<FieldT>(),
     enthTag_( enthTag ),
+    massFracTags_( massFracTags ),
     nasaFlag_ ( false ),
     shomateFlag_ ( false )
 {
@@ -218,13 +219,6 @@ Temperature( const Expr::Tag& massFracTag,
   const Cantera::SpeciesThermo& spThermo = gasMix->speciesThermo();
 
   nSpec_ = gasMix->nSpecies();
-  massFracTags_.clear();
-  for( size_t n=0; n<nSpec_; ++n ){
-    std::ostringstream name;
-    name << massFracTag.name() << "_" << n;
-    massFracTags_.push_back( Expr::Tag(name.str(),massFracTag.context()) );
-  }
-
   const std::vector<double> molecularWeights = gasMix->molecularWeights();
   std::vector<double> c(15,0); //vector of Cantera's coefficients
   int polyType; // type of polynomial - const_cp, shomate, or NASA
@@ -272,21 +266,12 @@ Temperature( const Expr::Tag& massFracTag,
 //--------------------------------------------------------------------
 
 template< typename FieldT >
-Temperature<FieldT>::
-~Temperature()
-{
-
-}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
 void
 Temperature<FieldT>::
 advertise_dependents( Expr::ExprDeps& exprDeps )
 {
   exprDeps.requires_expression( massFracTags_ );
-  exprDeps.requires_expression( enthTag_ );
+  exprDeps.requires_expression( enthTag_      );
 }
 
 //--------------------------------------------------------------------
@@ -439,10 +424,10 @@ evaluate()
 template< typename FieldT >
 Temperature<FieldT>::
 Builder::Builder( const Expr::Tag& resultTag,
-                  const Expr::Tag& massFracTag,
+                  const Expr::TagList& massFracTags,
                   const Expr::Tag& enthTag )
 : ExpressionBuilder( tag_list( resultTag, Temperature<FieldT>::temperature_powers_tags() ) ),
-  massFracTag_ ( massFracTag ),
+  massFracTags_( massFracTags ),
   enthTag_( enthTag )
 {}
 
@@ -453,7 +438,7 @@ Expr::ExpressionBase*
 Temperature<FieldT>::
 Builder::build() const
 {
-  return new Temperature<FieldT>( massFracTag_, enthTag_ );
+  return new Temperature<FieldT>( massFracTags_, enthTag_ );
 }
 
 //--------------------------------------------------------------------
@@ -474,12 +459,13 @@ TemperatureFromE0<FieldT>::temperature_powers_tags()
 
 template< typename FieldT >
 TemperatureFromE0<FieldT>::
-TemperatureFromE0( const Expr::Tag& massFracTag,
+TemperatureFromE0( const Expr::TagList& massFracTags,
                    const Expr::Tag& e0Tag,
                    const Expr::Tag& keTag )
   : Expr::Expression<FieldT>(),
     e0Tag_( e0Tag ),
     keTag_( keTag ),
+    massFracTags_( massFracTags ),
     nasaFlag_ ( false ),
     shomateFlag_ ( false )
 {
@@ -488,12 +474,6 @@ TemperatureFromE0( const Expr::Tag& massFracTag,
   const Cantera::SpeciesThermo& spThermo = gasMix->speciesThermo();
 
   nSpec_ = gasMix->nSpecies();
-  massFracTags_.clear();
-  for( size_t n=0; n<nSpec_; ++n ){
-    std::ostringstream name;
-    name << massFracTag.name() << "_" << n;
-    massFracTags_.push_back( Expr::Tag(name.str(),massFracTag.context()) );
-  }
 
   const std::vector<double> molecularWeights = gasMix->molecularWeights();
   std::vector<double> c(15,0); //vector of Cantera's coefficients
@@ -547,22 +527,13 @@ TemperatureFromE0( const Expr::Tag& massFracTag,
 //--------------------------------------------------------------------
 
 template< typename FieldT >
-TemperatureFromE0<FieldT>::
-~TemperatureFromE0()
-{
-
-}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
 void
 TemperatureFromE0<FieldT>::
 advertise_dependents( Expr::ExprDeps& exprDeps )
 {
   exprDeps.requires_expression( massFracTags_ );
-  exprDeps.requires_expression( e0Tag_ );
-  exprDeps.requires_expression( keTag_ );
+  exprDeps.requires_expression( e0Tag_        );
+  exprDeps.requires_expression( keTag_        );
 }
 
 //--------------------------------------------------------------------
@@ -714,11 +685,11 @@ evaluate()
 template< typename FieldT >
 TemperatureFromE0<FieldT>::
 Builder::Builder( const Expr::Tag& resultTag,
-                  const Expr::Tag& massFracTag,
+                  const Expr::TagList& massFracTags,
                   const Expr::Tag& e0Tag,
                   const Expr::Tag& keTag )
 : ExpressionBuilder( tag_list( resultTag, TemperatureFromE0<FieldT>::temperature_powers_tags()) ),
-  massFracTag_ ( massFracTag ),
+  massFracTags_( massFracTags ),
   e0Tag_( e0Tag ),
   keTag_( keTag )
 {}
@@ -730,7 +701,7 @@ Expr::ExpressionBase*
 TemperatureFromE0<FieldT>::
 Builder::build() const
 {
-  return new TemperatureFromE0<FieldT>( massFracTag_, e0Tag_, keTag_ );
+  return new TemperatureFromE0<FieldT>( massFracTags_, e0Tag_, keTag_ );
 }
 
 } // namespace pokitt
