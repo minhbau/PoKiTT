@@ -18,9 +18,9 @@
 
 #include <spatialops/structured/Grid.h>
 #include <spatialops/structured/FieldComparisons.h>
+#include <spatialops/util/TimeLogger.h>
 
 #include <boost/lexical_cast.hpp>
-#include <boost/timer.hpp>
 #include <boost/foreach.hpp>
 #include <boost/program_options.hpp>
 
@@ -125,7 +125,8 @@ get_cantera_result( const bool timings,
   std::vector<double>::iterator iTemp = tVec.begin();
   CellField::const_iterator iEnergy = energy.begin();
   CellField::const_iterator iVolume = canteraVolume->begin();
-  boost::timer tTime;
+  Timer tTime;
+  tTime.start();
   for(CellField::iterator iCant = canteraResult->begin(); iCant!=canteraResult->end();++iVolume, ++iEnergy, ++iTemp, ++iMass, ++iCant){
     gasMix.setState_TPY( *iTemp, refPressure, &(*iMass)[0]);
     switch( energyType ){
@@ -134,7 +135,8 @@ get_cantera_result( const bool timings,
     }
     *iCant=gasMix.temperature();
   }
-  if( timings ) std::cout << "Cantera T from " + energy_name(energyType) + " time " << tTime.elapsed() << std::endl;
+  tTime.stop();
+  if( timings ) std::cout << "Cantera T from " + energy_name(energyType) + " time " << tTime.elapsed_time() << std::endl;
   return canteraResult;
 }
 
@@ -304,10 +306,11 @@ bool driver( bool timings, EnergyType energyType)
 
     if( timings ) std::cout << std::endl << energy_name(energyType) << " test - " << *iPts << std::endl;
 
-    boost::timer tTimer;
+    Timer tTimer;
+    tTimer.start();
     tTree.execute_tree();
-
-    if( timings ) std::cout << "PoKiTT  T from " + energy_name(energyType) + " time " << tTimer.elapsed() << std::endl;
+    tTimer.stop();
+    if( timings ) std::cout << "PoKiTT  T from " + energy_name(energyType) + " time " << tTimer.elapsed_time() << std::endl;
 
     SpatFldPtr<CellField> canteraResult = get_cantera_result( timings, energyType, *gasMix, *iPts, temp, *mixMW, xcoord, energy );
 

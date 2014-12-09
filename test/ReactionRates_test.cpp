@@ -18,9 +18,9 @@
 
 #include <spatialops/structured/Grid.h>
 #include <spatialops/structured/FieldComparisons.h>
+#include <spatialops/util/TimeLogger.h>
 
 #include <boost/lexical_cast.hpp>
-#include <boost/timer.hpp>
 #include <boost/foreach.hpp>
 #include <boost/program_options.hpp>
 
@@ -70,7 +70,8 @@ get_cantera_results( const bool timings,
   std::vector< std::vector<double> >::iterator iMass = massfracs.begin();
   std::vector<double> rResult(nSpec,0.0);
 
-  boost::timer cTimer;
+  Timer cTimer;
+  cTimer.start();
   for( size_t i=0; i<nPts+2; ++iTemp, ++iMass, ++i){
     gasMix.setState_TPY( *iTemp, refPressure, &(*iMass)[0]);
     gasMix.getNetProductionRates(&rResult[0]);
@@ -78,7 +79,8 @@ get_cantera_results( const bool timings,
       (*canteraResults[n])[i] = rResult[n];
     }
   }
-  if( timings ) std::cout << "Cantera reaction rate time " << cTimer.elapsed() << std::endl;
+  cTimer.stop();
+  if( timings ) std::cout << "Cantera reaction rate time " << cTimer.elapsed_time() << std::endl;
 
   for( size_t n=0; n<nSpec; ++n){
     *canteraResults[n] <<= *canteraResults[n] * molecularWeights[n]; // convert to mass basis for field comparison
@@ -194,10 +196,11 @@ bool driver( bool timings )
 
     if( timings ) std::cout << std::endl << "Reaction rates test - " << *iPts << std::endl;
 
-    boost::timer rxnTimer;
+    Timer rxnTimer;
+    rxnTimer.start();
     tree.execute_tree();
-
-    if( timings ) std::cout << "PoKiTT  reaction rate time " << rxnTimer.elapsed() << std::endl;
+    rxnTimer.stop();
+    if( timings ) std::cout << "PoKiTT  reaction rate time " << rxnTimer.elapsed_time() << std::endl;
 
 #   ifdef ENABLE_CUDA
     BOOST_FOREACH( Expr::Tag rTag, rTags){

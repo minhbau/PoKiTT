@@ -18,8 +18,8 @@
 
 #include <spatialops/structured/Grid.h>
 #include <spatialops/structured/FieldComparisons.h>
+#include <spatialops/util/TimeLogger.h>
 
-#include <boost/timer.hpp>
 #include <boost/foreach.hpp>
 #include <boost/program_options.hpp>
 
@@ -94,7 +94,8 @@ get_cantera_result( const bool timings,
 
   std::vector< std::vector<double> >::const_iterator iMass = massFracs.begin();
   CellField::const_iterator iTemp = temp.begin();
-  boost::timer gasTime;
+  Timer gasTime;
+  gasTime.start();
   for(CellField::iterator iCant = canteraResult->begin(); iCant!=canteraResult->end(); ++iTemp, ++iMass, ++iCant){
     switch( gasQuantity ){
     case P:
@@ -107,7 +108,8 @@ get_cantera_result( const bool timings,
       break;
     }
   }
-  if( timings ) std::cout << "Cantera " + property_name(gasQuantity) + " time " << gasTime.elapsed() << std::endl;
+  gasTime.stop();
+  if( timings ) std::cout << "Cantera " + property_name(gasQuantity) + " time " << gasTime.elapsed_time() << std::endl;
   return canteraResult;
 }
 
@@ -151,7 +153,7 @@ bool driver( bool timings,
   exprFactory.register_expression( new Temperature::Builder (tTag) );
   exprFactory.register_expression( new RefQuantity::Builder (refTag) );
   BOOST_FOREACH( Expr::Tag yiTag, yiTags){
-    exprFactory.register_expression( new MassFracs      ::Builder( yiTag ) );
+    exprFactory.register_expression( new MassFracs::Builder( yiTag ) );
   }
   exprFactory.register_expression( new MixtureMolWeight ::Builder( mmwTag, yiTag, molecularWeights));
 
@@ -231,10 +233,12 @@ bool driver( bool timings,
 
     if( timings ) std::cout << std::endl << property_name(gasQuantity) + " test - " << *iPts << std::endl;
 
-    boost::timer gasTimer;
+    Timer gasTimer;
+    gasTimer.start();
     gasTree.execute_tree();
+    gasTimer.stop();
 
-    if( timings ) std::cout << "PoKiTT  " + property_name(gasQuantity) + " time " << gasTimer.elapsed() << std::endl;
+    if( timings ) std::cout << "PoKiTT  " + property_name(gasQuantity) + " time " << gasTimer.elapsed_time() << std::endl;
 
 #ifdef ENABLE_CUDA
     gasField.set_device_as_active( CPU_INDEX );
@@ -257,14 +261,14 @@ int main( int iarg, char* carg[] )
   bool timings = false;
 
   // parse the command line options input describing the problem
-  try {
-    po::options_description desc("Supported Options");
-    desc.add_options()
-           ( "help", "print help message" )
-           ( "xml-input-file", po::value<std::string>(&inputFileName), "Cantera xml input file name" )
-           ( "phase", po::value<std::string>(&inpGroup), "name of phase in Cantera xml input file" )
-           ( "timings", "Generate comparison timings between Cantera and PoKiTT across several problem sizes" );
+  po::options_description desc("Supported Options");
+  desc.add_options()
+               ( "help", "print help message" )
+               ( "xml-input-file", po::value<std::string>(&inputFileName), "Cantera xml input file name" )
+               ( "phase", po::value<std::string>(&inpGroup), "name of phase in Cantera xml input file" )
+               ( "timings", "Generate comparison timings between Cantera and PoKiTT across several problem sizes" );
 
+  try {
     po::variables_map args;
     po::store( po::parse_command_line(iarg,carg,desc), args );
     po::notify(args);
@@ -284,7 +288,7 @@ int main( int iarg, char* carg[] )
   }
 
   catch( std::exception& err ){
-    std::cout << "Error parsing input arguments\n" << err.what() << std::endl;
+    std::cout << "Error parsing input arguments\n" << err.what() << std::endl << desc << std::endl;
     return -2;
   }
 

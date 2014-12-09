@@ -19,9 +19,9 @@
 
 #include <spatialops/structured/Grid.h>
 #include <spatialops/structured/FieldComparisons.h>
+#include <spatialops/util/TimeLogger.h>
 
 #include <boost/lexical_cast.hpp>
-#include <boost/timer.hpp>
 #include <boost/foreach.hpp>
 #include <boost/program_options.hpp>
 
@@ -124,10 +124,11 @@ get_cantera_results( const bool timings,
 
   CellField::const_iterator iTemp = temp.begin();
   std::vector< std::vector<double> >::iterator iMass = massFracs.begin();
-  boost::timer transportTimer;
+  Timer transportTimer;
 
   if( transportQuantity == DIFF_MASS || transportQuantity == DIFF_MOL){
     std::vector<double> d_result(nSpec,0.0);
+    transportTimer.start();
     for( size_t i=0; i<nPts+2; ++iTemp, ++iMass, ++i){
       canteraThermo.setState_TPY( *iTemp, refPressure, &(*iMass)[0]);
       switch(transportQuantity ){
@@ -145,8 +146,10 @@ get_cantera_results( const bool timings,
       break;
       }
     }
+    transportTimer.stop();
   }
   else{
+    transportTimer.start();
     CellField::iterator iCantEnd = canteraResults[0]->end();
     for(CellField::iterator iCant = canteraResults[0]->begin(); iCant!=iCantEnd; ++iTemp, ++iMass, ++iCant){
       canteraThermo.setState_TPY( *iTemp, refPressure, &(*iMass)[0]);
@@ -159,9 +162,10 @@ get_cantera_results( const bool timings,
         break;
       }
     }
+    transportTimer.stop();
   }
 
-  if( timings ) std::cout << "Cantera " + transport_name(transportQuantity) + " time " << transportTimer.elapsed() << std::endl;
+  if( timings ) std::cout << "Cantera " + transport_name(transportQuantity) + " time " << transportTimer.elapsed_time() << std::endl;
   return canteraResults;
 }
 
@@ -301,10 +305,12 @@ bool driver( const bool timings,
 
     if( timings ) std::cout << std::endl << transport_name(transportQuantity) << " test - " << *iPts << std::endl;
 
-    boost::timer transportTimer;
+    Timer transportTimer;
+    transportTimer.start();
     transportTree.execute_tree();
+    transportTimer.stop();
 
-    if( timings ) std::cout << "PoKiTT  " + transport_name(transportQuantity) + " time " << transportTimer.elapsed() << std::endl;
+    if( timings ) std::cout << "PoKiTT  " + transport_name(transportQuantity) + " time " << transportTimer.elapsed_time() << std::endl;
 
 #   ifdef ENABLE_CUDA
     BOOST_FOREACH( Expr::Tag transportTag, transportTags){

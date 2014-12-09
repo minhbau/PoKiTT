@@ -19,9 +19,9 @@
 
 #include <spatialops/structured/Grid.h>
 #include <spatialops/structured/FieldComparisons.h>
+#include <spatialops/util/TimeLogger.h>
 
 #include <boost/lexical_cast.hpp>
-#include <boost/timer.hpp>
 #include <boost/foreach.hpp>
 #include <boost/program_options.hpp>
 
@@ -140,13 +140,14 @@ get_cantera_results( const bool mix,
   std::vector< SpatFldPtr<CellField> > canteraResults;
   CellField::const_iterator iTemp = temp.begin();
   std::vector< std::vector<double> >::iterator iMass = massfracs.begin();
-  double evalTime;
+
+  Timer thermoTimer;
 
   if( mix ){
     SpatFldPtr<CellField> canteraResult = SpatialFieldStore::get<CellField>(temp);
     CellField::iterator iCantEnd = canteraResult->end();
-    boost::timer thermoTimer;
 
+    thermoTimer.start();
     for( CellField::iterator iCant = canteraResult->begin(); iCant!=iCantEnd; ++iTemp, ++iMass, ++iCant ){
       gasMix.setState_TPY( *iTemp, refPressure, &(*iMass)[0]);
       switch(thermoQuantity){
@@ -155,7 +156,7 @@ get_cantera_results( const bool mix,
         case ENTH: *iCant=gasMix.enthalpy_mass(); break;
       } // switch(thermoQuantity)
     }
-    evalTime = thermoTimer.elapsed();
+    thermoTimer.stop();
     canteraResults.push_back( canteraResult );
   }
 
@@ -164,8 +165,8 @@ get_cantera_results( const bool mix,
       canteraResults.push_back( SpatialFieldStore::get<CellField>(temp) );
     }
     std::vector<double> thermoResult(nSpec,0.0);
-    boost::timer thermoTimer;
-
+    Timer thermoTimer;
+    thermoTimer.start();
     for( size_t i=0; i<npts+2; ++iTemp, ++iMass, ++i){
       gasMix.setState_TPY( *iTemp, refPressure, &(*iMass)[0]);
       switch( thermoQuantity ){
@@ -177,7 +178,6 @@ get_cantera_results( const bool mix,
         (*canteraResults[n])[i] = thermoResult[n];
       }
     }
-    evalTime = thermoTimer.elapsed();
     for( size_t n=0; n<nSpec; ++n){
       switch( thermoQuantity ){
         case CP  : *canteraResults[n] <<=   *canteraResults[n] / molecularWeights[n];                           break; // convert to mass basis for field comparison
@@ -185,9 +185,10 @@ get_cantera_results( const bool mix,
         case ENTH: *canteraResults[n] <<=   *canteraResults[n] / molecularWeights[n];                           break; // convert to mass basis for field comparison
       }
     }
+    thermoTimer.stop();
   }
 
-  if( timings ) std::cout << "Cantera " + thermo_name(thermoQuantity) + " time " << evalTime << std::endl;
+  if( timings ) std::cout << "Cantera " + thermo_name(thermoQuantity) + " time " << thermoTimer.elapsed_time() << std::endl;
   return canteraResults;
 }
 
@@ -300,10 +301,10 @@ bool driver( const bool timings,
 
     if( timings ) std::cout << std::endl << thermo_name(thermoQuantity) << " test - " << *iPts << std::endl;
 
-    boost::timer thermoTimer;
+    Timer thermoTimer;
     thermoTree.execute_tree();
 
-    if( timings ) std::cout << "PoKiTT  " + thermo_name(thermoQuantity) + " time " << thermoTimer.elapsed() << std::endl;
+    if( timings ) std::cout << "PoKiTT  " + thermo_name(thermoQuantity) + " time " << thermoTimer.elapsed_time() << std::endl;
 
 #   ifdef ENABLE_CUDA
     BOOST_FOREACH( Expr::Tag thermoTag, thermoTags){
