@@ -96,7 +96,6 @@ bool driver( bool timings )
 
   const int nSpec=gasMix->nSpecies();
   const double refPressure=gasMix->pressure();
-  const std::vector<double>& molecularWeights = gasMix->molecularWeights();
 
   typedef Expr::PlaceHolder <CellField> Temp;
   typedef TemperaturePowers <CellField> TemperaturePowers;
@@ -125,7 +124,7 @@ bool driver( bool timings )
   BOOST_FOREACH( Expr::Tag yiTag, yiTags){
     exprFactory.register_expression( new MassFracs      ::Builder( yiTag ) );
   }
-  exprFactory.register_expression( new MixtureMolWeight ::Builder( mmwTag, yiTags, molecularWeights));
+  exprFactory.register_expression( new MixtureMolWeight ::Builder( mmwTag, yiTags ));
   Expr::ExpressionID rRate_id = exprFactory.register_expression( new ReactionRate::Builder(rTags, tTag, pTag, yiTags, mmwTag) );
 
   std::vector<int> ptvec;

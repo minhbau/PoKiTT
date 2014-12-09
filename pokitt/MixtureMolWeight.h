@@ -13,7 +13,7 @@ class MixtureMolWeight
  : public Expr::Expression<FieldT>
 {
   const Expr::TagList massFracTags_;
-  const std::vector<double> specMW_;
+  const std::vector<double>& specMW_;
   const int nSpec_;
   std::vector<const FieldT*> massFracs_;
 
@@ -30,14 +30,13 @@ public:
      *  @param specMW vector of species molecular weights
      */
     Builder( const Expr::Tag& resultTag,
-             const Expr::TagList& massFracTags,
-             const std::vector<double>& specMW );
+             const Expr::TagList& massFracTags );
 
     Expr::ExpressionBase* build() const;
 
   private:
     const Expr::TagList massFracTags_;
-    const std::vector<double> specMW_;
+    std::vector<double> specMW_;
   };
 
   ~MixtureMolWeight(){}
@@ -64,7 +63,9 @@ MixtureMolWeight( const Expr::TagList& massFracTags,
     massFracTags_( massFracTags ),
     specMW_(specMW),
     nSpec_( specMW.size() )
-{}
+{
+  assert( massFracTags.size() == nSpec_ );
+}
 
 //--------------------------------------------------------------------
 
@@ -112,12 +113,14 @@ evaluate()
 template< typename FieldT >
 MixtureMolWeight<FieldT>::
 Builder::Builder( const Expr::Tag& resultTag,
-                  const Expr::TagList& massFracTags,
-                  const std::vector<double>& specMW )
+                  const Expr::TagList& massFracTags )
   : ExpressionBuilder( resultTag ),
-    massFracTags_( massFracTags ),
-    specMW_( specMW )
-{}
+    massFracTags_( massFracTags )
+{
+  Cantera_CXX::IdealGasMix* const gasMix = CanteraObjects::get_gasmix();
+  specMW_ = gasMix->molecularWeights();
+  CanteraObjects::restore_gasmix(gasMix);
+}
 
 //--------------------------------------------------------------------
 

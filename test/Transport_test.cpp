@@ -187,9 +187,7 @@ bool driver( const bool timings,
   }
 
   const int nSpec=mixTrans->thermo().nSpecies();
-  size_t n;
   const double refPressure=mixTrans->thermo().pressure();
-  const std::vector<double>& molecularWeights = mixTrans->thermo().molecularWeights();
 
   typedef Expr::PlaceHolder <CellField> Temp;
   typedef Expr::PlaceHolder <CellField> Pressure;
@@ -199,7 +197,7 @@ bool driver( const bool timings,
   const Expr::Tag tTag ( "Temperature", Expr::STATE_NONE );
   const Expr::Tag pTag ( "Pressure"   , Expr::STATE_NONE);
   Expr::TagList yiTags;
-  for( n=0; n<nSpec; ++n ){
+  for( size_t n=0; n<nSpec; ++n ){
     std::ostringstream name;
     name << "yi_" << n;
     yiTags.push_back( Expr::Tag( name.str(), Expr::STATE_NONE ) );
@@ -214,7 +212,7 @@ bool driver( const bool timings,
   BOOST_FOREACH( const Expr::Tag& yiTag, yiTags){
     exprFactory.register_expression( new MassFracs::Builder (yiTag) );
   }
-  exprFactory.register_expression( new MixtureMolWeight::Builder( mmwTag, yiTags, molecularWeights));
+  exprFactory.register_expression( new MixtureMolWeight::Builder( mmwTag, yiTags ));
   Expr::ExpressionID transportID;
   switch( transportQuantity ){
   case DIFF_MASS:
@@ -290,7 +288,7 @@ bool driver( const bool timings,
 
     SpatFldPtr<CellField> sum  = SpatialFieldStore::get<CellField>(temp);
     *sum<<=0.0;
-    for( n=0; n<nSpec; ++n ){
+    for( size_t n=0; n<nSpec; ++n ){
       CellField& yi = cellFM.field_ref(yiTags[n]);
       yi <<= n + 1 + xcoord;
       *sum <<= *sum + yi;

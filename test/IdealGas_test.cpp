@@ -122,7 +122,6 @@ bool driver( bool timings,
   Cantera_CXX::IdealGasMix* const gasMix = CanteraObjects::get_gasmix();
 
   const int nSpec = gasMix->nSpecies();
-  const std::vector<double>& molecularWeights = gasMix->molecularWeights();
 
   double refQuantity;
   switch( gasQuantity ){
@@ -152,7 +151,7 @@ bool driver( bool timings,
   }
   exprFactory.register_expression( new Temperature::Builder(tTag  ) );
   exprFactory.register_expression( new RefQuantity::Builder(refTag) );
-  exprFactory.register_expression( new MixtureMolWeight ::Builder( mmwTag, yiTags, molecularWeights) );
+  exprFactory.register_expression( new MixtureMolWeight ::Builder( mmwTag, yiTags ) );
 
   Expr::ExpressionID gas_id;
   switch( gasQuantity ){
