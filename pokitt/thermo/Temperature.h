@@ -147,7 +147,7 @@ class TemperatureFromE0
   bool nasaFlag_; // flag if NASA polynomial is present
   bool shomateFlag_; // flag if Shomate polynomial is present
 
-  TemperatureFromE0( const Expr::TagList& massFracTag,
+  TemperatureFromE0( const Expr::TagList& massFracTags,
                      const Expr::Tag& e0Tag,
                      const Expr::Tag& keTag );
 public:
