@@ -23,7 +23,7 @@ namespace pokitt{
  * \frac{1}{D_{k,mass}'} = \sum^K_{j \neq k} \frac{x_j}{D_{kj}} + \frac{x_k}{1-y_{k}} \sum^K_{j \neq k} \frac{y_j}{D_{kj}}
  * \f]
  *
- * Where \f$ D_kj \f$ is the binary diffusion coefficient of species k and j,
+ * Where \f$ D_{kj} \f$ is the binary diffusion coefficient of species k and j,
  * \f$ y_j \f$ is the mass fraction of species j, and \f$ x_j \f$ is the mole
  * fraction of species j.
  *
