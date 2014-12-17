@@ -232,9 +232,7 @@ bool driver( bool timings, EnergyType energyType)
     ptvec.push_back(16*16*16);
     ptvec.push_back(32*32*32);
     ptvec.push_back(64*64*64);
-#   ifdef ENABLE_CUDA
     ptvec.push_back(128*128*128);
-#   endif
   }
   else ptvec.push_back(10);
 
