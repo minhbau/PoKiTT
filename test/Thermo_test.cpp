@@ -282,7 +282,7 @@ bool driver( const bool timings,
     if(mix){
       SpatFldPtr<CellField> sum  = SpatialFieldStore::get<CellField>(temp);
       *sum<<=0.0;
-      for( n=0; n<nSpec; ++n ){
+      for( size_t n=0; n<nSpec; ++n ){
         CellField& yi = cellFM.field_ref(yiTags[n]);
         yi <<= n + 1 + xcoord;
         *sum <<= *sum + yi;
