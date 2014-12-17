@@ -202,7 +202,6 @@ bool driver( const bool timings,
   Cantera_CXX::IdealGasMix* const gasMix = CanteraObjects::get_gasmix();
 
   const int nSpec=gasMix->nSpecies();
-  size_t n;
 
   typedef Expr::PlaceHolder < CellField > Temp;
   typedef TemperaturePowers < CellField > TemperaturePowers;
@@ -211,7 +210,7 @@ bool driver( const bool timings,
   const Expr::Tag tTag ( "Temperature", Expr::STATE_NONE );
   const Expr::Tag yiTag ( "yi", Expr::STATE_NONE );
   Expr::TagList yiTags;
-  for( n=0; n<nSpec; ++n ){
+  for( size_t n=0; n<nSpec; ++n ){
     std::ostringstream name;
     name << "yi_" << n;
     yiTags.push_back( Expr::Tag( name.str(), Expr::STATE_NONE ) );
@@ -220,7 +219,7 @@ bool driver( const bool timings,
   if( mix )
     thermoTags.push_back(Expr::Tag( thermo_name(thermoQuantity) + " mix", Expr::STATE_NONE));
   else{
-    for( n=0; n<nSpec; ++n ){
+    for( size_t n=0; n<nSpec; ++n ){
       thermoTags.push_back( Expr::Tag( thermo_name(thermoQuantity) + boost::lexical_cast<std::string>(n), Expr::STATE_NONE ) );
     }
   }
@@ -244,9 +243,7 @@ bool driver( const bool timings,
     ptvec.push_back(16*16*16);
     ptvec.push_back(32*32*32);
     ptvec.push_back(64*64*64);
-#   ifdef ENABLE_CUDA
     ptvec.push_back(128*128*128);
-#   endif
   }
   else{
     ptvec.push_back(10);
