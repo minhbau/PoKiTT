@@ -165,7 +165,6 @@ get_cantera_results( const bool mix,
       canteraResults.push_back( SpatialFieldStore::get<CellField>(temp) );
     }
     std::vector<double> thermoResult(nSpec,0.0);
-    Timer thermoTimer;
     thermoTimer.start();
     for( size_t i=0; i<npts+2; ++iTemp, ++iMass, ++i){
       gasMix.setState_TPY( *iTemp, refPressure, &(*iMass)[0]);
@@ -301,8 +300,9 @@ bool driver( const bool timings,
 
     if( timings ) std::cout << std::endl << thermo_name(thermoQuantity) << " test - " << *iPts << std::endl;
 
-    Timer thermoTimer;
+    Timer thermoTimer;  thermoTimer.start();
     thermoTree.execute_tree();
+    thermoTimer.stop();
 
     if( timings ) std::cout << "PoKiTT  " + thermo_name(thermoQuantity) + " time " << thermoTimer.elapsed_time() << std::endl;
 
