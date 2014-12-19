@@ -39,6 +39,7 @@ using namespace pokitt;
 
 const std::vector< So::SpatFldPtr<CellField> >
 get_cantera_results( const bool timings,
+                     const size_t repeats,
                     Cantera_CXX::IdealGasMix& gasMix,
                     const int nPts,
                     CellField& temp){
@@ -48,17 +49,17 @@ get_cantera_results( const bool timings,
   const std::vector<double>& molecularWeights = gasMix.molecularWeights();
   const int nSpec = gasMix.nSpecies();
 
-  std::vector< std::vector<double> > massfracs;
+  std::vector< std::vector<double> > massFracs;
   for( size_t i=0; i<nPts+2; ++i ){
-    std::vector<double> massfrac;
+    std::vector<double> massFrac;
     double sum = 0.0;
     for( size_t n=0; n<nSpec; ++n){
-      massfrac.push_back(1 + n + (i-0.5)/ nPts);
-      sum+=massfrac[n];
+      massFrac.push_back(1 + n + (i-0.5)/ nPts);
+      sum+=massFrac[n];
     }
     for( size_t n=0; n<nSpec; ++n )
-      massfrac[n] = massfrac[n]/sum;
-    massfracs.push_back(massfrac);
+      massFrac[n] = massFrac[n]/sum;
+    massFracs.push_back(massFrac);
   }
 
   std::vector< SpatFldPtr<CellField> > canteraResults;
@@ -67,20 +68,24 @@ get_cantera_results( const bool timings,
   }
 
   CellField::const_iterator iTemp = temp.begin();
-  std::vector< std::vector<double> >::iterator iMass = massfracs.begin();
+  std::vector< std::vector<double> >::iterator iMass = massFracs.begin();
   std::vector<double> rResult(nSpec,0.0);
 
   Timer cTimer;
   cTimer.start();
-  for( size_t i=0; i<nPts+2; ++iTemp, ++iMass, ++i){
-    gasMix.setState_TPY( *iTemp, refPressure, &(*iMass)[0]);
-    gasMix.getNetProductionRates(&rResult[0]);
-    for( size_t n=0; n<nSpec; ++n){
-      (*canteraResults[n])[i] = rResult[n];
+  for( size_t rep=0; rep < repeats; ++rep ){
+    iTemp = temp.begin();
+    iMass = massFracs.begin();
+    for( size_t i=0; i < nPts+2; ++iTemp, ++iMass, ++i){
+      gasMix.setState_TPY( *iTemp, refPressure, &(*iMass)[0]);
+      gasMix.getNetProductionRates(&rResult[0]);
+      for( size_t n=0; n<nSpec; ++n){
+        (*canteraResults[n])[i] = rResult[n];
+      }
     }
   }
   cTimer.stop();
-  if( timings ) std::cout << "Cantera reaction rate time " << cTimer.elapsed_time() << std::endl;
+  if( timings ) std::cout << "Cantera reaction rate time " << cTimer.elapsed_time()/repeats << std::endl;
 
   for( size_t n=0; n<nSpec; ++n){
     *canteraResults[n] <<= *canteraResults[n] * molecularWeights[n]; // convert to mass basis for field comparison
@@ -89,7 +94,7 @@ get_cantera_results( const bool timings,
   return canteraResults;
 }
 
-bool driver( bool timings )
+bool driver( const bool timings, const size_t repeats )
 {
   TestHelper status( !timings );
   Cantera_CXX::IdealGasMix* const gasMix = CanteraObjects::get_gasmix();
@@ -192,9 +197,11 @@ bool driver( bool timings )
 
     Timer rxnTimer;
     rxnTimer.start();
-    tree.execute_tree();
+    for( size_t rep = 0; rep < repeats; ++rep ){
+      tree.execute_tree();
+    }
     rxnTimer.stop();
-    if( timings ) std::cout << "PoKiTT  reaction rate time " << rxnTimer.elapsed_time() << std::endl;
+    if( timings ) std::cout << "PoKiTT  reaction rate time " << rxnTimer.elapsed_time()/repeats << std::endl;
 
 #   ifdef ENABLE_CUDA
     BOOST_FOREACH( Expr::Tag rTag, rTags){
@@ -205,6 +212,7 @@ bool driver( bool timings )
 #   endif
 
     const std::vector< SpatFldPtr<CellField> > canteraResults = get_cantera_results( timings,
+                                                                                     repeats,
                                                                                      *gasMix,
                                                                                      *iPts,
                                                                                      temp );
@@ -228,6 +236,7 @@ int main( int iarg, char* carg[] )
   std::string inputFileName;
   std::string inpGroup;
   bool timings = false;
+  size_t repeats = 1;
 
   // parse the command line options input describing the problem
   try {
@@ -236,7 +245,8 @@ int main( int iarg, char* carg[] )
            ( "help", "print help message" )
            ( "xml-input-file", po::value<std::string>(&inputFileName), "Cantera xml input file name" )
            ( "phase", po::value<std::string>(&inpGroup), "name of phase in Cantera xml input file" )
-           ( "timings", "Generate comparison timings between Cantera and PoKiTT across several problem sizes" );
+           ( "timings", "Generate comparison timings between Cantera and PoKiTT across several problem sizes" )
+           ( "repeats", po::value<size_t>(&repeats), "Repeat the tests and report the average execution time");
 
     po::variables_map args;
     po::store( po::parse_command_line(iarg,carg,desc), args );
@@ -266,7 +276,7 @@ int main( int iarg, char* carg[] )
     CanteraObjects::setup_cantera( setup );
 
     TestHelper status( !timings );
-    status( driver( timings ), "Reaction Rates" );
+    status( driver( timings, repeats ), "Reaction Rates" );
 
     if( status.ok() ){
       std::cout << "\nPASS\n";

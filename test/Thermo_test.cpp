@@ -112,6 +112,7 @@ void write_tree( const bool mix, const ThermoQuantity thermoQuantity, const Expr
 std::vector< So::SpatFldPtr<CellField> >
 get_cantera_results( const bool mix,
                      const bool timings,
+                     const size_t repeats,
                      const ThermoQuantity thermoQuantity,
                      Cantera_CXX::IdealGasMix& gasMix,
                      const int npts,
@@ -123,23 +124,23 @@ get_cantera_results( const bool mix,
   const std::vector<double>& molecularWeights = gasMix.molecularWeights();
   const int nSpec = gasMix.nSpecies();
 
-  // we need to calculate massfracs manually because they don't get registered for the pure species case
-  std::vector< std::vector<double> > massfracs;
+  // we need to calculate mass fractions manually because they don't get registered for the pure species case
+  std::vector< std::vector<double> > massFracs;
   for( size_t i=0; i<npts+2; ++i){
-    std::vector<double> massfrac;
+    std::vector<double> massFrac;
     double sum = 0.0;
     for( size_t n=0; n<nSpec; ++n){
-      massfrac.push_back(1 + n + (i-0.5)/ npts);
-      sum+=massfrac[n];
+      massFrac.push_back(1 + n + (i-0.5)/ npts);
+      sum+=massFrac[n];
     }
     for( size_t n=0; n<nSpec; ++n)
-      massfrac[n] = massfrac[n]/sum;
-    massfracs.push_back(massfrac);
+      massFrac[n] = massFrac[n]/sum;
+    massFracs.push_back(massFrac);
   }
 
   std::vector< SpatFldPtr<CellField> > canteraResults;
   CellField::const_iterator iTemp = temp.begin();
-  std::vector< std::vector<double> >::iterator iMass = massfracs.begin();
+  std::vector< std::vector<double> >::iterator iMass = massFracs.begin();
 
   Timer thermoTimer;
 
@@ -148,6 +149,9 @@ get_cantera_results( const bool mix,
     CellField::iterator iCantEnd = canteraResult->end();
 
     thermoTimer.start();
+    for( size_t rep=0; rep < repeats; ++rep ){
+       iTemp = temp.begin();
+       iMass = massFracs.begin();
     for( CellField::iterator iCant = canteraResult->begin(); iCant!=iCantEnd; ++iTemp, ++iMass, ++iCant ){
       gasMix.setState_TPY( *iTemp, refPressure, &(*iMass)[0]);
       switch(thermoQuantity){
@@ -155,6 +159,7 @@ get_cantera_results( const bool mix,
         case CV  : *iCant=gasMix.cv_mass();       break;
         case ENTH: *iCant=gasMix.enthalpy_mass(); break;
       } // switch(thermoQuantity)
+    }
     }
     thermoTimer.stop();
     canteraResults.push_back( canteraResult );
@@ -166,6 +171,9 @@ get_cantera_results( const bool mix,
     }
     std::vector<double> thermoResult(nSpec,0.0);
     thermoTimer.start();
+    for( size_t rep=0; rep < repeats; ++rep ){
+       iTemp = temp.begin();
+       iMass = massFracs.begin();
     for( size_t i=0; i<npts+2; ++iTemp, ++iMass, ++i){
       gasMix.setState_TPY( *iTemp, refPressure, &(*iMass)[0]);
       switch( thermoQuantity ){
@@ -184,16 +192,18 @@ get_cantera_results( const bool mix,
         case ENTH: *canteraResults[n] <<=   *canteraResults[n] / molecularWeights[n];                           break; // convert to mass basis for field comparison
       }
     }
+    }
     thermoTimer.stop();
   }
 
-  if( timings ) std::cout << "Cantera " + thermo_name(thermoQuantity) + " time " << thermoTimer.elapsed_time() << std::endl;
+  if( timings ) std::cout << "Cantera " + thermo_name(thermoQuantity) + " time " << thermoTimer.elapsed_time()/repeats << std::endl;
   return canteraResults;
 }
 
 //==============================================================================
 
 bool driver( const bool timings,
+             const size_t repeats,
              const bool mix,
              const ThermoQuantity thermoQuantity )
 {
@@ -298,10 +308,12 @@ bool driver( const bool timings,
     if( timings ) std::cout << std::endl << thermo_name(thermoQuantity) << " test - " << *iPts << std::endl;
 
     Timer thermoTimer;  thermoTimer.start();
-    thermoTree.execute_tree();
+    for( size_t rep = 0; rep < repeats; ++rep ){
+      thermoTree.execute_tree();
+    }
     thermoTimer.stop();
 
-    if( timings ) std::cout << "PoKiTT  " + thermo_name(thermoQuantity) + " time " << thermoTimer.elapsed_time() << std::endl;
+    if( timings ) std::cout << "PoKiTT  " + thermo_name(thermoQuantity) + " time " << thermoTimer.elapsed_time()/repeats << std::endl;
 
 #   ifdef ENABLE_CUDA
     BOOST_FOREACH( Expr::Tag thermoTag, thermoTags){
@@ -313,6 +325,7 @@ bool driver( const bool timings,
 
     const std::vector< SpatFldPtr<CellField> > canteraResults = get_cantera_results( mix,
                                                                                      timings,
+                                                                                     repeats,
                                                                                      thermoQuantity,
                                                                                      *gasMix,
                                                                                      *iPts,
@@ -348,6 +361,7 @@ int main( int iarg, char* carg[] )
   std::string inpGroup;
   bool mix     = false;
   bool timings = false;
+  size_t repeats = 1;
 
   // parse the command line options input describing the problem
   try {
@@ -357,7 +371,8 @@ int main( int iarg, char* carg[] )
            ( "xml-input-file", po::value<std::string>(&inputFileName), "Cantera xml input file name" )
            ( "phase", po::value<std::string>(&inpGroup), "name of phase in Cantera xml input file" )
            ( "mix", "Triggers mixture heat capacity test.  Otherwise, species heat capacities are tested." )
-           ( "timings", "Generate comparison timings between Cantera and PoKiTT across several problem sizes" );
+           ( "timings", "Generate comparison timings between Cantera and PoKiTT across several problem sizes" )
+           ( "repeats", po::value<size_t>(&repeats), "Repeat the tests and report the average execution time");
 
     po::variables_map args;
     po::store( po::parse_command_line(iarg,carg,desc), args );
@@ -388,9 +403,9 @@ int main( int iarg, char* carg[] )
     CanteraObjects::setup_cantera( setup );
 
     TestHelper status( !timings );
-    status( driver(  timings, mix, CP   ), thermo_name(CP  ) );
-    status( driver(  timings, mix, CV   ), thermo_name(CV  ) );
-    status( driver(  timings, mix, ENTH ), thermo_name(ENTH) );
+    status( driver(  timings, repeats, mix, CP   ), thermo_name(CP  ) );
+    status( driver(  timings, repeats, mix, CV   ), thermo_name(CV  ) );
+    status( driver(  timings, repeats, mix, ENTH ), thermo_name(ENTH) );
 
     if( status.ok() ){
       std::cout << "\nPASS\n";

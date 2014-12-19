@@ -81,6 +81,7 @@ const Expr::TagList make_trans_tags( TransportQuantity transportQuantity, const 
 
 std::vector< So::SpatFldPtr<CellField> >
 get_cantera_results( const bool timings,
+                     const size_t repeats,
                      const TransportQuantity transportQuantity,
                      Cantera::MixTransport& mixTrans,
                      const int nPts,
@@ -129,6 +130,9 @@ get_cantera_results( const bool timings,
   if( transportQuantity == DIFF_MASS || transportQuantity == DIFF_MOL){
     std::vector<double> d_result(nSpec,0.0);
     transportTimer.start();
+    for( size_t rep=0; rep < repeats; ++rep ){
+       iTemp = temp.begin();
+       iMass = massFracs.begin();
     for( size_t i=0; i<nPts+2; ++iTemp, ++iMass, ++i){
       canteraThermo.setState_TPY( *iTemp, refPressure, &(*iMass)[0]);
       switch(transportQuantity ){
@@ -146,10 +150,14 @@ get_cantera_results( const bool timings,
       break;
       }
     }
+    }
     transportTimer.stop();
   }
   else{
     transportTimer.start();
+    for( size_t rep=0; rep < repeats; ++rep ){
+       iTemp = temp.begin();
+       iMass = massFracs.begin();
     CellField::iterator iCantEnd = canteraResults[0]->end();
     for(CellField::iterator iCant = canteraResults[0]->begin(); iCant!=iCantEnd; ++iTemp, ++iMass, ++iCant){
       canteraThermo.setState_TPY( *iTemp, refPressure, &(*iMass)[0]);
@@ -162,16 +170,18 @@ get_cantera_results( const bool timings,
         break;
       }
     }
+    }
     transportTimer.stop();
   }
 
-  if( timings ) std::cout << "Cantera " + transport_name(transportQuantity) + " time " << transportTimer.elapsed_time() << std::endl;
+  if( timings ) std::cout << "Cantera " + transport_name(transportQuantity) + " time " << transportTimer.elapsed_time()/repeats << std::endl;
   return canteraResults;
 }
 
 //==============================================================================
 
 bool driver( const bool timings,
+             const size_t repeats,
              const TransportQuantity transportQuantity )
 {
   TestHelper status( !timings );
@@ -302,10 +312,12 @@ bool driver( const bool timings,
 
     Timer transportTimer;
     transportTimer.start();
-    transportTree.execute_tree();
+    for( size_t rep = 0; rep < repeats; ++rep ){
+      transportTree.execute_tree();
+    }
     transportTimer.stop();
 
-    if( timings ) std::cout << "PoKiTT  " + transport_name(transportQuantity) + " time " << transportTimer.elapsed_time() << std::endl;
+    if( timings ) std::cout << "PoKiTT  " + transport_name(transportQuantity) + " time " << transportTimer.elapsed_time()/repeats << std::endl;
 
 #   ifdef ENABLE_CUDA
     BOOST_FOREACH( const Expr::Tag& transportTag, transportTags){
@@ -316,6 +328,7 @@ bool driver( const bool timings,
 #   endif
 
     const std::vector< SpatFldPtr<CellField> > canteraResults = get_cantera_results( timings,
+                                                                                     repeats,
                                                                                      transportQuantity,
                                                                                      *mixTrans,
                                                                                      *iPts,
@@ -340,6 +353,7 @@ int main( int iarg, char* carg[] )
   std::string inputFileName;
   std::string inpGroup;
   bool timings = false;
+  size_t repeats = 1;
 
   // parse the command line options input describing the problem
   try {
@@ -348,7 +362,8 @@ int main( int iarg, char* carg[] )
            ( "help", "print help message" )
            ( "xml-input-file", po::value<std::string>(&inputFileName), "Cantera xml input file name" )
            ( "phase", po::value<std::string>(&inpGroup), "name of phase in Cantera xml input file" )
-           ( "timings", "Generate comparison timings between Cantera and PoKiTT across several problem sizes" );
+           ( "timings", "Generate comparison timings between Cantera and PoKiTT across several problem sizes" )
+           ( "repeats", po::value<size_t>(&repeats), "Repeat the tests and report the average execution time");
 
     po::variables_map args;
     po::store( po::parse_command_line(iarg,carg,desc), args );
@@ -378,10 +393,10 @@ int main( int iarg, char* carg[] )
     CanteraObjects::setup_cantera( setup );
 
     TestHelper status( !timings );
-    status( driver( timings, DIFF_MASS  ), transport_name(DIFF_MASS ) );
-    status( driver( timings, DIFF_MOL  ), transport_name(DIFF_MOL ) );
-    status( driver( timings, TCOND ), transport_name(TCOND) );
-    status( driver( timings, VISC  ), transport_name(VISC ) );
+    status( driver( timings, repeats, DIFF_MASS  ), transport_name(DIFF_MASS ) );
+    status( driver( timings, repeats, DIFF_MOL  ), transport_name(DIFF_MOL ) );
+    status( driver( timings, repeats, TCOND ), transport_name(TCOND) );
+    status( driver( timings, repeats, VISC  ), transport_name(VISC ) );
 
     if( status.ok() ){
       std::cout << "\nPASS\n";

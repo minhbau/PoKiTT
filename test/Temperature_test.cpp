@@ -97,6 +97,7 @@ void calculate_energy(CellField& energy, CellField& temp, Cantera_CXX::IdealGasM
 
 So::SpatFldPtr<CellField>
 get_cantera_result( const bool timings,
+                    const size_t repeats,
                     const EnergyType energyType,
                     Cantera_CXX::IdealGasMix& gasMix,
                     const int nPts,
@@ -127,7 +128,12 @@ get_cantera_result( const bool timings,
   CellField::const_iterator iVolume = canteraVolume->begin();
   Timer tTime;
   tTime.start();
-  for(CellField::iterator iCant = canteraResult->begin(); iCant!=canteraResult->end();++iVolume, ++iEnergy, ++iTemp, ++iMass, ++iCant){
+  for( size_t rep=0; rep < repeats; ++rep ){
+    iEnergy = energy.begin();
+    iVolume = canteraVolume->begin();
+     iTemp = tVec.begin();
+     iMass = massFracs.begin();
+  for(CellField::iterator iCant = canteraResult->begin(); iCant!=canteraResult->end(); ++iVolume, ++iEnergy, ++iTemp, ++iMass, ++iCant){
     gasMix.setState_TPY( *iTemp, refPressure, &(*iMass)[0]);
     switch( energyType ){
     case H:  gasMix.setState_HP( *iEnergy, refPressure ); break;
@@ -135,8 +141,9 @@ get_cantera_result( const bool timings,
     }
     *iCant=gasMix.temperature();
   }
+  }
   tTime.stop();
-  if( timings ) std::cout << "Cantera T from " + energy_name(energyType) + " time " << tTime.elapsed_time() << std::endl;
+  if( timings ) std::cout << "Cantera T from " + energy_name(energyType) + " time " << tTime.elapsed_time()/repeats << std::endl;
   return canteraResult;
 }
 
@@ -181,7 +188,7 @@ bool TPowers_equal( TestHelper& status, So::SpatFldPtr<CellField> canteraResult,
 
 //==============================================================================
 
-bool driver( bool timings, EnergyType energyType)
+bool driver( const bool timings, const size_t repeats, const EnergyType energyType)
 {
   TestHelper status( !timings );
   Cantera_CXX::IdealGasMix* const gasMix = CanteraObjects::get_gasmix();
@@ -296,19 +303,21 @@ bool driver( bool timings, EnergyType energyType)
       ke <<= 0.0;
     }
 
-    temp <<= temp + 25 - 50 * xcoord;
-
     tTree.lock_fields( fml );  // prevent fields from being deallocated so that we can get them after graph execution.
 
     if( timings ) std::cout << std::endl << energy_name(energyType) << " test - " << *iPts << std::endl;
 
     Timer tTimer;
-    tTimer.start();
-    tTree.execute_tree();
-    tTimer.stop();
-    if( timings ) std::cout << "PoKiTT  T from " + energy_name(energyType) + " time " << tTimer.elapsed_time() << std::endl;
+    for( size_t rep = 0; rep < repeats; ++rep ){
+      temp <<= temp + 25 - 50 * xcoord; // reset initial guess
+      tTimer.start();
+      tTree.execute_tree();
+      tTimer.stop();
+    }
 
-    SpatFldPtr<CellField> canteraResult = get_cantera_result( timings, energyType, *gasMix, *iPts, temp, *mixMW, xcoord, energy );
+    if( timings ) std::cout << "PoKiTT  T from " + energy_name(energyType) + " time " << tTimer.elapsed_time()/repeats << std::endl;
+
+    SpatFldPtr<CellField> canteraResult = get_cantera_result( timings, repeats, energyType, *gasMix, *iPts, temp, *mixMW, xcoord, energy );
 
     status( field_equal(temp, *canteraResult, 5e-4), tTag.name() );
 
@@ -325,6 +334,7 @@ int main( int iarg, char* carg[] )
   std::string inputFileName;
   std::string inpGroup;
   bool timings = false;
+  size_t repeats = 1;
 
   // parse the command line options input describing the problem
   try {
@@ -333,7 +343,8 @@ int main( int iarg, char* carg[] )
            ( "help", "print help message" )
            ( "xml-input-file", po::value<std::string>(&inputFileName), "Cantera xml input file name" )
            ( "phase", po::value<std::string>(&inpGroup), "name of phase in Cantera xml input file" )
-           ( "timings", "Generate comparison timings between Cantera and PoKiTT across several problem sizes" );
+           ( "timings", "Generate comparison timings between Cantera and PoKiTT across several problem sizes" )
+           ( "repeats", po::value<size_t>(&repeats), "Repeat the tests and report the average execution time");
 
     po::variables_map args;
     po::store( po::parse_command_line(iarg,carg,desc), args );
@@ -363,9 +374,9 @@ int main( int iarg, char* carg[] )
     CanteraObjects::setup_cantera( setup );
 
     TestHelper status( !timings );
-    status( driver( timings, H  ), "T from " + energy_name(H ) );
+    status( driver( timings, repeats, H  ), "T from " + energy_name(H ) );
     std::cout << std::endl;
-    status( driver( timings, E0 ), "T from " + energy_name(E0) );
+    status( driver( timings, repeats, E0 ), "T from " + energy_name(E0) );
 
     if( status.ok() ){
       std::cout << "\nPASS\n";
