@@ -29,6 +29,7 @@
 
 namespace So = SpatialOps;
 typedef   So::SVolField CellField;
+typedef So::SpatFldPtr<CellField> CellFieldPtrT;
 
 namespace Cantera_CXX{ class IdealGasMix; } //location of polynomial
 
@@ -79,7 +80,45 @@ const Expr::TagList make_trans_tags( TransportQuantity transportQuantity, const 
 
 //==============================================================================
 
-std::vector< So::SpatFldPtr<CellField> >
+void calculate_mass_fracs(const int nSpec, CellField& xcoord, const Expr::TagList yiTags, Expr::FieldManagerList& fml){
+  Expr::FieldMgrSelector<CellField>::type& cellFM = fml.field_manager<CellField>();
+  CellField& yi = cellFM.field_ref(yiTags[0]);
+  CellFieldPtrT sum = So::SpatialFieldStore::get<CellField>(yi);
+  *sum<<=0.0;
+  for( size_t n=0; n<nSpec; ++n ){
+    CellField& yi = cellFM.field_ref(yiTags[n]);
+    yi <<= n + 1 + xcoord;
+    *sum <<= *sum + yi;
+  }
+  BOOST_FOREACH( Expr::Tag yiTag, yiTags){
+    CellField& yi = cellFM.field_ref(yiTag);
+    yi <<= yi / *sum;
+  }
+}
+
+//==============================================================================
+
+const std::vector< std::vector<double> >
+mass_fracs(const int nPts, const int nSpec){
+  std::vector< std::vector<double> > massFracs;
+  double sum;
+  for( size_t i=0; i < nPts+2; ++i){
+    std::vector<double> massFrac;
+    sum = 0.0;
+    for( size_t n=0; n < nSpec; ++n){
+      massFrac.push_back(1 + n + (i-0.5)/ nPts);
+      sum += massFrac[n];
+    }
+    for( size_t n=0; n < nSpec; ++n)
+      massFrac[n] = massFrac[n]/sum;
+    massFracs.push_back(massFrac);
+  }
+  return massFracs;
+}
+
+//==============================================================================
+
+std::vector< CellFieldPtrT >
 get_cantera_results( const bool timings,
                      const size_t repeats,
                      const TransportQuantity transportQuantity,
@@ -94,20 +133,9 @@ get_cantera_results( const bool timings,
   const std::vector<double>& molecularWeights = canteraThermo.molecularWeights();
   const int nSpec = canteraThermo.nSpecies();
 
-  std::vector< std::vector<double> > massFracs;
-  for( size_t i=0; i<nPts+2; ++i){
-    std::vector<double> massFrac;
-    double sum = 0.0;
-    for( size_t n=0; n<nSpec; ++n){
-      massFrac.push_back(1 + n + (i-0.5)/ nPts);
-      sum+=massFrac[n];
-    }
-    for( size_t n=0; n<nSpec; ++n)
-      massFrac[n] = massFrac[n]/sum;
-    massFracs.push_back(massFrac);
-  }
+  const std::vector< std::vector<double> > massFracs = mass_fracs( nPts, nSpec);
 
-  std::vector< SpatFldPtr<CellField> > canteraResults;
+  std::vector< CellFieldPtrT > canteraResults;
   switch( transportQuantity ){
   case DIFF_MASS:
     for( size_t n=0; n < nSpec; ++n){
@@ -123,53 +151,54 @@ get_cantera_results( const bool timings,
     canteraResults.push_back(SpatialFieldStore::get<CellField>(temp));
   }
 
-  CellField::const_iterator iTemp = temp.begin();
-  std::vector< std::vector<double> >::iterator iMass = massFracs.begin();
+  CellField::const_iterator                          iTemp    = temp.begin();
+  const CellField::const_iterator                    iTempEnd = temp.end();
+  std::vector< std::vector<double> >::const_iterator iMass = massFracs.begin();
   Timer transportTimer;
 
   if( transportQuantity == DIFF_MASS || transportQuantity == DIFF_MOL){
     std::vector<double> d_result(nSpec,0.0);
     transportTimer.start();
     for( size_t rep=0; rep < repeats; ++rep ){
-       iTemp = temp.begin();
-       iMass = massFracs.begin();
-    for( size_t i=0; i<nPts+2; ++iTemp, ++iMass, ++i){
-      canteraThermo.setState_TPY( *iTemp, refPressure, &(*iMass)[0]);
-      switch(transportQuantity ){
-      case DIFF_MASS:
-      mixTrans.getMixDiffCoeffsMass(&d_result[0]);
-      for( size_t n=0; n<nSpec; ++n){
-        (*canteraResults[n])[i] = d_result[n];
+      iMass = massFracs.begin();
+      size_t i = 0;
+      for( iTemp = temp.begin(); iTemp != iTempEnd; ++iTemp, ++iMass, ++i){
+        canteraThermo.setState_TPY( *iTemp, refPressure, &(*iMass)[0]);
+        switch(transportQuantity ){
+        case DIFF_MASS:
+          mixTrans.getMixDiffCoeffsMass(&d_result[0]);
+          for( size_t n=0; n<nSpec; ++n){
+            (*canteraResults[n])[i] = d_result[n];
+          }
+          break;
+        case DIFF_MOL:
+          mixTrans.getMixDiffCoeffs(&d_result[0]);
+          for( size_t n=0; n<nSpec; ++n){
+            (*canteraResults[n])[i] = d_result[n];
+          }
+          break;
+        }
       }
-      break;
-      case DIFF_MOL:
-      mixTrans.getMixDiffCoeffs(&d_result[0]);
-      for( size_t n=0; n<nSpec; ++n){
-        (*canteraResults[n])[i] = d_result[n];
-      }
-      break;
-      }
-    }
     }
     transportTimer.stop();
   }
   else{
     transportTimer.start();
     for( size_t rep=0; rep < repeats; ++rep ){
-       iTemp = temp.begin();
-       iMass = massFracs.begin();
-    CellField::iterator iCantEnd = canteraResults[0]->end();
-    for(CellField::iterator iCant = canteraResults[0]->begin(); iCant!=iCantEnd; ++iTemp, ++iMass, ++iCant){
-      canteraThermo.setState_TPY( *iTemp, refPressure, &(*iMass)[0]);
-      switch( transportQuantity ){
-      case TCOND:
-        *iCant = mixTrans.thermalConductivity();
-        break;
-      case VISC:
-        *iCant = mixTrans.viscosity();
-        break;
+      iTemp = temp.begin();
+      iMass = massFracs.begin();
+      CellField::iterator iCantEnd = canteraResults[0]->end();
+      for(CellField::iterator iCant = canteraResults[0]->begin(); iCant!=iCantEnd; ++iTemp, ++iMass, ++iCant){
+        canteraThermo.setState_TPY( *iTemp, refPressure, &(*iMass)[0]);
+        switch( transportQuantity ){
+        case TCOND:
+          *iCant = mixTrans.thermalConductivity();
+          break;
+        case VISC:
+          *iCant = mixTrans.viscosity();
+          break;
+        }
       }
-    }
     }
     transportTimer.stop();
   }
@@ -294,17 +323,7 @@ bool driver( const bool timings,
       p <<= refPressure;
     }
 
-    SpatFldPtr<CellField> sum  = SpatialFieldStore::get<CellField>(temp);
-    *sum<<=0.0;
-    for( size_t n=0; n<nSpec; ++n ){
-      CellField& yi = cellFM.field_ref(yiTags[n]);
-      yi <<= n + 1 + xcoord;
-      *sum <<= *sum + yi;
-    }
-    BOOST_FOREACH( const Expr::Tag& yiTag, yiTags){
-      CellField& yi = cellFM.field_ref(yiTag);
-      yi <<= yi / *sum;
-    }
+    calculate_mass_fracs( nSpec, xcoord, yiTags, fml );
 
     transportTree.lock_fields( fml );  // prevent fields from being deallocated so that we can get them after graph execution.
 
@@ -327,14 +346,14 @@ bool driver( const bool timings,
     temp.set_device_as_active( CPU_INDEX );
 #   endif
 
-    const std::vector< SpatFldPtr<CellField> > canteraResults = get_cantera_results( timings,
-                                                                                     repeats,
-                                                                                     transportQuantity,
-                                                                                     *mixTrans,
-                                                                                     *iPts,
-                                                                                     temp );
+    const std::vector< CellFieldPtrT > canteraResults = get_cantera_results( timings,
+                                                                             repeats,
+                                                                             transportQuantity,
+                                                                             *mixTrans,
+                                                                             *iPts,
+                                                                             temp );
 
-    std::vector< SpatFldPtr<CellField> >::const_iterator iCantera = canteraResults.begin();
+    std::vector< CellFieldPtrT >::const_iterator iCantera = canteraResults.begin();
     BOOST_FOREACH( const Expr::Tag& transportTag, transportTags ){
       CellField& transport = cellFM.field_ref(transportTag);
       status( field_equal( transport, **iCantera, 1e-12 ), transportTag.name() );
@@ -393,10 +412,10 @@ int main( int iarg, char* carg[] )
     CanteraObjects::setup_cantera( setup );
 
     TestHelper status( !timings );
-    status( driver( timings, repeats, DIFF_MASS  ), transport_name(DIFF_MASS ) );
-    status( driver( timings, repeats, DIFF_MOL  ), transport_name(DIFF_MOL ) );
-    status( driver( timings, repeats, TCOND ), transport_name(TCOND) );
-    status( driver( timings, repeats, VISC  ), transport_name(VISC ) );
+    status( driver( timings, repeats, DIFF_MASS ), transport_name(DIFF_MASS ) );
+    status( driver( timings, repeats, DIFF_MOL  ), transport_name(DIFF_MOL  ) );
+    status( driver( timings, repeats, TCOND     ), transport_name(TCOND     ) );
+    status( driver( timings, repeats, VISC      ), transport_name(VISC      ) );
 
     if( status.ok() ){
       std::cout << "\nPASS\n";

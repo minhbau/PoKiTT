@@ -29,6 +29,7 @@
 
 namespace So = SpatialOps;
 typedef So::SVolField   CellField;
+typedef So::SpatFldPtr<CellField> CellFieldPtrT;
 
 namespace Cantera_CXX{ class IdealGasMix; } //location of polynomial
 
@@ -53,25 +54,49 @@ std::string energy_name( const EnergyType e )
 
 //==============================================================================
 
-const std::vector< std::vector<double> > mass_fracs(const int nPts, const int nSpec){
-  std::vector< std::vector<double> > massfracs;
-  for( size_t i=0; i<nPts+2; ++i){
-    std::vector<double> massfrac;
-    double sum = 0.0;
-    for( size_t n=0; n<nSpec; ++n){
-      massfrac.push_back(1 + n + (i-0.5)/ nPts);
-      sum+=massfrac[n];
-    }
-    for( size_t n=0; n<nSpec; ++n)
-      massfrac[n] = massfrac[n]/sum;
-    massfracs.push_back(massfrac);
+void calculate_mass_fracs(const int nSpec, CellField& xcoord, const Expr::TagList yiTags, Expr::FieldManagerList& fml){
+  Expr::FieldMgrSelector<CellField>::type& cellFM = fml.field_manager<CellField>();
+  CellField& yi = cellFM.field_ref(yiTags[0]);
+  CellFieldPtrT sum = So::SpatialFieldStore::get<CellField>(yi);
+  *sum<<=0.0;
+  for( size_t n=0; n<nSpec; ++n ){
+    CellField& yi = cellFM.field_ref(yiTags[n]);
+    yi <<= n + 1 + xcoord;
+    *sum <<= *sum + yi;
   }
-  return massfracs;
+  BOOST_FOREACH( Expr::Tag yiTag, yiTags){
+    CellField& yi = cellFM.field_ref(yiTag);
+    yi <<= yi / *sum;
+  }
 }
 
 //==============================================================================
 
-void calculate_energy(CellField& energy, CellField& temp, Cantera_CXX::IdealGasMix& gasMix, const EnergyType energyType, const int nPts){
+const std::vector< std::vector<double> >
+mass_fracs(const int nPts, const int nSpec){
+  std::vector< std::vector<double> > massFracs;
+  double sum;
+  for( size_t i=0; i < nPts+2; ++i){
+    std::vector<double> massFrac;
+    sum = 0.0;
+    for( size_t n=0; n < nSpec; ++n){
+      massFrac.push_back(1 + n + (i-0.5)/ nPts);
+      sum += massFrac[n];
+    }
+    for( size_t n=0; n < nSpec; ++n)
+      massFrac[n] = massFrac[n]/sum;
+    massFracs.push_back(massFrac);
+  }
+  return massFracs;
+}
+
+//==============================================================================
+
+void calculate_energy(CellField& energy,
+                      CellField& temp,
+                      Cantera_CXX::IdealGasMix& gasMix,
+                      const EnergyType energyType,
+                      const int nPts){
 # ifdef ENABLE_CUDA
   energy.set_device_as_active( CPU_INDEX );
   temp.set_device_as_active( CPU_INDEX );
@@ -87,60 +112,57 @@ void calculate_energy(CellField& energy, CellField& temp, Cantera_CXX::IdealGasM
   for( CellField::iterator iEnergy = energy.begin(); iEnergy!=iEnergyEnd; ++iTemp, ++iMass, ++iEnergy ){
     gasMix.setState_TPY( *iTemp, refPressure, &(*iMass)[0]);
     switch(energyType){
-    case H  : *iEnergy=gasMix.enthalpy_mass();  break;
-    case E0 : *iEnergy=gasMix.intEnergy_mass(); break;
+    case H  : *iEnergy = gasMix.enthalpy_mass();  break;
+    case E0 : *iEnergy = gasMix.intEnergy_mass(); break;
     } // switch(energyType)
   }
 }
 
 //==============================================================================
 
-So::SpatFldPtr<CellField>
+CellFieldPtrT
 get_cantera_result( const bool timings,
                     const size_t repeats,
                     const EnergyType energyType,
                     Cantera_CXX::IdealGasMix& gasMix,
                     const int nPts,
-                    CellField& temp,
-                    CellField& mixMW,
+                    CellField& volume,
                     CellField& xcoord,
                     const CellField& energy)
 {
+  using namespace SpatialOps;
 # ifdef ENABLE_CUDA
-  temp.set_device_as_active  ( CPU_INDEX );
-  xcoord.set_device_as_active( CPU_INDEX );
-  mixMW.set_device_as_active ( CPU_INDEX );
+  xcoord.set_device_as_active  ( CPU_INDEX );
 # endif
   const int nSpec=gasMix.nSpecies();
   const double refPressure=gasMix.pressure();
 
   const std::vector< std::vector<double> > massFracs = mass_fracs( nPts, nSpec);
-  std::vector<double> tVec;
-  for( size_t i=0; i<nPts+2; ++i)
-    tVec.push_back( 525.0 + 950.0 * (i-0.5)/ nPts);
-  So::SpatFldPtr<CellField> canteraResult = So::SpatialFieldStore::get<CellField>(temp, CPU_INDEX);
-  So::SpatFldPtr<CellField> canteraVolume = So::SpatialFieldStore::get<CellField>(temp, CPU_INDEX);
-  *canteraVolume <<= Cantera::GasConstant * (500.0 + 1000 * xcoord) * mixMW / refPressure;
 
-  std::vector< std::vector<double> >::const_iterator iMass = massFracs.begin();
-  std::vector<double>::iterator iTemp = tVec.begin();
-  CellField::const_iterator iEnergy = energy.begin();
-  CellField::const_iterator iVolume = canteraVolume->begin();
+  CellFieldPtrT tGuess        = So::SpatialFieldStore::get<CellField>(xcoord, CPU_INDEX);
+  *tGuess <<= 525.0 + 950 * xcoord; // set initial guess
+  CellFieldPtrT canteraResult = So::SpatialFieldStore::get<CellField>(xcoord, CPU_INDEX);
+
+  std::vector< std::vector<double> >::const_iterator iMass   = massFracs.begin();
+  CellField::const_iterator                          iTemp   = tGuess->begin();
+  CellField::const_iterator                          iEnergy = energy.begin();
+  CellField::const_iterator                          iVolume = volume.begin();
+
   Timer tTime;
   tTime.start();
   for( size_t rep=0; rep < repeats; ++rep ){
     iEnergy = energy.begin();
-    iVolume = canteraVolume->begin();
-     iTemp = tVec.begin();
-     iMass = massFracs.begin();
-  for(CellField::iterator iCant = canteraResult->begin(); iCant!=canteraResult->end(); ++iVolume, ++iEnergy, ++iTemp, ++iMass, ++iCant){
-    gasMix.setState_TPY( *iTemp, refPressure, &(*iMass)[0]);
-    switch( energyType ){
-    case H:  gasMix.setState_HP( *iEnergy, refPressure ); break;
-    case E0: gasMix.setState_UV( *iEnergy, *iVolume    ); break;
+    iVolume = volume.begin();
+    iTemp   = tGuess->begin();
+    iMass   = massFracs.begin();
+    for(CellField::iterator iCant = canteraResult->begin(); iCant!=canteraResult->end(); ++iVolume, ++iEnergy, ++iTemp, ++iMass, ++iCant){
+      gasMix.setState_TPY( *iTemp, refPressure, &(*iMass)[0]);
+      switch( energyType ){
+      case H:  gasMix.setState_HP( *iEnergy, refPressure ); break;
+      case E0: gasMix.setState_UV( *iEnergy, *iVolume    ); break;
+      }
+      *iCant=gasMix.temperature();
     }
-    *iCant=gasMix.temperature();
-  }
   }
   tTime.stop();
   if( timings ) std::cout << "Cantera T from " + energy_name(energyType) + " time " << tTime.elapsed_time()/repeats << std::endl;
@@ -149,9 +171,9 @@ get_cantera_result( const bool timings,
 
 //==============================================================================
 
-bool TPowers_equal( TestHelper& status, So::SpatFldPtr<CellField> canteraResult, Expr::FieldMgrSelector<CellField>::type& cellFM, const Expr::TagList& tPowerTags ){
+bool TPowers_equal( TestHelper& status, CellFieldPtrT canteraResult, Expr::FieldMgrSelector<CellField>::type& cellFM, const Expr::TagList& tPowerTags ){
 
-  So::SpatFldPtr<CellField> canteraTPower = So::SpatialFieldStore::get<CellField>(*canteraResult, CPU_INDEX);
+  CellFieldPtrT canteraTPower = So::SpatialFieldStore::get<CellField>(*canteraResult, CPU_INDEX);
 # ifdef ENABLE_CUDA
   BOOST_FOREACH( const Expr::Tag& tPowerTag, tPowerTags){
     CellField& tpow = cellFM.field_ref(tPowerTag);
@@ -195,6 +217,7 @@ bool driver( const bool timings, const size_t repeats, const EnergyType energyTy
 
   const int nSpec=gasMix->nSpecies();
   const std::vector<double>& molecularWeights = gasMix->molecularWeights();
+  const double refPressure = gasMix->pressure();
 
   typedef Expr::PlaceHolder <CellField> MassFracs;
   typedef Expr::PlaceHolder <CellField> Energy;
@@ -206,17 +229,17 @@ bool driver( const bool timings, const size_t repeats, const EnergyType energyTy
     name << "yi_" << n;
     yiTags.push_back( Expr::Tag(name.str(),Expr::STATE_NONE) );
   }
-  const Expr::Tag energyTag( energy_name(energyType) , Expr::STATE_NONE);
-  const Expr::Tag keTag( "kinetic energy", Expr::STATE_NONE);
+  const Expr::Tag energyTag( energy_name(energyType) ,   Expr::STATE_NONE);
+  const Expr::Tag keTag    ( "kinetic energy",           Expr::STATE_NONE);
   Expr::TagList tPowerTags;
-  const Expr::Tag tTag( "Temperature", Expr::STATE_NONE);
+  const Expr::Tag tTag     ( "Temperature",              Expr::STATE_NONE);
 
   Expr::ExpressionFactory exprFactory;
 
   BOOST_FOREACH( const Expr::Tag& yiTag, yiTags){
     exprFactory.register_expression( new MassFracs::Builder(yiTag) );
   }
-  exprFactory.register_expression( new Energy::Builder (energyTag) );
+  exprFactory.register_expression( new Energy::Builder( energyTag ) );
 
   Expr::ExpressionID temp_id;
   switch( energyType ){
@@ -245,7 +268,7 @@ bool driver( const bool timings, const size_t repeats, const EnergyType energyTy
 
   for( std::vector<int>::iterator iPts = ptvec.begin(); iPts!= ptvec.end(); ++iPts){
 
-    Expr::ExpressionTree tTree( temp_id , exprFactory, 0 );
+    Expr::ExpressionTree tTree( temp_id, exprFactory, 0 );
     {
       std::ofstream tGraph( ("TemperatureFrom"+energy_name(energyType)+".dot").c_str() );
       tTree.write_tree( tGraph );
@@ -276,32 +299,28 @@ bool driver( const bool timings, const size_t repeats, const EnergyType energyTy
     CellField& temp = cellFM.field_ref(tTag);
     temp <<= 500.0 + 1000 * xcoord;
 
-    SpatFldPtr<CellField> sum  = SpatialFieldStore::get<CellField>(temp);
-    *sum<<=0.0;
-    for( size_t n=0; n<nSpec; ++n ){
-      CellField& yi = cellFM.field_ref(yiTags[n]);
-      yi <<= n + 1 + xcoord;
-      *sum <<= *sum + yi;
-    }
-    BOOST_FOREACH( const Expr::Tag& yiTag, yiTags){
-      CellField& yi = cellFM.field_ref(yiTag);
-      yi <<= yi / *sum;
+    if( energyType == E0 ){
+      CellField& ke = cellFM.field_ref(keTag);
+      ke <<= 0.0;
     }
 
-    SpatFldPtr<CellField> mixMW = SpatialFieldStore::get<CellField>(temp);
+    calculate_mass_fracs( nSpec, xcoord, yiTags, fml );
+
+    CellFieldPtrT mixMW = SpatialFieldStore::get<CellField>(temp);
     for( size_t n=0; n<nSpec; ++n ){
       CellField& yi = cellFM.field_ref(yiTags[n]);
       *mixMW <<= *mixMW + yi / molecularWeights[n];
     }
     *mixMW <<= 1.0 / *mixMW;
+#   ifdef ENABLE_CUDA
+    mixMW->set_device_as_active(CPU_INDEX);
+#   endif
 
-    CellField& energy = cellFM.field_ref(energyTag);
+    CellField& energy = cellFM.field_ref( energyTag );
     calculate_energy( energy, temp, *gasMix, energyType, *iPts);
 
-    if(energyType == E0){
-      CellField& ke = cellFM.field_ref(keTag);
-      ke <<= 0.0;
-    }
+    CellFieldPtrT canteraVolume = So::SpatialFieldStore::get<CellField>(xcoord, CPU_INDEX);
+    *canteraVolume <<= Cantera::GasConstant * temp * *mixMW / refPressure;
 
     tTree.lock_fields( fml );  // prevent fields from being deallocated so that we can get them after graph execution.
 
@@ -309,7 +328,7 @@ bool driver( const bool timings, const size_t repeats, const EnergyType energyTy
 
     Timer tTimer;
     for( size_t rep = 0; rep < repeats; ++rep ){
-      temp <<= temp + 25 - 50 * xcoord; // reset initial guess
+      temp <<= 525.0 + 950 * xcoord; // set initial guess
       tTimer.start();
       tTree.execute_tree();
       tTimer.stop();
@@ -317,7 +336,7 @@ bool driver( const bool timings, const size_t repeats, const EnergyType energyTy
 
     if( timings ) std::cout << "PoKiTT  T from " + energy_name(energyType) + " time " << tTimer.elapsed_time()/repeats << std::endl;
 
-    SpatFldPtr<CellField> canteraResult = get_cantera_result( timings, repeats, energyType, *gasMix, *iPts, temp, *mixMW, xcoord, energy );
+    CellFieldPtrT canteraResult = get_cantera_result( timings, repeats, energyType, *gasMix, *iPts, *canteraVolume, xcoord, energy );
 
     status( field_equal(temp, *canteraResult, 5e-4), tTag.name() );
 
