@@ -122,7 +122,7 @@ void calculate_energy(CellField& energy,
 
 CellFieldPtrT
 get_cantera_result( const bool timings,
-                    const size_t repeats,
+                    const size_t canteraReps,
                     const EnergyType energyType,
                     Cantera_CXX::IdealGasMix& gasMix,
                     const int nPts,
@@ -150,7 +150,7 @@ get_cantera_result( const bool timings,
 
   Timer tTime;
   tTime.start();
-  for( size_t rep=0; rep < repeats; ++rep ){
+  for( size_t rep=0; rep < canteraReps; ++rep ){
     iEnergy = energy.begin();
     iVolume = volume.begin();
     iTemp   = tGuess->begin();
@@ -165,7 +165,7 @@ get_cantera_result( const bool timings,
     }
   }
   tTime.stop();
-  if( timings ) std::cout << "Cantera T from " + energy_name(energyType) + " time " << tTime.elapsed_time()/repeats << std::endl;
+  if( timings ) std::cout << "Cantera T from " + energy_name(energyType) + " time " << tTime.elapsed_time()/canteraReps << std::endl;
   return canteraResult;
 }
 
@@ -210,7 +210,10 @@ bool TPowers_equal( TestHelper& status, CellFieldPtrT canteraResult, Expr::Field
 
 //==============================================================================
 
-bool driver( const bool timings, const size_t repeats, const EnergyType energyType)
+bool driver( const bool timings,
+             const size_t pokittReps,
+             const size_t canteraReps,
+             const EnergyType energyType)
 {
   TestHelper status( !timings );
   Cantera_CXX::IdealGasMix* const gasMix = CanteraObjects::get_gasmix();
@@ -327,16 +330,16 @@ bool driver( const bool timings, const size_t repeats, const EnergyType energyTy
     if( timings ) std::cout << std::endl << energy_name(energyType) << " test - " << *iPts << std::endl;
 
     Timer tTimer;
-    for( size_t rep = 0; rep < repeats; ++rep ){
+    for( size_t rep = 0; rep < pokittReps; ++rep ){
       temp <<= 525.0 + 950 * xcoord; // set initial guess
       tTimer.start();
       tTree.execute_tree();
       tTimer.stop();
     }
 
-    if( timings ) std::cout << "PoKiTT  T from " + energy_name(energyType) + " time " << tTimer.elapsed_time()/repeats << std::endl;
+    if( timings ) std::cout << "PoKiTT  T from " + energy_name(energyType) + " time " << tTimer.elapsed_time()/pokittReps << std::endl;
 
-    CellFieldPtrT canteraResult = get_cantera_result( timings, repeats, energyType, *gasMix, *iPts, *canteraVolume, xcoord, energy );
+    CellFieldPtrT canteraResult = get_cantera_result( timings, canteraReps, energyType, *gasMix, *iPts, *canteraVolume, xcoord, energy );
 
     status( field_equal(temp, *canteraResult, 5e-4), tTag.name() );
 
@@ -353,7 +356,8 @@ int main( int iarg, char* carg[] )
   std::string inputFileName;
   std::string inpGroup;
   bool timings = false;
-  size_t repeats = 1;
+  size_t pokittReps = 1;
+  size_t canteraReps = 1;
 
   // parse the command line options input describing the problem
   try {
@@ -363,7 +367,8 @@ int main( int iarg, char* carg[] )
            ( "xml-input-file", po::value<std::string>(&inputFileName), "Cantera xml input file name" )
            ( "phase", po::value<std::string>(&inpGroup), "name of phase in Cantera xml input file" )
            ( "timings", "Generate comparison timings between Cantera and PoKiTT across several problem sizes" )
-           ( "repeats", po::value<size_t>(&repeats), "Repeat the tests and report the average execution time");
+           ( "pokitt-reps", po::value<size_t>(&pokittReps), "Repeat the PoKiTT tests and report the average execution time")
+           ( "cantera-reps", po::value<size_t>(&canteraReps), "Repeat the Cantera tests and report the average execution time");
 
     po::variables_map args;
     po::store( po::parse_command_line(iarg,carg,desc), args );
@@ -393,9 +398,9 @@ int main( int iarg, char* carg[] )
     CanteraObjects::setup_cantera( setup );
 
     TestHelper status( !timings );
-    status( driver( timings, repeats, H  ), "T from " + energy_name(H ) );
+    status( driver( timings, pokittReps, canteraReps, H  ), "T from " + energy_name(H ) );
     std::cout << std::endl;
-    status( driver( timings, repeats, E0 ), "T from " + energy_name(E0) );
+    status( driver( timings, pokittReps, canteraReps, E0 ), "T from " + energy_name(E0) );
 
     if( status.ok() ){
       std::cout << "\nPASS\n";

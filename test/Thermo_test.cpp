@@ -151,7 +151,7 @@ mass_fracs(const int nPts, const int nSpec){
 std::vector< CellFieldPtrT >
 get_cantera_results( const bool mix,
                      const bool timings,
-                     const size_t repeats,
+                     const bool canteraReps,
                      const ThermoQuantity thermoQuantity,
                      Cantera_CXX::IdealGasMix& gasMix,
                      const int nPts,
@@ -176,7 +176,7 @@ get_cantera_results( const bool mix,
     CellField::iterator iCantEnd = canteraResult->end();
 
     thermoTimer.start();
-    for( size_t rep=0; rep < repeats; ++rep ){
+    for( size_t rep=0; rep < canteraReps; ++rep ){
       iTemp = temp.begin();
       iMass = massFracs.begin();
       for( CellField::iterator iCant = canteraResult->begin(); iCant!=iCantEnd; ++iTemp, ++iMass, ++iCant ){
@@ -199,7 +199,7 @@ get_cantera_results( const bool mix,
     std::vector<double> thermoResult(nSpec,0.0);
     const CellField::const_iterator iTempEnd = temp.end();
     thermoTimer.start();
-    for( size_t rep=0; rep < repeats; ++rep ){
+    for( size_t rep=0; rep < canteraReps; ++rep ){
       size_t i = 0;
       iMass = massFracs.begin();
       for( iTemp = temp.begin(); iTemp != iTempEnd; ++iTemp, ++iMass, ++i){
@@ -224,14 +224,15 @@ get_cantera_results( const bool mix,
     thermoTimer.stop();
   }
 
-  if( timings ) std::cout << "Cantera " + thermo_name(thermoQuantity) + " time " << thermoTimer.elapsed_time()/repeats << std::endl;
+  if( timings ) std::cout << "Cantera " + thermo_name(thermoQuantity) + " time " << thermoTimer.elapsed_time()/canteraReps << std::endl;
   return canteraResults;
 }
 
 //==============================================================================
 
 bool driver( const bool timings,
-             const size_t repeats,
+             const size_t pokittReps,
+             const size_t canteraReps,
              const bool mix,
              const ThermoQuantity thermoQuantity )
 {
@@ -326,12 +327,12 @@ bool driver( const bool timings,
     if( timings ) std::cout << std::endl << thermo_name(thermoQuantity) << " test - " << *iPts << std::endl;
 
     Timer thermoTimer;  thermoTimer.start();
-    for( size_t rep = 0; rep < repeats; ++rep ){
+    for( size_t rep = 0; rep < pokittReps; ++rep ){
       thermoTree.execute_tree();
     }
     thermoTimer.stop();
 
-    if( timings ) std::cout << "PoKiTT  " + thermo_name(thermoQuantity) + " time " << thermoTimer.elapsed_time()/repeats << std::endl;
+    if( timings ) std::cout << "PoKiTT  " + thermo_name(thermoQuantity) + " time " << thermoTimer.elapsed_time()/pokittReps << std::endl;
 
 #   ifdef ENABLE_CUDA
     BOOST_FOREACH( Expr::Tag thermoTag, thermoTags){
@@ -343,7 +344,7 @@ bool driver( const bool timings,
 
     const std::vector< CellFieldPtrT > canteraResults = get_cantera_results( mix,
                                                                              timings,
-                                                                             repeats,
+                                                                             canteraReps,
                                                                              thermoQuantity,
                                                                              *gasMix,
                                                                              *iPts,
@@ -379,7 +380,8 @@ int main( int iarg, char* carg[] )
   std::string inpGroup;
   bool mix     = false;
   bool timings = false;
-  size_t repeats = 1;
+  size_t pokittReps = 1;
+  size_t canteraReps = 1;
 
   // parse the command line options input describing the problem
   try {
@@ -390,7 +392,8 @@ int main( int iarg, char* carg[] )
            ( "phase", po::value<std::string>(&inpGroup), "name of phase in Cantera xml input file" )
            ( "mix", "Triggers mixture heat capacity test.  Otherwise, species heat capacities are tested." )
            ( "timings", "Generate comparison timings between Cantera and PoKiTT across several problem sizes" )
-           ( "repeats", po::value<size_t>(&repeats), "Repeat the tests and report the average execution time");
+           ( "pokitt-reps", po::value<size_t>(&pokittReps), "Repeat the PoKiTT tests and report the average execution time")
+           ( "cantera-reps", po::value<size_t>(&canteraReps), "Repeat the Cantera tests and report the average execution time");
 
     po::variables_map args;
     po::store( po::parse_command_line(iarg,carg,desc), args );
@@ -421,9 +424,9 @@ int main( int iarg, char* carg[] )
     CanteraObjects::setup_cantera( setup );
 
     TestHelper status( !timings );
-    status( driver(  timings, repeats, mix, CP   ), thermo_name(CP  ) );
-    status( driver(  timings, repeats, mix, CV   ), thermo_name(CV  ) );
-    status( driver(  timings, repeats, mix, ENTH ), thermo_name(ENTH) );
+    status( driver(  timings, pokittReps, canteraReps, mix, CP   ), thermo_name(CP  ) );
+    status( driver(  timings, pokittReps, canteraReps, mix, CV   ), thermo_name(CV  ) );
+    status( driver(  timings, pokittReps, canteraReps, mix, ENTH ), thermo_name(ENTH) );
 
     if( status.ok() ){
       std::cout << "\nPASS\n";

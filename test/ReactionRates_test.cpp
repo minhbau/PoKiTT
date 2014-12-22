@@ -78,7 +78,7 @@ mass_fracs(const int nPts, const int nSpec){
 
 const std::vector< CellFieldPtrT >
 get_cantera_results( const bool timings,
-                     const size_t repeats,
+                     const size_t canteraReps,
                      Cantera_CXX::IdealGasMix& gasMix,
                      const int nPts,
                      CellField& temp){
@@ -102,7 +102,7 @@ get_cantera_results( const bool timings,
 
   Timer cTimer;
   cTimer.start();
-  for( size_t rep=0; rep < repeats; ++rep ){
+  for( size_t rep=0; rep < canteraReps; ++rep ){
     iMass = massFracs.begin();
     size_t i = 0;
     for( iTemp = temp.begin(); iTemp != iTempEnd; ++iTemp, ++iMass, ++i){
@@ -114,7 +114,7 @@ get_cantera_results( const bool timings,
     }
   }
   cTimer.stop();
-  if( timings ) std::cout << "Cantera reaction rate time " << cTimer.elapsed_time()/repeats << std::endl;
+  if( timings ) std::cout << "Cantera reaction rate time " << cTimer.elapsed_time()/canteraReps << std::endl;
 
   for( size_t n=0; n<nSpec; ++n){
     *canteraResults[n] <<= *canteraResults[n] * molecularWeights[n]; // convert to mass basis for field comparison
@@ -123,7 +123,9 @@ get_cantera_results( const bool timings,
   return canteraResults;
 }
 
-bool driver( const bool timings, const size_t repeats )
+bool driver( const bool timings,
+             const size_t pokittReps,
+             const size_t canteraReps )
 {
   TestHelper status( !timings );
   Cantera_CXX::IdealGasMix* const gasMix = CanteraObjects::get_gasmix();
@@ -217,11 +219,11 @@ bool driver( const bool timings, const size_t repeats )
 
     Timer rxnTimer;
     rxnTimer.start();
-    for( size_t rep = 0; rep < repeats; ++rep ){
+    for( size_t rep = 0; rep < pokittReps; ++rep ){
       tree.execute_tree();
     }
     rxnTimer.stop();
-    if( timings ) std::cout << "PoKiTT  reaction rate time " << rxnTimer.elapsed_time()/repeats << std::endl;
+    if( timings ) std::cout << "PoKiTT  reaction rate time " << rxnTimer.elapsed_time()/pokittReps << std::endl;
 
 #   ifdef ENABLE_CUDA
     BOOST_FOREACH( Expr::Tag rTag, rTags){
@@ -232,7 +234,7 @@ bool driver( const bool timings, const size_t repeats )
 #   endif
 
     const std::vector< CellFieldPtrT > canteraResults = get_cantera_results( timings,
-                                                                             repeats,
+                                                                             canteraReps,
                                                                              *gasMix,
                                                                              *iPts,
                                                                              temp );
@@ -256,7 +258,8 @@ int main( int iarg, char* carg[] )
   std::string inputFileName;
   std::string inpGroup;
   bool timings = false;
-  size_t repeats = 1;
+  size_t pokittReps = 1;
+  size_t canteraReps = 1;
 
   // parse the command line options input describing the problem
   try {
@@ -266,7 +269,8 @@ int main( int iarg, char* carg[] )
            ( "xml-input-file", po::value<std::string>(&inputFileName), "Cantera xml input file name" )
            ( "phase", po::value<std::string>(&inpGroup), "name of phase in Cantera xml input file" )
            ( "timings", "Generate comparison timings between Cantera and PoKiTT across several problem sizes" )
-           ( "repeats", po::value<size_t>(&repeats), "Repeat the tests and report the average execution time");
+           ( "pokitt-reps", po::value<size_t>(&pokittReps), "Repeat the PoKiTT tests and report the average execution time")
+           ( "cantera-reps", po::value<size_t>(&canteraReps), "Repeat the Cantera tests and report the average execution time");
 
     po::variables_map args;
     po::store( po::parse_command_line(iarg,carg,desc), args );
@@ -296,7 +300,7 @@ int main( int iarg, char* carg[] )
     CanteraObjects::setup_cantera( setup );
 
     TestHelper status( !timings );
-    status( driver( timings, repeats ), "Reaction Rates" );
+    status( driver( timings, pokittReps, canteraReps ), "Reaction Rates" );
 
     if( status.ok() ){
       std::cout << "\nPASS\n";
