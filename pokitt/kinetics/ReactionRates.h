@@ -250,6 +250,14 @@ ReactionRates( const Expr::Tag& tTag,
     case NASA2:
       for( std::vector<double>::iterator ic = c.begin() + 1; ic!=c.end(); ++ic)
         *ic *= Cantera::GasConstant; // dimensionalize the coefficients
+      c[2]  = c[2]/2; // perform division of coefficients here - minor optimization
+      c[3]  = c[3]/6;
+      c[4]  = c[4]/12;
+      c[5]  = c[5]/20;
+      c[9]  = c[9]/2;
+      c[10] = c[10]/6;
+      c[11] = c[11]/12;
+      c[12] = c[12]/20;
       break;
     default:{
       std::ostringstream msg;
@@ -368,10 +376,11 @@ evaluate()
           break;
         case NASA2:{
           /* polynomials are applicable in two temperature ranges - high and low
-           * If the temperature is out of range, properties are evaluated using constant cp
+           * Caution: polynomials are used even if temperature is out of range
+           * Note: coefficients have been divided by integers during construction of expression
            */
-          *gPtrvec[n] <<= cond( t <= c[0], c[ 6] + (c[1] - c[ 7]) * t - c[2]/2 * t2 - c[ 3]/6 * t3 - c[ 4]/12 * t4 - c[ 5]/20 * t5 - c[1] * tlogT ) // if low temp
-                              (            c[13] + (c[8] - c[14]) * t - c[9]/2 * t2 - c[10]/6 * t3 - c[11]/12 * t4 - c[12]/20 * t5 - c[8] * tlogT ); // else if high temp
+          *gPtrvec[n] <<= cond( t <= c[0], c[ 6] + (c[1] - c[ 7]) * t - c[2] * t2 - c[ 3] * t3 - c[ 4] * t4 - c[ 5] * t5 - c[1] * tlogT ) // if low temp
+                              (            c[13] + (c[8] - c[14]) * t - c[9] * t2 - c[10] * t3 - c[11] * t4 - c[12] * t5 - c[8] * tlogT ); // else if high temp
           break;
         }
       } // switch
