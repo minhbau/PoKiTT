@@ -110,7 +110,8 @@ void write_tree( const bool mix, const ThermoQuantity thermoQuantity, const Expr
 
 //==============================================================================
 
-void calculate_mass_fracs(const int nSpec, CellField& xcoord, const Expr::TagList yiTags, Expr::FieldManagerList& fml){
+const std::vector< std::vector<double> >
+calculate_mass_fracs(const int nSpec, CellField& xcoord, const Expr::TagList yiTags, Expr::FieldManagerList& fml){
   Expr::FieldMgrSelector<CellField>::type& cellFM = fml.field_manager<CellField>();
   CellField& yi = cellFM.field_ref(yiTags[0]);
   CellFieldPtrT sum = So::SpatialFieldStore::get<CellField>(yi);
@@ -124,24 +125,24 @@ void calculate_mass_fracs(const int nSpec, CellField& xcoord, const Expr::TagLis
     CellField& yi = cellFM.field_ref(yiTag);
     yi <<= yi / *sum;
   }
-}
-
-//==============================================================================
-
-const std::vector< std::vector<double> >
-mass_fracs(const int nPts, const int nSpec){
   std::vector< std::vector<double> > massFracs;
-  double sum;
-  for( size_t i=0; i < nPts+2; ++i){
-    std::vector<double> massFrac;
-    sum = 0.0;
-    for( size_t n=0; n < nSpec; ++n){
-      massFrac.push_back(1 + n + (i-0.5)/ nPts);
-      sum += massFrac[n];
-    }
-    for( size_t n=0; n < nSpec; ++n)
-      massFrac[n] = massFrac[n]/sum;
+  size_t nPts = xcoord.window_with_ghost().glob_npts();
+  for( size_t i=0; i<nPts; ++i ){
+    std::vector<double> massFrac( nSpec, 0.0 );
     massFracs.push_back(massFrac);
+  }
+  for( size_t n=0; n<nSpec; ++n ){
+    CellField& yi = cellFM.field_ref(yiTags[n]);
+#   ifdef ENABLE_CUDA
+    yi.set_device_as_active( CPU_INDEX );
+#   endif
+    size_t i=0;
+    for( CellField::iterator iY = yi.begin(); iY != yi.end(); ++iY, ++i ){
+      massFracs[i][n] = *iY;
+    }
+#   ifdef ENABLE_CUDA
+    yi.set_device_as_active( GPU_INDEX );
+#   endif
   }
   return massFracs;
 }
@@ -154,7 +155,7 @@ get_cantera_results( const bool mix,
                      const bool canteraReps,
                      const ThermoQuantity thermoQuantity,
                      Cantera_CXX::IdealGasMix& gasMix,
-                     const int nPts,
+                     const std::vector< std::vector<double> >& massFracs,
                      const CellField& temp)
 {
   using namespace SpatialOps;
@@ -162,8 +163,6 @@ get_cantera_results( const bool mix,
   const double refPressure = gasMix.pressure();
   const std::vector<double>& molecularWeights = gasMix.molecularWeights();
   const int nSpec = gasMix.nSpecies();
-
-  const std::vector< std::vector<double> > massFracs = mass_fracs( nPts, nSpec);
 
   std::vector< CellFieldPtrT > canteraResults;
   CellField::const_iterator iTemp = temp.begin();
@@ -276,24 +275,24 @@ bool driver( const bool timings,
                                                                 thermoTags, tTag, yiTag,
                                                                 nSpec);
 
-  std::vector<int> ptvec;
+  std::vector<So::IntVec> ptvec;
   if( timings ){
-    ptvec.push_back(8*8*8);
-    ptvec.push_back(16*16*16);
-    ptvec.push_back(32*32*32);
-    ptvec.push_back(64*64*64);
-    ptvec.push_back(128*128*128);
+    ptvec.push_back( So::IntVec(  6,  6,  6) );
+    ptvec.push_back( So::IntVec( 14, 14, 14) );
+    ptvec.push_back( So::IntVec( 30, 30, 30) );
+    ptvec.push_back( So::IntVec( 62, 62, 62) );
+    ptvec.push_back( So::IntVec(126,126,126) );
   }
   else{
-    ptvec.push_back(10);
+    ptvec.push_back( So::IntVec(20,1,1) );
   }
 
-  for( std::vector<int>::iterator iPts = ptvec.begin(); iPts!= ptvec.end(); ++iPts){
+  for( std::vector<So::IntVec>::iterator iPts = ptvec.begin(); iPts!= ptvec.end(); ++iPts){
 
     Expr::ExpressionTree thermoTree( thermoID, exprFactory, 0 );
     write_tree( mix, thermoQuantity, thermoTree);
 
-    So::IntVec nPts(*iPts,1,1);
+    So::IntVec nPts = *iPts;
     const So::BoundaryCellInfo cellBCInfo = So::BoundaryCellInfo::build<CellField>(false,false,false);
     const So::GhostData cellGhosts(1);
     const So::MemoryWindow vwindow( So::get_window_with_ghost(nPts,cellGhosts,cellBCInfo) );
@@ -318,13 +317,20 @@ bool driver( const bool timings,
     CellField& temp = cellFM.field_ref(tTag);
     temp <<= 500.0 + 1000.0 * xcoord;
 
+    std::vector< std::vector<double> > massFracs;
     if(mix){
-      calculate_mass_fracs( nSpec, xcoord, yiTags, fml );
+      massFracs = calculate_mass_fracs( nSpec, xcoord, yiTags, fml );
+    }
+    else{
+      for( size_t i=0; i < vwindow.glob_npts(); ++i ){
+        std::vector<double> massFrac( nSpec, 1.0 );
+        massFracs.push_back(massFrac);
+      }
     }
 
     thermoTree.lock_fields( fml );  // prevent fields from being deallocated so that we can get them after graph execution.
 
-    if( timings ) std::cout << std::endl << thermo_name(thermoQuantity) << " test - " << *iPts << std::endl;
+    if( timings ) std::cout << std::endl << thermo_name(thermoQuantity) << " test - " << vwindow.glob_npts() << std::endl;
 
     Timer thermoTimer;  thermoTimer.start();
     for( size_t rep = 0; rep < pokittReps; ++rep ){
@@ -347,7 +353,7 @@ bool driver( const bool timings,
                                                                              canteraReps,
                                                                              thermoQuantity,
                                                                              *gasMix,
-                                                                             *iPts,
+                                                                             massFracs,
                                                                              temp );
 
     std::vector< CellFieldPtrT >::const_iterator iCantera = canteraResults.begin();

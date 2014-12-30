@@ -80,7 +80,8 @@ const Expr::TagList make_trans_tags( TransportQuantity transportQuantity, const 
 
 //==============================================================================
 
-void calculate_mass_fracs(const int nSpec, CellField& xcoord, const Expr::TagList yiTags, Expr::FieldManagerList& fml){
+const std::vector< std::vector<double> >
+calculate_mass_fracs(const int nSpec, CellField& xcoord, const Expr::TagList yiTags, Expr::FieldManagerList& fml){
   Expr::FieldMgrSelector<CellField>::type& cellFM = fml.field_manager<CellField>();
   CellField& yi = cellFM.field_ref(yiTags[0]);
   CellFieldPtrT sum = So::SpatialFieldStore::get<CellField>(yi);
@@ -94,24 +95,24 @@ void calculate_mass_fracs(const int nSpec, CellField& xcoord, const Expr::TagLis
     CellField& yi = cellFM.field_ref(yiTag);
     yi <<= yi / *sum;
   }
-}
-
-//==============================================================================
-
-const std::vector< std::vector<double> >
-mass_fracs(const int nPts, const int nSpec){
   std::vector< std::vector<double> > massFracs;
-  double sum;
-  for( size_t i=0; i < nPts+2; ++i){
-    std::vector<double> massFrac;
-    sum = 0.0;
-    for( size_t n=0; n < nSpec; ++n){
-      massFrac.push_back(1 + n + (i-0.5)/ nPts);
-      sum += massFrac[n];
-    }
-    for( size_t n=0; n < nSpec; ++n)
-      massFrac[n] = massFrac[n]/sum;
+  size_t nPts = xcoord.window_with_ghost().glob_npts();
+  for( size_t i=0; i<nPts; ++i ){
+    std::vector<double> massFrac( nSpec, 0.0 );
     massFracs.push_back(massFrac);
+  }
+  for( size_t n=0; n<nSpec; ++n ){
+    CellField& yi = cellFM.field_ref(yiTags[n]);
+#   ifdef ENABLE_CUDA
+    yi.set_device_as_active( CPU_INDEX );
+#   endif
+    size_t i=0;
+    for( CellField::iterator iY = yi.begin(); iY != yi.end(); ++iY, ++i ){
+      massFracs[i][n] = *iY;
+    }
+#   ifdef ENABLE_CUDA
+    yi.set_device_as_active( GPU_INDEX );
+#   endif
   }
   return massFracs;
 }
@@ -123,17 +124,14 @@ get_cantera_results( const bool timings,
                      const size_t canteraReps,
                      const TransportQuantity transportQuantity,
                      Cantera::MixTransport& mixTrans,
-                     const int nPts,
+                     const std::vector< std::vector<double> >& massFracs,
                      const CellField& temp )
 {
   using namespace SpatialOps;
-
   Cantera::ThermoPhase& canteraThermo = mixTrans.thermo();
   const double refPressure = canteraThermo.pressure();
   const std::vector<double>& molecularWeights = canteraThermo.molecularWeights();
   const int nSpec = canteraThermo.nSpecies();
-
-  const std::vector< std::vector<double> > massFracs = mass_fracs( nPts, nSpec);
 
   std::vector< CellFieldPtrT > canteraResults;
   switch( transportQuantity ){
@@ -153,9 +151,8 @@ get_cantera_results( const bool timings,
 
   CellField::const_iterator                          iTemp    = temp.begin();
   const CellField::const_iterator                    iTempEnd = temp.end();
-  std::vector< std::vector<double> >::const_iterator iMass = massFracs.begin();
+  std::vector< std::vector<double> >::const_iterator iMass    = massFracs.begin();
   Timer transportTimer;
-
   if( transportQuantity == DIFF_MASS || transportQuantity == DIFF_MOL){
     std::vector<double> d_result(nSpec,0.0);
     transportTimer.start();
@@ -189,6 +186,7 @@ get_cantera_results( const bool timings,
       iMass = massFracs.begin();
       CellField::iterator iCantEnd = canteraResults[0]->end();
       for(CellField::iterator iCant = canteraResults[0]->begin(); iCant!=iCantEnd; ++iTemp, ++iMass, ++iCant){
+        const std::vector<double>& mass = *iMass;
         canteraThermo.setState_TPY( *iTemp, refPressure, &(*iMass)[0]);
         switch( transportQuantity ){
         case TCOND:
@@ -202,7 +200,6 @@ get_cantera_results( const bool timings,
     }
     transportTimer.stop();
   }
-
   if( timings ) std::cout << "Cantera " + transport_name(transportQuantity) + " time " << transportTimer.elapsed_time()/canteraReps << std::endl;
   return canteraResults;
 }
@@ -248,7 +245,7 @@ bool driver( const bool timings,
   Expr::ExpressionFactory exprFactory;
 
   exprFactory.register_expression( new Temp::Builder(tTag) );
-  exprFactory.register_expression( new Pressure ::Builder (pTag                 ) );
+  exprFactory.register_expression( new Pressure ::Builder (pTag) );
   BOOST_FOREACH( const Expr::Tag& yiTag, yiTags){
     exprFactory.register_expression( new MassFracs::Builder (yiTag) );
   }
@@ -273,19 +270,19 @@ bool driver( const bool timings,
     break;
   }
 
-  std::vector<int> ptvec;
+  std::vector<So::IntVec> ptvec;
   if( timings ){
-    ptvec.push_back(8*8*8);
-    ptvec.push_back(16*16*16);
-    ptvec.push_back(32*32*32);
-    ptvec.push_back(64*64*64);
-    ptvec.push_back(128*128*128);
+    ptvec.push_back( So::IntVec(  6,  6,  6) );
+    ptvec.push_back( So::IntVec( 14, 14, 14) );
+    ptvec.push_back( So::IntVec( 30, 30, 30) );
+    ptvec.push_back( So::IntVec( 62, 62, 62) );
+    ptvec.push_back( So::IntVec(126,126,126) );
   }
   else{
-    ptvec.push_back(10);
+    ptvec.push_back( So::IntVec(20,1,1) );
   }
 
-  for( std::vector<int>::iterator iPts = ptvec.begin(); iPts!= ptvec.end(); ++iPts){
+  for( std::vector<So::IntVec>::iterator iPts = ptvec.begin(); iPts!= ptvec.end(); ++iPts){
 
     Expr::ExpressionTree transportTree( transportID, exprFactory, 0 );
 
@@ -294,14 +291,14 @@ bool driver( const bool timings,
       transportTree.write_tree(fout);
     }
 
-    So::IntVec npts(*iPts,1,1);
+    So::IntVec nPts = *iPts;
     const So::BoundaryCellInfo cellBCInfo = So::BoundaryCellInfo::build<CellField>(false,false,false);
     const So::GhostData cellGhosts(1);
-    const So::MemoryWindow vwindow( So::get_window_with_ghost(npts,cellGhosts,cellBCInfo) );
+    const So::MemoryWindow vwindow( So::get_window_with_ghost(nPts,cellGhosts,cellBCInfo) );
     CellField xcoord( vwindow, cellBCInfo, cellGhosts, NULL );
 
     std::vector<double> length(3,1.0);
-    So::Grid grid( npts, length );
+    So::Grid grid( nPts, length );
     grid.set_coord<SpatialOps::XDIR>( xcoord );
 #   ifdef ENABLE_CUDA
     xcoord.add_device( GPU_INDEX );
@@ -310,7 +307,7 @@ bool driver( const bool timings,
     Expr::FieldManagerList fml;
 
     transportTree.register_fields( fml );
-    fml.allocate_fields( Expr::FieldAllocInfo( npts, 0, 0, false, false, false ) );
+    fml.allocate_fields( Expr::FieldAllocInfo( nPts, 0, 0, false, false, false ) );
     transportTree.bind_fields( fml );
 
     using namespace SpatialOps;
@@ -324,11 +321,11 @@ bool driver( const bool timings,
       p <<= refPressure;
     }
 
-    calculate_mass_fracs( nSpec, xcoord, yiTags, fml );
+    const std::vector< std::vector<double> > massFracs = calculate_mass_fracs( nSpec, xcoord, yiTags, fml );
 
     transportTree.lock_fields( fml );  // prevent fields from being deallocated so that we can get them after graph execution.
 
-    if( timings ) std::cout << std::endl << transport_name(transportQuantity) << " test - " << *iPts << std::endl;
+    if( timings ) std::cout << std::endl << transport_name(transportQuantity) << " test - " << vwindow.glob_npts() << std::endl;
 
     Timer transportTimer;
     transportTimer.start();
@@ -346,12 +343,11 @@ bool driver( const bool timings,
     }
     temp.set_device_as_active( CPU_INDEX );
 #   endif
-
     const std::vector< CellFieldPtrT > canteraResults = get_cantera_results( timings,
-        canteraReps,
+                                                                             canteraReps,
                                                                              transportQuantity,
                                                                              *mixTrans,
-                                                                             *iPts,
+                                                                             massFracs,
                                                                              temp );
 
     std::vector< CellFieldPtrT >::const_iterator iCantera = canteraResults.begin();
