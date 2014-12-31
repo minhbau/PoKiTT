@@ -14,6 +14,7 @@ class MixtureMolWeight
 {
   const Expr::TagList massFracTags_;
   const std::vector<double>& specMW_;
+  std::vector<double> molecularWeightsInv_;
   const int nSpec_;
   std::vector<const FieldT*> massFracs_;
 
@@ -65,6 +66,9 @@ MixtureMolWeight( const Expr::TagList& massFracTags,
     nSpec_( specMW.size() )
 {
   assert( massFracTags.size() == nSpec_ );
+  molecularWeightsInv_.resize(nSpec_);
+  for( size_t n=0; n<nSpec_; ++n)
+    molecularWeightsInv_[n] = 1 / specMW_[n];
 }
 
 //--------------------------------------------------------------------
@@ -101,9 +105,9 @@ evaluate()
   using namespace SpatialOps;
   FieldT& mixMW = this->value();
 
-  mixMW <<= *massFracs_[0] / specMW_[0];
+  mixMW <<= *massFracs_[0] * molecularWeightsInv_[0];
   for( size_t n=1; n<nSpec_; ++n ){
-    mixMW <<= mixMW + *massFracs_[n] / specMW_[n];
+    mixMW <<= mixMW + *massFracs_[n] * molecularWeightsInv_[n];
   }
   mixMW <<= 1.0 / mixMW;
 }
