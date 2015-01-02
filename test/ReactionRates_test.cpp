@@ -165,11 +165,11 @@ bool driver( const bool timings,
 
   std::vector<So::IntVec> ptvec;
   if( timings ){
-    ptvec.push_back( So::IntVec(  6,  6,  6) );
-    ptvec.push_back( So::IntVec( 14, 14, 14) );
-    ptvec.push_back( So::IntVec( 30, 30, 30) );
-    ptvec.push_back( So::IntVec( 62, 62, 62) );
     ptvec.push_back( So::IntVec(126,126,126) );
+    ptvec.push_back( So::IntVec( 62, 62, 62) );
+    ptvec.push_back( So::IntVec( 30, 30, 30) );
+    ptvec.push_back( So::IntVec( 14, 14, 14) );
+    ptvec.push_back( So::IntVec(  6,  6,  6) );
   }
   else{
     ptvec.push_back( So::IntVec(20,1,1) );
