@@ -14,23 +14,23 @@ set( Cantera_DIR "" CACHE PATH "Location where cantera was installed" )
 # default to release builds
 if( NOT CMAKE_BUILD_TYPE )
   set( CMAKE_BUILD_TYPE "Release" CACHE STRING
-    "Choose the type of build, options are: Debug Release RelWithDebInfo MinSizeRel."
-    FORCE )
+       "Choose the type of build, options are: Debug Release RelWithDebInfo MinSizeRel."
+       FORCE
+       )
 endif( NOT CMAKE_BUILD_TYPE )
 
 #-- Set the location for the installation.  Comment this out to install to /usr/local
 if( CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT )
-  set (CMAKE_INSTALL_PREFIX
-    ${CMAKE_CURRENT_BINARY_DIR}/install
-    CACHE PATH "Installation directory" FORCE
-    )
+  set( CMAKE_INSTALL_PREFIX
+       ${CMAKE_CURRENT_BINARY_DIR}/install
+       CACHE PATH "Installation directory" FORCE
+       )
 endif( CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT )
 
 set( PoKiTT_CONFIG_INSTALL
-  ${CMAKE_INSTALL_PREFIX}/share
-    CACHE PATH
-  "Location to install configuration files"
-  )
+     ${CMAKE_INSTALL_PREFIX}/share
+     CACHE PATH
+     "Location to install configuration files" )
 
 #-------------------------------------------------------------------------------
 #------------------------------------- GIT -------------------------------------
