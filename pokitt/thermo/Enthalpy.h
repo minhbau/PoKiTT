@@ -191,8 +191,17 @@ Enthalpy( const Expr::Tag& tTag,
       c[3] /= molecularWeights[n]; // convert to mass basis
       break;
     case NASA2:
-      for( std::vector<double>::iterator ic = c.begin() + 1; ic!=c.end(); ++ic)
+      for( std::vector<double>::iterator ic = c.begin() + 1; ic!=c.end(); ++ic){
         *ic *= Cantera::GasConstant / molecularWeights[n]; // dimensionalize the coefficients to mass basis
+      }
+      c[2] /= 2;
+      c[3] /= 3;
+      c[4] /= 4;
+      c[5] /= 5;
+      c[9] /= 2;
+      c[10] /= 3;
+      c[11] /= 4;
+      c[12] /= 5;
       break;
     case SHOMATE2:
       for( std::vector<double>::iterator ic = c.begin() + 1; ic!=c.end(); ++ic ){
@@ -280,8 +289,8 @@ evaluate()
       h <<= h + *massFracs_[n] * ( c[1] + c[3] * (*t_ - c[0]) );
       break;
     case NASA2:
-      h <<= h + *massFracs_[n] * cond( *t_ <= c[0] && *t_ >= minT, c[ 6] + c[1] * *t_ + c[2]/2 * t2 + c[ 3]/3 * t3 + c[ 4]/4 * t4 + c[ 5]/5 * t5) // if low temp
-                                     ( *t_ >  c[0] && *t_ <= maxT, c[13] + c[8] * *t_ + c[9]/2 * t2 + c[10]/3 * t3 + c[11]/4 * t4 + c[12]/5 * t5)  // else if high temp
+      h <<= h + *massFracs_[n] * cond( *t_ <= c[0] && *t_ >= minT, c[ 6] + c[1] * *t_ + c[2] * t2 + c[ 3] * t3 + c[ 4] * t4 + c[ 5] * t5) // if low temp
+                                     ( *t_ >  c[0] && *t_ <= maxT, c[13] + c[8] * *t_ + c[9] * t2 + c[10] * t3 + c[11] * t4 + c[12] * t5)  // else if high temp
                                      ( *t_ < minT, c[1] * *t_ + c[2] * minT * (*t_-minT/2) + c[ 3] * minT * minT * (*t_-2*minT/3) + c[ 4] * pow(minT,3) * (*t_-3*minT/4) + c[ 5] * pow(minT,4) * (*t_-4*minT/5) + c[ 6]) // else if out of bounds - low
                                      (             c[8] * *t_ + c[9] * maxT * (*t_-maxT/2) + c[10] * maxT * maxT * (*t_-2*maxT/3) + c[11] * pow(maxT,3) * (*t_-3*maxT/4) + c[12] * pow(maxT,4) * (*t_-4*maxT/5) + c[13]); // else out of bounds - high
       break;
@@ -345,6 +354,14 @@ SpeciesEnthalpy( const Expr::Tag& tTag,
     for( std::vector<double>::iterator ic = c_.begin() + 1; ic!=c_.end(); ++ic){
       *ic *= Cantera::GasConstant / molecularWeight; // dimensionalize the coefficients to mass basis
     }
+    c_[2] /= 2;
+    c_[3] /= 3;
+    c_[4] /= 4;
+    c_[5] /= 5;
+    c_[9] /= 2;
+    c_[10] /= 3;
+    c_[11] /= 4;
+    c_[12] /= 5;
     break;
   case SHOMATE2:
     for( std::vector<double>::iterator ic = c_.begin() + 1; ic!=c_.end(); ++ic ){
@@ -413,8 +430,8 @@ evaluate()
     h <<= c_[1] + c_[3] * (*t_ - c_[0]);
     break;
   case NASA2:
-    h <<= cond( *t_ <= c_[0] && *t_ >= minT_, c_[ 6] + c_[1] * *t_ + c_[2]/2 * t2 + c_[ 3]/3 * t3 + c_[ 4]/4 * t4 + c_[ 5]/5 * t5) // if low temp
-              ( *t_ >  c_[0] && *t_ <= maxT_, c_[13] + c_[8] * *t_ + c_[9]/2 * t2 + c_[10]/3 * t3 + c_[11]/4 * t4 + c_[12]/5 * t5)  // else if high temp
+    h <<= cond( *t_ <= c_[0] && *t_ >= minT_, c_[ 6] + c_[1] * *t_ + c_[2] * t2 + c_[ 3] * t3 + c_[ 4] * t4 + c_[ 5] * t5) // if low temp
+              ( *t_ >  c_[0] && *t_ <= maxT_, c_[13] + c_[8] * *t_ + c_[9] * t2 + c_[10] * t3 + c_[11] * t4 + c_[12] * t5)  // else if high temp
               ( *t_ <  minT_                 , c_[1] * *t_ + c_[2] * minT_ * (*t_-minT_/2) + c_[ 3] * minT_ * minT_ * (*t_ - 2*minT_/3) + c_[ 4] * pow(minT_,3) * (*t_ - 3*minT_/4) + c_[ 5] * pow(minT_,4) * (*t_ - 4*minT_/5) + c_[ 6]) // else if out of bounds - low
               (                                c_[8] * *t_ + c_[9] * maxT_ * (*t_-maxT_/2) + c_[10] * maxT_ * maxT_ * (*t_ - 2*maxT_/3) + c_[11] * pow(maxT_,3) * (*t_ - 3*maxT_/4) + c_[12] * pow(maxT_,4) * (*t_ - 4*maxT_/5) + c_[13]); // else out of bounds - high
     break;
