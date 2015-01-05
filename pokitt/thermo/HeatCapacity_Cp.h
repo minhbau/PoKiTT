@@ -218,6 +218,15 @@ HeatCapacity_Cp( const Expr::Tag& tTag,
       for( std::vector<double>::iterator ic = c.begin() + 1; ic!=c.end(); ++ic ){
         *ic *= 1e3 / molecularWeights[n]; // scale the coefficients to keep units consistent on mass basis
       }
+      //Shomate polynomial uses T/1000 so we multiply coefficients by 1e-3 to avoid division
+      c[2 ] *= 1e-3;
+      c[9 ] *= 1e-3;
+      c[3 ] *= 1e-6;
+      c[10] *= 1e-6;
+      c[4 ] *= 1e-9;
+      c[11] *= 1e-9;
+      c[5 ] *= 1e6;
+      c[12] *= 1e6;
       break;
     }
     cVec_.push_back(c); // vector of polynomial coefficients
@@ -280,9 +289,6 @@ evaluate()
   using namespace Cantera;
   FieldT& cp = this->value();
 
-  const FieldT& t2 =          *tPowers_[0]; // t^2
-  const FieldT& t3 =          *tPowers_[1]; // t^3
-  const FieldT& t4 =          *tPowers_[2]; // t^4
   const FieldT& recipRecipT = *tPowers_[5]; // t^-2
 
   cp <<= 0.0; // set cp to 0 before starting summation
@@ -300,17 +306,17 @@ evaluate()
        * If the temperature is out of range, the value is set to the value at the min or max temp
        */
     case NASA2:
-      cp <<= cp + *massFracs_[n] * cond( *t_ <= c[0] && *t_ >= minT, c[1] + c[2] * *t_ + c[ 3] * t2 + c[ 4] * t3 + c[ 5] * t4 ) // if low temp
-                                       ( *t_ >  c[0] && *t_ <= maxT, c[8] + c[9] * *t_ + c[10] * t2 + c[11] * t3 + c[12] * t4 )  // else if high temp
-                                       ( *t_ < minT, c[1] + c[2] * minT + c[ 3] * minT * minT + c[ 4] * pow(minT,3) + c[ 5] * pow(minT,4) )  // else if out of bounds - low
-                                       (             c[8] + c[9] * maxT + c[10] * maxT * maxT + c[11] * pow(maxT,3) + c[12] * pow(maxT,4) ); // else out of bounds - high
+      cp <<= cp + *massFracs_[n] * cond( *t_ <= c[0] && *t_ >= minT, c[1] + *t_  * ( c[2] + *t_  * ( c[ 3] + *t_  * ( c[ 4] + *t_  * c[ 5] ))) )  // if low temp
+                                       ( *t_ >  c[0] && *t_ <= maxT, c[8] + *t_  * ( c[9] + *t_  * ( c[10] + *t_  * ( c[11] + *t_  * c[12] ))) )  // else if high temp
+                                       ( *t_ < minT,                 c[1] + minT * ( c[2] + minT * ( c[ 3] + minT * ( c[ 4] + minT * c[ 5] ))) )  // else if out of bounds - low
+                                       (                             c[8] + maxT * ( c[9] + maxT * ( c[10] + maxT * ( c[11] + maxT * c[12] ))) ); // else out of bounds - high
 
       break;
     case SHOMATE2:
-      cp <<= cp + *massFracs_[n] * cond( *t_ <= c[0] && *t_ >= minT, c[1] + c[2] * *t_*1e-3 + c[ 3] * t2*1e-6 + c[ 4] * t3*1e-9 + c[ 5] * recipRecipT*1e6 ) // if low temp
-                                       ( *t_ >  c[0] && *t_ <= maxT, c[8] + c[9] * *t_*1e-3 + c[10] * t2*1e-6 + c[11] * t3*1e-9 + c[12] * recipRecipT*1e6 )  // else if high temp
-                                       ( *t_ < minT, c[1] + c[2] * minT*1e-3 + c[ 3] * minT*1e-3 * minT*1e-3 + c[ 4] * pow(minT*1e-3,3) + c[ 5] * pow(minT*1e-3,-2) )  // else if out of bounds - low
-                                       (             c[8] + c[9] * maxT*1e-3 + c[10] * maxT*1e-3 * maxT*1e-3 + c[11] * pow(maxT*1e-3,3) + c[12] * pow(maxT*1e-3,-2) ); // else out of bounds - high
+      cp <<= cp + *massFracs_[n] * cond( *t_ <= c[0] && *t_ >= minT, c[1] + *t_  * ( c[2] + *t_  * ( c[ 3] + *t_  * c[ 4])) + c[ 5] * recipRecipT )  // if low temp
+                                       ( *t_ >  c[0] && *t_ <= maxT, c[8] + *t_  * ( c[9] + *t_  * ( c[10] + *t_  * c[11])) + c[12] * recipRecipT )  // else if high temp
+                                       ( *t_ < minT,                 c[1] + minT * ( c[2] + minT * ( c[ 3] + minT * c[ 4])) + c[ 5] / (minT*minT) )  // else if out of bounds - low
+                                       (                             c[8] + maxT * ( c[9] + maxT * ( c[10] + maxT * c[11])) + c[12] / (maxT*maxT) ); // else out of bounds - high
 
       break;
     }
@@ -372,6 +378,15 @@ SpeciesHeatCapacity_Cp( const Expr::Tag& tTag,
     for( std::vector<double>::iterator ic = c_.begin() + 1; ic!=c_.end(); ++ic ){
       *ic *= 1e3 / molecularWeight; // scale the coefficients to keep units consistent on mass basis
     }
+    //Shomate polynomial uses T/1000 so we multiply coefficients by 1e-3 to avoid division
+    c_[2 ] *= 1e-3;
+    c_[9 ] *= 1e-3;
+    c_[3 ] *= 1e-6;
+    c_[10] *= 1e-6;
+    c_[4 ] *= 1e-9;
+    c_[11] *= 1e-9;
+    c_[5 ] *= 1e6;
+    c_[12] *= 1e6;
     break;
   }
   CanteraObjects::restore_gasmix(gasMix);
@@ -425,9 +440,6 @@ evaluate()
   using namespace SpatialOps;
   FieldT& cp = this->value();
 
-  const FieldT& t2 =          *tPowers_[0]; // t^2
-  const FieldT& t3 =          *tPowers_[1]; // t^3
-  const FieldT& t4 =          *tPowers_[2]; // t^4
   const FieldT& recipRecipT = *tPowers_[5]; // t^-2
 
   switch (polyType_) {
@@ -438,17 +450,17 @@ evaluate()
     /* polynomials are applicable in two temperature ranges - high and low
      * If the temperature is out of range, the value is set to the value at the min or max temp
      */
-    cp <<= cond( *t_ <= c_[0] && *t_ >= minT_, c_[1] + c_[2] * *t_ + c_[ 3] * t2 + c_[ 4] * t3 + c_[ 5] * t4 ) // if low temp
-               ( *t_ >  c_[0] && *t_ <= maxT_, c_[8] + c_[9] * *t_ + c_[10] * t2 + c_[11] * t3 + c_[12] * t4 )  // else if high temp
-               ( *t_ < minT_, c_[1] + c_[2] * minT_ + c_[ 3] * minT_ * minT_ + c_[ 4] * pow(minT_,3) + c_[ 5] * pow(minT_,4) )  // else if out of bounds - low
-               (              c_[8] + c_[9] * maxT_ + c_[10] * maxT_ * maxT_ + c_[11] * pow(maxT_,3) + c_[12] * pow(maxT_,4) ); // else out of bounds - high
+    cp <<= cond( *t_ <= c_[0] && *t_ >= minT_, c_[1] + *t_   * ( c_[2] + *t_   * ( c_[ 3] + *t_   * ( c_[ 4] + *t_   * c_[ 5] ))) )  // if low temp
+               ( *t_ >  c_[0] && *t_ <= maxT_, c_[8] + *t_   * ( c_[9] + *t_   * ( c_[10] + *t_   * ( c_[11] + *t_   * c_[12] ))) )  // else if high temp
+               ( *t_ < minT_,                  c_[1] + minT_ * ( c_[2] + minT_ * ( c_[ 3] + minT_ * ( c_[ 4] + minT_ * c_[ 5] ))) )  // else if out of bounds - low
+               (                               c_[8] + maxT_ * ( c_[9] + maxT_ * ( c_[10] + maxT_ * ( c_[11] + maxT_ * c_[12] ))) ); // else out of bounds - high
 
     break;
   case SHOMATE2:
-    cp <<= cond( *t_ <= c_[0] && *t_ >= minT_, c_[1] + c_[2] * *t_*1e-3 + c_[ 3] * t2*1e-6 + c_[ 4] * t3*1e-9 + c_[ 5] * recipRecipT*1e6 ) // if low temp
-               ( *t_ >  c_[0] && *t_ <= maxT_, c_[8] + c_[9] * *t_*1e-3 + c_[10] * t2*1e-6 + c_[11] * t3*1e-9 + c_[12] * recipRecipT*1e6 )  // else if high temp
-               ( *t_ < minT_, c_[1] + c_[2] * minT_*1e-3 + c_[ 3] * minT_*1e-3 * minT_*1e-3 + c_[ 4] * pow(minT_*1e-3,3) + c_[ 5] * pow(minT_*1e-3,-2) )  // else if out of bounds - low
-               (              c_[8] + c_[9] * maxT_*1e-3 + c_[10] * maxT_*1e-3 * maxT_*1e-3 + c_[11] * pow(maxT_*1e-3,3) + c_[12] * pow(maxT_*1e-3,-2) ); // else out of bounds - high
+    cp <<= cond( *t_ <= c_[0] && *t_ >= minT_, c_[1] + *t_   * ( c_[2] + *t_   * ( c_[ 3] + *t_   * c_[ 4])) + c_[ 5] * recipRecipT  )  // if low temp
+               ( *t_ >  c_[0] && *t_ <= maxT_, c_[8] + *t_   * ( c_[9] + *t_   * ( c_[10] + *t_   * c_[11])) + c_[12] * recipRecipT  )  // else if high temp
+               ( *t_ < minT_,                  c_[1] + minT_ * ( c_[2] + minT_ * ( c_[ 3] + minT_ * c_[ 4])) + c_[ 5] / (minT_*minT_))  // else if out of bounds - low
+               (                               c_[8] + maxT_ * ( c_[9] + maxT_ * ( c_[10] + maxT_ * c_[11])) + c_[12] / (maxT_*maxT_)); // else out of bounds - high
 
     break;
   }

@@ -161,17 +161,10 @@ evaluate()
   // pre-compute powers of temperature used in polynomial evaluations
   SpatFldPtr<FieldT> sqrtTPtr;
   SpatFldPtr<FieldT> logtPtr   = SpatialFieldStore::get<FieldT>(*temperature_); // log(t)
-  SpatFldPtr<FieldT> logttPtr  = SpatialFieldStore::get<FieldT>(*temperature_); // log(t)*log(t)
-  SpatFldPtr<FieldT> logtttPtr = SpatialFieldStore::get<FieldT>(*temperature_); // log(t)*log(t)*log(t)
-  SpatFldPtr<FieldT> logt4Ptr; // log(t)*log(t)*log(t)*log(t)
 
   FieldT& logt   = *logtPtr;
-  FieldT& logtt  = *logttPtr;
-  FieldT& logttt = *logtttPtr;
 
   logt   <<= log( *temperature_ );
-  logtt  <<= logt * logt;
-  logttt <<= logtt * logt;
 
   SpatFldPtr<FieldT> speciesTCondPtr = SpatialFieldStore::get<FieldT>(*temperature_); // temporary to store the thermal conductivity for an individual species
   SpatFldPtr<FieldT> sumPtr          = SpatialFieldStore::get<FieldT>(*temperature_); // for mixing rule
@@ -185,19 +178,16 @@ evaluate()
   inverseSum <<= 0.0; // set inverse sum to 0 before loop
 
   if( modelType_ == Cantera::cMixtureAveraged ) { // as opposed to CK mode
-    logt4Ptr = SpatialFieldStore::get<FieldT>(*temperature_);
     sqrtTPtr = SpatialFieldStore::get<FieldT>(*temperature_);
-
-    *logt4Ptr <<= logttt * logt;
     *sqrtTPtr <<= sqrt( *temperature_ );
   }
 
   for( size_t n = 0; n < nSpec_; ++n){
     const std::vector<double>& tCondCoefs = tCondCoefs_[n];
     if( modelType_ == Cantera::cMixtureAveraged )
-      speciesTCond <<= *sqrtTPtr * ( tCondCoefs[0] + tCondCoefs[1] * logt + tCondCoefs[2] * logtt + tCondCoefs[3] * logttt + tCondCoefs[4] * *logt4Ptr );
+      speciesTCond <<= *sqrtTPtr * ( tCondCoefs[0] + logt * ( tCondCoefs[1] + logt * ( tCondCoefs[2] + logt * ( tCondCoefs[3] + logt * tCondCoefs[4] ))) );
     else
-      speciesTCond <<=         exp ( tCondCoefs[0] + tCondCoefs[1] * logt + tCondCoefs[2] * logtt + tCondCoefs[3] * logttt );
+      speciesTCond <<=         exp ( tCondCoefs[0] + logt * ( tCondCoefs[1] + logt * ( tCondCoefs[2] + logt *   tCondCoefs[3]                         )) );
     sum        <<= sum        + *massFracs_[n] * speciesTCond * molecularWeightsInv_[n];
     inverseSum <<= inverseSum + *massFracs_[n] / speciesTCond * molecularWeightsInv_[n];
   }
