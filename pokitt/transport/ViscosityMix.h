@@ -252,32 +252,23 @@ evaluate()
   // pre-compute power of log(t) for the species viscosity polynomial
   SpatFldPtr<FieldT> tOneFourthPtr; // t^(1/4)
   SpatFldPtr<FieldT> logtPtr   = SpatialFieldStore::get<FieldT>(*temperature_);
-  SpatFldPtr<FieldT> logttPtr  = SpatialFieldStore::get<FieldT>(*temperature_);
-  SpatFldPtr<FieldT> logtttPtr = SpatialFieldStore::get<FieldT>(*temperature_);
-  SpatFldPtr<FieldT> logt4Ptr; // log(t)*log(t)*log(t)*log(t)
 
   FieldT& logt   = *logtPtr;
-  FieldT& logtt  = *logttPtr;
-  FieldT& logttt = *logtttPtr;
 
   logt   <<= log( *temperature_ );
-  logtt  <<= logt * logt;
-  logttt <<= logtt * logt;
 
   if( modelType_ == Cantera::cMixtureAveraged ) { // as opposed to CK mode
-    logt4Ptr      = SpatialFieldStore::get<FieldT>(*temperature_);
     tOneFourthPtr = SpatialFieldStore::get<FieldT>(*temperature_);
 
     *tOneFourthPtr <<= pow( *temperature_, 0.25 );
-    *logt4Ptr      <<= logttt * logt;
   }
 
   for( size_t n = 0; n<nSpec_; ++n ){
     const std::vector<double>& viscCoefs = viscosityCoefs_[n];
     if( modelType_ == Cantera::cMixtureAveraged )
-      *sqrtSpeciesVis[n] <<= *tOneFourthPtr * ( viscCoefs[0] + viscCoefs[1] * logt + viscCoefs[2] * logtt + viscCoefs[3] * logttt + viscCoefs[4] * *logt4Ptr );
+      *sqrtSpeciesVis[n] <<= *tOneFourthPtr * ( viscCoefs[0] + logt * ( viscCoefs[1] + logt * ( viscCoefs[2] + logt * ( viscCoefs[3] + logt * viscCoefs[4] ))) );
     else
-      *sqrtSpeciesVis[n] <<=      exp ( 0.5 * ( viscCoefs[0] + viscCoefs[1] * logt + viscCoefs[2] * logtt + viscCoefs[3] * logttt ) );
+      *sqrtSpeciesVis[n] <<=      exp ( 0.5 * ( viscCoefs[0] + logt * ( viscCoefs[1] + logt * ( viscCoefs[2] + logt *   viscCoefs[3]                        )) ));
   }
 
   mixVis <<= 0.0; // set result to 0 before summing species contributions
