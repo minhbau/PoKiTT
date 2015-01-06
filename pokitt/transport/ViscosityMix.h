@@ -216,7 +216,7 @@ Viscosity<FieldT>::
 advertise_dependents( Expr::ExprDeps& exprDeps )
 {
   exprDeps.requires_expression( temperatureTag_ );
-  exprDeps.requires_expression( massFracTags_ );
+  exprDeps.requires_expression( massFracTags_   );
 }
 
 //--------------------------------------------------------------------
@@ -250,16 +250,14 @@ evaluate()
     sqrtSpeciesVis.push_back(SpatialFieldStore::get<FieldT>(*temperature_));
 
   // pre-compute power of log(t) for the species viscosity polynomial
-  SpatFldPtr<FieldT> tOneFourthPtr; // t^(1/4)
-  SpatFldPtr<FieldT> logtPtr   = SpatialFieldStore::get<FieldT>(*temperature_);
+  SpatFldPtr<FieldT> tOneFourthPtr; // t^(1/4) -- may be used later on
+  SpatFldPtr<FieldT> logtPtr = SpatialFieldStore::get<FieldT>(*temperature_);
 
-  FieldT& logt   = *logtPtr;
-
-  logt   <<= log( *temperature_ );
+  FieldT& logt = *logtPtr;
+  logt <<= log( *temperature_ );
 
   if( modelType_ == Cantera::cMixtureAveraged ) { // as opposed to CK mode
     tOneFourthPtr = SpatialFieldStore::get<FieldT>(*temperature_);
-
     *tOneFourthPtr <<= pow( *temperature_, 0.25 );
   }
 

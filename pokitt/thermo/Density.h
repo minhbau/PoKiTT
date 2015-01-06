@@ -94,9 +94,7 @@ Density( const Expr::Tag& tTag,
 template< typename FieldT >
 Density<FieldT>::
 ~Density()
-{
-
-}
+{}
 
 //--------------------------------------------------------------------
 
@@ -119,10 +117,9 @@ bind_fields( const Expr::FieldManagerList& fml )
 {
   const typename Expr::FieldMgrSelector<FieldT>::type& fm = fml.field_manager<FieldT>();
 
-  t_ = &fm.field_ref( tTag_ );
-  p_ = &fm.field_ref( pTag_ );
+  t_ =   &fm.field_ref( tTag_   );
+  p_ =   &fm.field_ref( pTag_   );
   mmw_ = &fm.field_ref( mmwTag_ );
-
 }
 
 //--------------------------------------------------------------------
@@ -134,8 +131,7 @@ evaluate()
 {
   using namespace SpatialOps;
   FieldT& rho = this->value();
-
-  rho <<= *p_ * *mmw_ / *t_ / Cantera::GasConstant;
+  rho <<= *p_ * *mmw_ / ( *t_ * Cantera::GasConstant );
 }
 //--------------------------------------------------------------------
 

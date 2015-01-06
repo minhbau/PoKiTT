@@ -139,8 +139,10 @@ ThermalConductivity<FieldT>::
 bind_fields( const Expr::FieldManagerList& fml )
 {
   const typename Expr::FieldMgrSelector<FieldT>::type& fm = fml.field_manager<FieldT>();
+
   temperature_ = &fm.field_ref( temperatureTag_ );
-  mmw_ = &fm.field_ref( mmwTag_ );
+  mmw_         = &fm.field_ref( mmwTag_         );
+
   massFracs_.clear();
   BOOST_FOREACH( const Expr::Tag& tag, massFracTags_ ){
     massFracs_.push_back( &fm.field_ref(tag) );
@@ -159,12 +161,11 @@ evaluate()
   FieldT& mixTCond = this->value();
 
   // pre-compute powers of temperature used in polynomial evaluations
-  SpatFldPtr<FieldT> sqrtTPtr;
+  SpatFldPtr<FieldT> sqrtTPtr;  // may be used later on
   SpatFldPtr<FieldT> logtPtr   = SpatialFieldStore::get<FieldT>(*temperature_); // log(t)
 
-  FieldT& logt   = *logtPtr;
-
-  logt   <<= log( *temperature_ );
+  FieldT& logt = *logtPtr;
+  logt <<= log( *temperature_ );
 
   SpatFldPtr<FieldT> speciesTCondPtr = SpatialFieldStore::get<FieldT>(*temperature_); // temporary to store the thermal conductivity for an individual species
   SpatFldPtr<FieldT> sumPtr          = SpatialFieldStore::get<FieldT>(*temperature_); // for mixing rule

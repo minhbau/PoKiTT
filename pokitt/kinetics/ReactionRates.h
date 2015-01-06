@@ -197,7 +197,7 @@ ReactionRates( const Expr::Tag& tTag,
     int dOrder=0;
     std::vector<double>::const_iterator iStoich;
     for( iStoich = canteraRStoich.begin(); iStoich!=canteraRStoich.end(); ++iStoich ){
-      if( fabs(*iStoich-1) <1e-2 )
+      if( fabs(*iStoich-1) < 1e-2 )
         rStoich.push_back(1);
       else if( fabs(*iStoich-2) < 1e-2 )
         rStoich.push_back(2);
@@ -229,7 +229,7 @@ ReactionRates( const Expr::Tag& tTag,
 
     rStoich_.push_back(rStoich); // store stoich coeffs for each reaction
     pStoich_.push_back(pStoich);
-    dOrder_.push_back(dOrder); // store dOrder for each reaction
+    dOrder_ .push_back(dOrder ); // store dOrder for each reaction
   }
 
   // collect polynomial coefficients for evaluating the gibbs energy function
@@ -250,14 +250,14 @@ ReactionRates( const Expr::Tag& tTag,
     case NASA2:
       for( std::vector<double>::iterator ic = c.begin() + 1; ic!=c.end(); ++ic)
         *ic *= Cantera::GasConstant; // dimensionalize the coefficients
-      c[2]  = c[2]/2; // perform division of coefficients here - minor optimization
-      c[3]  = c[3]/6;
-      c[4]  = c[4]/12;
-      c[5]  = c[5]/20;
-      c[9]  = c[9]/2;
-      c[10] = c[10]/6;
-      c[11] = c[11]/12;
-      c[12] = c[12]/20;
+      c[ 2] /= 2; // perform division of coefficients here - minor optimization
+      c[ 3] /= 6;
+      c[ 4] /= 12;
+      c[ 5] /= 20;
+      c[ 9] /= 2;
+      c[10] /= 6;
+      c[11] /= 12;
+      c[12] /= 20;
       break;
     default:{
       std::ostringstream msg;
@@ -334,8 +334,9 @@ evaluate()
   SpatFldPtr<FieldT> logTPtr    = SpatialFieldStore::get<FieldT>(t); // log(t)
 
   SpatFldPtr<FieldT> dgPtr      = SpatialFieldStore::get<FieldT>(t); // delta gibbs energy for a reaction
+
   std::vector< SpatFldPtr<FieldT> > gPtrvec; // gibbs energy for each species
-  for( size_t n=0; n<nSpec_; ++n)
+  for( size_t n=0; n<nSpec_; ++n )
     gPtrvec.push_back( SpatialFieldStore::get<FieldT>(t) );
 
   FieldT& conc    = *concPtr;
@@ -536,7 +537,7 @@ evaluate()
     for( iSpec = products.begin(); iSpec!=products.end(); ++iSpec, ++iStoich )
       *rRates[*iSpec] <<= *rRates[*iSpec] + *iStoich * (k - kr) * molecularWeights_[*iSpec];
 
-  }
+  } // loop over reactions
 }
 
 //--------------------------------------------------------------------

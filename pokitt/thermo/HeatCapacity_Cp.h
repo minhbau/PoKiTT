@@ -219,13 +219,13 @@ HeatCapacity_Cp( const Expr::Tag& tTag,
         *ic *= 1e3 / molecularWeights[n]; // scale the coefficients to keep units consistent on mass basis
       }
       //Shomate polynomial uses T/1000 so we multiply coefficients by 1e-3 to avoid division
-      c[2 ] *= 1e-3;
-      c[9 ] *= 1e-3;
-      c[3 ] *= 1e-6;
+      c[ 2] *= 1e-3;
+      c[ 9] *= 1e-3;
+      c[ 3] *= 1e-6;
       c[10] *= 1e-6;
-      c[4 ] *= 1e-9;
+      c[ 4] *= 1e-9;
       c[11] *= 1e-9;
-      c[5 ] *= 1e6;
+      c[ 5] *= 1e6;
       c[12] *= 1e6;
       break;
     }
@@ -240,9 +240,7 @@ HeatCapacity_Cp( const Expr::Tag& tTag,
 template< typename FieldT >
 HeatCapacity_Cp<FieldT>::
 ~HeatCapacity_Cp()
-{
-
-}
+{}
 
 //--------------------------------------------------------------------
 
@@ -251,8 +249,8 @@ void
 HeatCapacity_Cp<FieldT>::
 advertise_dependents( Expr::ExprDeps& exprDeps )
 {
-  exprDeps.requires_expression( tTag_ );
-  exprDeps.requires_expression( tPowerTags_ );
+  exprDeps.requires_expression( tTag_         );
+  exprDeps.requires_expression( tPowerTags_   );
   exprDeps.requires_expression( massFracTags_ );
 }
 
@@ -310,14 +308,12 @@ evaluate()
                                        ( *t_ >  c[0] && *t_ <= maxT, c[8] + *t_  * ( c[9] + *t_  * ( c[10] + *t_  * ( c[11] + *t_  * c[12] ))) )  // else if high temp
                                        ( *t_ < minT,                 c[1] + minT * ( c[2] + minT * ( c[ 3] + minT * ( c[ 4] + minT * c[ 5] ))) )  // else if out of bounds - low
                                        (                             c[8] + maxT * ( c[9] + maxT * ( c[10] + maxT * ( c[11] + maxT * c[12] ))) ); // else out of bounds - high
-
       break;
     case SHOMATE2:
       cp <<= cp + *massFracs_[n] * cond( *t_ <= c[0] && *t_ >= minT, c[1] + *t_  * ( c[2] + *t_  * ( c[ 3] + *t_  * c[ 4])) + c[ 5] * recipRecipT )  // if low temp
                                        ( *t_ >  c[0] && *t_ <= maxT, c[8] + *t_  * ( c[9] + *t_  * ( c[10] + *t_  * c[11])) + c[12] * recipRecipT )  // else if high temp
                                        ( *t_ < minT,                 c[1] + minT * ( c[2] + minT * ( c[ 3] + minT * c[ 4])) + c[ 5] / (minT*minT) )  // else if out of bounds - low
                                        (                             c[8] + maxT * ( c[9] + maxT * ( c[10] + maxT * c[11])) + c[12] / (maxT*maxT) ); // else out of bounds - high
-
       break;
     }
   }
@@ -379,13 +375,13 @@ SpeciesHeatCapacity_Cp( const Expr::Tag& tTag,
       *ic *= 1e3 / molecularWeight; // scale the coefficients to keep units consistent on mass basis
     }
     //Shomate polynomial uses T/1000 so we multiply coefficients by 1e-3 to avoid division
-    c_[2 ] *= 1e-3;
-    c_[9 ] *= 1e-3;
-    c_[3 ] *= 1e-6;
+    c_[ 2] *= 1e-3;
+    c_[ 9] *= 1e-3;
+    c_[ 3] *= 1e-6;
     c_[10] *= 1e-6;
-    c_[4 ] *= 1e-9;
+    c_[ 4] *= 1e-9;
     c_[11] *= 1e-9;
-    c_[5 ] *= 1e6;
+    c_[ 5] *= 1e6;
     c_[12] *= 1e6;
     break;
   }
@@ -397,9 +393,7 @@ SpeciesHeatCapacity_Cp( const Expr::Tag& tTag,
 template< typename FieldT >
 SpeciesHeatCapacity_Cp<FieldT>::
 ~SpeciesHeatCapacity_Cp()
-{
-
-}
+{}
 
 //--------------------------------------------------------------------
 
@@ -408,7 +402,7 @@ void
 SpeciesHeatCapacity_Cp<FieldT>::
 advertise_dependents( Expr::ExprDeps& exprDeps )
 {
-  exprDeps.requires_expression( tTag_ );
+  exprDeps.requires_expression( tTag_       );
   exprDeps.requires_expression( tPowerTags_ );
 }
 
@@ -453,14 +447,12 @@ evaluate()
                ( *t_ >  c_[0] && *t_ <= maxT_, c_[8] + *t_   * ( c_[9] + *t_   * ( c_[10] + *t_   * ( c_[11] + *t_   * c_[12] ))) )  // else if high temp
                ( *t_ < minT_,                  c_[1] + minT_ * ( c_[2] + minT_ * ( c_[ 3] + minT_ * ( c_[ 4] + minT_ * c_[ 5] ))) )  // else if out of bounds - low
                (                               c_[8] + maxT_ * ( c_[9] + maxT_ * ( c_[10] + maxT_ * ( c_[11] + maxT_ * c_[12] ))) ); // else out of bounds - high
-
     break;
   case SHOMATE2:
     cp <<= cond( *t_ <= c_[0] && *t_ >= minT_, c_[1] + *t_   * ( c_[2] + *t_   * ( c_[ 3] + *t_   * c_[ 4])) + c_[ 5] * recipRecipT  )  // if low temp
                ( *t_ >  c_[0] && *t_ <= maxT_, c_[8] + *t_   * ( c_[9] + *t_   * ( c_[10] + *t_   * c_[11])) + c_[12] * recipRecipT  )  // else if high temp
                ( *t_ < minT_,                  c_[1] + minT_ * ( c_[2] + minT_ * ( c_[ 3] + minT_ * c_[ 4])) + c_[ 5] / (minT_*minT_))  // else if out of bounds - low
                (                               c_[8] + maxT_ * ( c_[9] + maxT_ * ( c_[10] + maxT_ * c_[11])) + c_[12] / (maxT_*maxT_)); // else out of bounds - high
-
     break;
   }
 }

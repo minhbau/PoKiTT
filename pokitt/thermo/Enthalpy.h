@@ -194,11 +194,11 @@ Enthalpy( const Expr::Tag& tTag,
       for( std::vector<double>::iterator ic = c.begin() + 1; ic!=c.end(); ++ic){
         *ic *= Cantera::GasConstant / molecularWeights[n]; // dimensionalize the coefficients to mass basis
       }
-      c[2] /= 2;
-      c[3] /= 3;
-      c[4] /= 4;
-      c[5] /= 5;
-      c[9] /= 2;
+      c[ 2] /= 2;
+      c[ 3] /= 3;
+      c[ 4] /= 4;
+      c[ 5] /= 5;
+      c[ 9] /= 2;
       c[10] /= 3;
       c[11] /= 4;
       c[12] /= 5;
@@ -207,21 +207,21 @@ Enthalpy( const Expr::Tag& tTag,
       for( std::vector<double>::iterator ic = c.begin() + 1; ic!=c.end(); ++ic ){
         *ic *= 1e6 / molecularWeights[n]; // scale the coefficients to keep units consistent on mass basis
       }
-      c[2] /= 2;
-      c[3] /= 3;
-      c[4] /= 4;
-      c[9] /= 2;
+      c[ 2] /= 2;
+      c[ 3] /= 3;
+      c[ 4] /= 4;
+      c[ 9] /= 2;
       c[10] /= 3;
       c[11] /= 4;
-      c[1] *= 1e-3;
-      c[8] *= 1e-3;
-      c[2] *= 1e-6;
-      c[9] *= 1e-6;
-      c[3] *= 1e-9;
+      c[ 1] *= 1e-3;
+      c[ 8] *= 1e-3;
+      c[ 2] *= 1e-6;
+      c[ 9] *= 1e-6;
+      c[ 3] *= 1e-9;
       c[10] *= 1e-9;
-      c[4] *= 1e-12;
+      c[ 4] *= 1e-12;
       c[11] *= 1e-12;
-      c[5] *= 1e3;
+      c[ 5] *= 1e3;
       c[12] *= 1e3;
       break;
     }
@@ -236,9 +236,7 @@ Enthalpy( const Expr::Tag& tTag,
 template< typename FieldT >
 Enthalpy<FieldT>::
 ~Enthalpy()
-{
-
-}
+{}
 
 //--------------------------------------------------------------------
 
@@ -247,8 +245,8 @@ void
 Enthalpy<FieldT>::
 advertise_dependents( Expr::ExprDeps& exprDeps )
 {
-  exprDeps.requires_expression( tTag_ );
-  exprDeps.requires_expression( tPowerTags_ );
+  exprDeps.requires_expression( tTag_         );
+  exprDeps.requires_expression( tPowerTags_   );
   exprDeps.requires_expression( massFracTags_ );
 }
 
@@ -379,21 +377,21 @@ SpeciesEnthalpy( const Expr::Tag& tTag,
     for( std::vector<double>::iterator ic = c_.begin() + 1; ic!=c_.end(); ++ic ){
       *ic *= 1e6 / molecularWeight; // scale the coefficients to keep units consistent on mass basis
     }
-    c_[2] /= 2;
-    c_[3] /= 3;
-    c_[4] /= 4;
-    c_[9] /= 2;
+    c_[ 2] /= 2;
+    c_[ 3] /= 3;
+    c_[ 4] /= 4;
+    c_[ 9] /= 2;
     c_[10] /= 3;
     c_[11] /= 4;
-    c_[1] *= 1e-3;
-    c_[8] *= 1e-3;
-    c_[2] *= 1e-6;
-    c_[9] *= 1e-6;
-    c_[3] *= 1e-9;
+    c_[ 1] *= 1e-3;
+    c_[ 8] *= 1e-3;
+    c_[ 2] *= 1e-6;
+    c_[ 9] *= 1e-6;
+    c_[ 3] *= 1e-9;
     c_[10] *= 1e-9;
-    c_[4] *= 1e-12;
+    c_[ 4] *= 1e-12;
     c_[11] *= 1e-12;
-    c_[5] *= 1e3;
+    c_[ 5] *= 1e3;
     c_[12] *= 1e3;
     break;
   }

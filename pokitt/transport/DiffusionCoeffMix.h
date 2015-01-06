@@ -401,9 +401,11 @@ DiffusionCoeffMol<FieldT>::
 bind_fields( const Expr::FieldManagerList& fml )
 {
   const typename Expr::FieldMgrSelector<FieldT>::type& fm = fml.field_manager<FieldT>();
+
   temperature_ = &fm.field_ref( temperatureTag_ );
-  p_ = &fm.field_ref( pTag_ );
-  mmw_ = &fm.field_ref( mmwTag_ );
+  p_           = &fm.field_ref( pTag_           );
+  mmw_         = &fm.field_ref( mmwTag_         );
+
   massFracs_.clear();
   BOOST_FOREACH( const Expr::Tag& tag, massFracTags_ ){
     massFracs_.push_back( &fm.field_ref(tag) );

@@ -94,9 +94,7 @@ Pressure( const Expr::Tag& tTag,
 template< typename FieldT >
 Pressure<FieldT>::
 ~Pressure()
-{
-
-}
+{}
 
 //--------------------------------------------------------------------
 
@@ -122,7 +120,6 @@ bind_fields( const Expr::FieldManagerList& fml )
   t_ = &fm.field_ref( tTag_ );
   rho_ = &fm.field_ref( rhoTag_ );
   mmw_ = &fm.field_ref( mmwTag_ );
-
 }
 
 //--------------------------------------------------------------------
@@ -133,9 +130,7 @@ Pressure<FieldT>::
 evaluate()
 {
   using namespace SpatialOps;
-  FieldT& p = this->value();
-
-  p <<= *rho_ * Cantera::GasConstant * *t_ / *mmw_;
+  this->value() <<= *rho_ * Cantera::GasConstant * *t_ / *mmw_;
 }
 //--------------------------------------------------------------------
 
