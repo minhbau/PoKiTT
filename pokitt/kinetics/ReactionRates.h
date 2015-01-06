@@ -4,7 +4,6 @@
 #include <expression/Expression.h>
 
 #include <pokitt/CanteraObjects.h> // include cantera wrapper
-#include <pokitt/thermo/Temperature.h>
 
 #include <cantera/kernel/ct_defs.h> // contains value of gas constant
 #include <cantera/kernel/reaction_defs.h> // reaction type definitions
@@ -80,13 +79,11 @@ class ReactionRates
   typedef std::vector<FieldT*> SpecT;
 
   const Expr::Tag tTag_;
-  const Expr::TagList tPowerTags_;
   const Expr::Tag pTag_;
   const Expr::Tag mmwTag_;
   const Expr::TagList massFracTags_;
 
   const FieldT* t_;
-  std::vector<const FieldT*> tPowers_;
   const FieldT* p_;
   const FieldT* mmw_; // mixture molecular weight
 
@@ -165,7 +162,6 @@ ReactionRates( const Expr::Tag& tTag,
                const Expr::Tag& mmwTag )
   : Expr::Expression<FieldT>(),
     tTag_( tTag ),
-    tPowerTags_( Temperature<FieldT>::temperature_powers_tags() ), // temperature powers are auto-generated
     pTag_( pTag ),
     massFracTags_( massFracTags ),
     mmwTag_( mmwTag )
@@ -280,7 +276,6 @@ ReactionRates<FieldT>::
 advertise_dependents( Expr::ExprDeps& exprDeps )
 {
   exprDeps.requires_expression( tTag_         );
-  exprDeps.requires_expression( tPowerTags_   );
   exprDeps.requires_expression( pTag_         );
   exprDeps.requires_expression( massFracTags_ );
   exprDeps.requires_expression( mmwTag_       );
@@ -295,11 +290,6 @@ bind_fields( const Expr::FieldManagerList& fml )
 {
   const typename Expr::FieldMgrSelector<FieldT>::type& fm = fml.field_manager<FieldT>();
   t_ = &fm.field_ref( tTag_ );
-
-  tPowers_.clear();
-  BOOST_FOREACH( const Expr::Tag& tag, tPowerTags_ ){
-    tPowers_.push_back( &fm.field_ref(tag) );
-  }
 
   p_ = &fm.field_ref( pTag_ );
   mmw_ = &fm.field_ref( mmwTag_ );
@@ -332,6 +322,7 @@ evaluate()
   SpatFldPtr<FieldT> krPtr      = SpatialFieldStore::get<FieldT>(t); // reverse rate constant
 
   SpatFldPtr<FieldT> logTPtr    = SpatialFieldStore::get<FieldT>(t); // log(t)
+  SpatFldPtr<FieldT> tRecipPtr  = SpatialFieldStore::get<FieldT>(t); // 1/t
 
   SpatFldPtr<FieldT> dgPtr      = SpatialFieldStore::get<FieldT>(t); // delta gibbs energy for a reaction
 
@@ -347,10 +338,11 @@ evaluate()
   FieldT& kr = *krPtr;
 
   FieldT& logT   = *logTPtr;
+  FieldT& tRecip = *tRecipPtr;
   FieldT& dg = *dgPtr;
 
-  const FieldT& tRecip = *tPowers_[0];
   logT    <<= log(t);
+  tRecip  <<= 1/t;
   conc    <<= tRecip * p / GasConstant; // molar concentration
   logConc <<= log(conc);
   conc    <<= conc * *mmw_; // mass concentration

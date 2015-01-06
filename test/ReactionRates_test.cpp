@@ -12,7 +12,6 @@
 
 #include <expression/ExprLib.h>
 
-#include <test/TemperaturePowers.h>
 #include <pokitt/MixtureMolWeight.h>
 #include <pokitt/kinetics/ReactionRates.h>
 
@@ -133,7 +132,6 @@ bool driver( const bool timings,
   const double refPressure=gasMix->pressure();
 
   typedef Expr::PlaceHolder <CellField> Temp;
-  typedef TemperaturePowers <CellField> TemperaturePowers;
   typedef Expr::PlaceHolder <CellField> Pressure;
   typedef Expr::PlaceHolder <CellField> MassFracs;
   typedef MixtureMolWeight  <CellField> MixtureMolWeight;
@@ -157,7 +155,6 @@ bool driver( const bool timings,
     exprFactory.register_expression( new MassFracs::Builder( yiTag ) );
   }
   exprFactory.register_expression( new Temp             ::Builder( tTag  ) );
-  exprFactory.register_expression( new TemperaturePowers::Builder( tTag  ) );
   exprFactory.register_expression( new Pressure         ::Builder( pTag  ) );
   exprFactory.register_expression( new MixtureMolWeight ::Builder( mmwTag, yiTags ));
 

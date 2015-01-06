@@ -10,7 +10,6 @@
 #include <fstream>
 #include "TestHelper.h"
 
-#include <test/TemperaturePowers.h>
 #include <pokitt/thermo/HeatCapacity_Cp.h>
 #include <pokitt/thermo/HeatCapacity_Cv.h>
 #include <pokitt/thermo/Enthalpy.h>
@@ -242,7 +241,6 @@ bool driver( const bool timings,
   const int nSpec=gasMix->nSpecies();
 
   typedef Expr::PlaceHolder < CellField > Temp;
-  typedef TemperaturePowers < CellField > TemperaturePowers;
   typedef Expr::PlaceHolder < CellField > MassFracs;
 
   const Expr::Tag tTag  ( "Temperature", Expr::STATE_NONE );
@@ -265,7 +263,6 @@ bool driver( const bool timings,
   Expr::ExpressionFactory exprFactory;
 
   exprFactory.register_expression( new Temp             ::Builder(tTag) );
-  exprFactory.register_expression( new TemperaturePowers::Builder(tTag) );
   BOOST_FOREACH( Expr::Tag yiTag, yiTags){
     exprFactory.register_expression( new MassFracs::Builder (yiTag) );
   }

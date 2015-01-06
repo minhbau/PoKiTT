@@ -3,6 +3,8 @@
 
 #include <expression/Expression.h>
 
+#include <pokitt/CanteraObjects.h> //include cantera wrapper
+
 namespace pokitt{
 
 /**

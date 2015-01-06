@@ -11,7 +11,6 @@
 #include "TestHelper.h"
 
 #include <pokitt/thermo/Temperature.h>
-#include <test/TemperaturePowers.h>
 #include <pokitt/MixtureMolWeight.h>
 
 #include <expression/ExprLib.h>
@@ -169,29 +168,6 @@ get_cantera_result( const bool timings,
 
 //==============================================================================
 
-bool TPowers_equal( TestHelper& status, CellFieldPtrT canteraResult, Expr::FieldMgrSelector<CellField>::type& cellFM, const Expr::TagList& tPowerTags ){
-
-  CellFieldPtrT canteraTPower = So::SpatialFieldStore::get<CellField>(*canteraResult, CPU_INDEX);
-# ifdef ENABLE_CUDA
-  BOOST_FOREACH( const Expr::Tag& tPowerTag, tPowerTags){
-    CellField& tpow = cellFM.field_ref(tPowerTag);
-    tpow.set_device_as_active( CPU_INDEX );
-  }
-# endif
-
-  *canteraTPower <<= 1 / *canteraResult;
-  CellField& recipT = cellFM.field_ref(tPowerTags[0]);
-  status( field_equal(recipT, *canteraTPower , 5e-4), tPowerTags[0].name() );
-
-  *canteraTPower <<=  1 / *canteraResult / *canteraResult;
-  CellField& recipRecipT = cellFM.field_ref(tPowerTags[1]);
-  status( field_equal(recipRecipT, *canteraTPower , 5e-4), tPowerTags[1].name() );
-
-  return status.ok();
-}
-
-//==============================================================================
-
 bool driver( const bool timings,
              const size_t pokittReps,
              const size_t canteraReps,
@@ -216,7 +192,6 @@ bool driver( const bool timings,
   }
   const Expr::Tag energyTag( energy_name(energyType) ,   Expr::STATE_NONE);
   const Expr::Tag keTag    ( "kinetic energy",           Expr::STATE_NONE);
-  Expr::TagList tPowerTags;
   const Expr::Tag tTag     ( "Temperature",              Expr::STATE_NONE);
 
   Expr::ExpressionFactory exprFactory;
@@ -231,13 +206,11 @@ bool driver( const bool timings,
   case H:
     typedef Temperature <CellField> Temperature;
     temp_id = exprFactory.register_expression( new Temperature ::Builder (tTag, yiTags, energyTag) );
-    tPowerTags = Temperature::temperature_powers_tags();
     break;
   case E0:
     typedef TemperatureFromE0 <CellField> TemperatureE0;
     exprFactory.register_expression( new KineticEnergy::Builder (keTag) );
     temp_id = exprFactory.register_expression( new TemperatureE0 ::Builder (tTag, yiTags, energyTag, keTag) );
-    tPowerTags = TemperatureE0::temperature_powers_tags();
     break;
   }
 
@@ -326,8 +299,6 @@ bool driver( const bool timings,
     CellFieldPtrT canteraResult = get_cantera_result( timings, canteraReps, energyType, *gasMix, massFracs, *canteraVolume, xcoord, energy );
 
     status( field_equal(temp, *canteraResult, 5e-4), tTag.name() );
-
-    status( TPowers_equal( status, canteraResult, cellFM, tPowerTags ), "TPowers" );
 
   }
   return status.ok();

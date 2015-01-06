@@ -4,7 +4,6 @@
 #include <expression/Expression.h>
 
 #include <pokitt/CanteraObjects.h> //include cantera wrapper
-#include <pokitt/thermo/Temperature.h>
 
 #include <cantera/kernel/ct_defs.h> // contains value of gas constant
 #include <cantera/kernel/SpeciesThermoInterpType.h> // contains definitions for which polynomial is being used
@@ -40,10 +39,8 @@ class Enthalpy
 {
   typedef std::vector<double> PolyVals; // values used for polynomial
   const Expr::Tag tTag_;
-  const Expr::TagList tPowerTags_;
   Expr::TagList massFracTags_;
   const FieldT* t_;
-  std::vector<const FieldT*> tPowers_;
   std::vector<const FieldT*> massFracs_;
 
   int nSpec_; // number of species
@@ -51,6 +48,7 @@ class Enthalpy
   PolyVals maxTVec_; // vector of maximum temperatures for polynomial evaluations
   std::vector< PolyVals > cVec_; // vector of polynomial coefficients
   std::vector<int> polyTypeVec_; // vector of polynomial types
+  bool shomateFlag_; // true if any polynomial is shomate
 
   Enthalpy( const Expr::Tag& tTag,
             const Expr::Tag& massFracTag );
@@ -104,9 +102,7 @@ class SpeciesEnthalpy
  : public Expr::Expression<FieldT>
 {
   const Expr::Tag tTag_;
-  const Expr::TagList tPowerTags_;
   const FieldT* t_;
-  std::vector<const FieldT*> tPowers_;
 
   const int n_; //index of species to be evaluated
   double minT_; // minimum temperature for polynomial evaluation
@@ -158,7 +154,7 @@ Enthalpy( const Expr::Tag& tTag,
           const Expr::Tag& massFracTag )
   : Expr::Expression<FieldT>(),
     tTag_( tTag ),
-    tPowerTags_( Temperature<FieldT>::temperature_powers_tags() ) // temperature powers are auto-generated
+    shomateFlag_( false )
 {
   this->set_gpu_runnable( true );
 
@@ -204,6 +200,7 @@ Enthalpy( const Expr::Tag& tTag,
       c[12] /= 5;
       break;
     case SHOMATE2:
+      shomateFlag_ = true;
       for( std::vector<double>::iterator ic = c.begin() + 1; ic!=c.end(); ++ic ){
         *ic *= 1e6 / molecularWeights[n]; // scale the coefficients to keep units consistent on mass basis
       }
@@ -246,7 +243,6 @@ Enthalpy<FieldT>::
 advertise_dependents( Expr::ExprDeps& exprDeps )
 {
   exprDeps.requires_expression( tTag_         );
-  exprDeps.requires_expression( tPowerTags_   );
   exprDeps.requires_expression( massFracTags_ );
 }
 
@@ -260,11 +256,6 @@ bind_fields( const Expr::FieldManagerList& fml )
   const typename Expr::FieldMgrSelector<FieldT>::type& fm = fml.field_manager<FieldT>();
 
   t_ = &fm.field_ref( tTag_ );
-
-  tPowers_.clear();
-  BOOST_FOREACH( const Expr::Tag& tag, tPowerTags_ ){
-    tPowers_.push_back( &fm.field_ref(tag) );
-  }
 
   massFracs_.clear();
   BOOST_FOREACH( const Expr::Tag& tag, massFracTags_ ){
@@ -282,7 +273,11 @@ evaluate()
   using namespace SpatialOps;
   FieldT& h = this->value();
 
-  const FieldT& recipT = *tPowers_[0]; // t^-1
+  SpatFldPtr<FieldT> recipT;      // may be used for Shomate polynomial
+  if( shomateFlag_ ) {
+    recipT = SpatialFieldStore::get<FieldT>(*t_);
+    *recipT <<= 1 / *t_;
+  }
 
   h <<= 0.0;
 
@@ -305,8 +300,8 @@ evaluate()
                                      (                             c[13] + c[8] * *t_ + maxT * ( 2*c[9] * *t_ + maxT * ( 3*c[10] * *t_ - c[9] + maxT * ( 4*c[11] * *t_ - 2*c[10] + maxT * ( 5*c[12] * *t_ - 3*c[11] + maxT * -4*c[12] )))) ); // else out of bounds - high
       break;
     case SHOMATE2:
-      h <<= h + *massFracs_[n] * cond( *t_ <= c[0] && *t_ >= minT, c[ 6] + *t_ * ( c[1] + *t_ * ( c[2] + *t_ * ( c[ 3] + *t_ * c[ 4] ))) - c[ 5] * recipT ) // if low temp
-                                     ( *t_ >  c[0] && *t_ <= maxT, c[13] + *t_ * ( c[8] + *t_ * ( c[9] + *t_ * ( c[10] + *t_ * c[11] ))) - c[12] * recipT )  // else if high range
+      h <<= h + *massFracs_[n] * cond( *t_ <= c[0] && *t_ >= minT, c[ 6] + *t_ * ( c[1] + *t_ * ( c[2] + *t_ * ( c[ 3] + *t_ * c[ 4] ))) - c[ 5] * *recipT ) // if low temp
+                                     ( *t_ >  c[0] && *t_ <= maxT, c[13] + *t_ * ( c[8] + *t_ * ( c[9] + *t_ * ( c[10] + *t_ * c[11] ))) - c[12] * *recipT )  // else if high range
                                      ( *t_ <  minT,                c[ 6] + c[1] * *t_ + minT * ( 2*c[2] * *t_ + minT * ( 3*c[ 3] * *t_ - c[2] + minT * ( 4*c[ 4] * *t_ - 2*c[ 3] + minT * -3*c[ 4] ))) + ( c[ 5] * *t_ / minT - 2*c[ 5] ) / minT ) // else if out of bounds - low
                                      (                             c[13] + c[8] * *t_ + maxT * ( 2*c[9] * *t_ + maxT * ( 3*c[10] * *t_ - c[9] + maxT * ( 4*c[11] * *t_ - 2*c[10] + maxT * -3*c[11] ))) + ( c[12] * *t_ / maxT - 2*c[12] ) / maxT ); // else out of bounds - high
       break;
@@ -343,7 +338,6 @@ SpeciesEnthalpy( const Expr::Tag& tTag,
                  const int n )
     : Expr::Expression<FieldT>(),
       tTag_( tTag ),
-      tPowerTags_( Temperature<FieldT>::temperature_powers_tags() ), // temperature powers are auto-generated
       n_ ( n )
 {
   this->set_gpu_runnable( true );
@@ -412,7 +406,6 @@ SpeciesEnthalpy<FieldT>::
 advertise_dependents( Expr::ExprDeps& exprDeps )
 {
   exprDeps.requires_expression( tTag_ );
-  exprDeps.requires_expression( tPowerTags_ );
 }
 
 //--------------------------------------------------------------------
@@ -425,11 +418,6 @@ bind_fields( const Expr::FieldManagerList& fml )
   const typename Expr::FieldMgrSelector<FieldT>::type& fm = fml.field_manager<FieldT>();
 
   t_ = &fm.field_ref( tTag_ );
-
-  tPowers_.clear();
-  BOOST_FOREACH( const Expr::Tag& tag, tPowerTags_ ){
-    tPowers_.push_back( &fm.field_ref(tag) );
-  }
 }
 
 //--------------------------------------------------------------------
@@ -441,8 +429,6 @@ evaluate()
 {
   using namespace SpatialOps;
   FieldT& h = this->value();
-
-  const FieldT& recipT = *tPowers_[0]; // t^-1
 
   switch (polyType_) {
   /* polynomial can be out of bounds low, low temp, high temp, or out of bounds high
@@ -458,8 +444,8 @@ evaluate()
               (                               c_[13] + c_[8] * *t_ + maxT_ * ( 2*c_[9] * *t_ + maxT_ * ( 3*c_[10] * *t_ - c_[9] + maxT_ * ( 4*c_[11] * *t_ - 2*c_[10] + maxT_ * ( 5*c_[12] * *t_ - 3*c_[11] + maxT_ * -4*c_[12] )))) ); // else out of bounds - high
     break;
   case SHOMATE2:
-    h <<= cond( *t_ <= c_[0] && *t_ >= minT_, c_[ 6] + *t_ * ( c_[1] + *t_ * ( c_[2] + *t_ * ( c_[ 3] + *t_ * c_[ 4] ))) - c_[ 5] * recipT ) // if low temp
-              ( *t_ >  c_[0] && *t_ <= maxT_, c_[13] + *t_ * ( c_[8] + *t_ * ( c_[9] + *t_ * ( c_[10] + *t_ * c_[11] ))) - c_[12] * recipT )  // else if high range
+    h <<= cond( *t_ <= c_[0] && *t_ >= minT_, c_[ 6] + *t_ * ( c_[1] + *t_ * ( c_[2] + *t_ * ( c_[ 3] + *t_ * c_[ 4] ))) - c_[ 5] / *t_ ) // if low temp
+              ( *t_ >  c_[0] && *t_ <= maxT_, c_[13] + *t_ * ( c_[8] + *t_ * ( c_[9] + *t_ * ( c_[10] + *t_ * c_[11] ))) - c_[12] / *t_ )  // else if high range
               ( *t_ <  minT_,                 c_[ 6] + c_[1] * *t_ + minT_ * ( 2*c_[2] * *t_ + minT_ * ( 3*c_[ 3] * *t_ - c_[2] + minT_ * ( 4*c_[ 4] * *t_ - 2*c_[ 3] + minT_ * -3*c_[ 4] ))) + ( c_[ 5] * *t_ / minT_ - 2*c_[ 5] ) / minT_ ) // else if out of bounds - low
               (                               c_[13] + c_[8] * *t_ + maxT_ * ( 2*c_[9] * *t_ + maxT_ * ( 3*c_[10] * *t_ - c_[9] + maxT_ * ( 4*c_[11] * *t_ - 2*c_[10] + maxT_ * -3*c_[11] ))) + ( c_[12] * *t_ / maxT_ - 2*c_[12] ) / maxT_ ); // else out of bounds - high
     break;
