@@ -348,22 +348,13 @@ evaluate()
   FieldT& logT   = *logTPtr;
   FieldT& dg = *dgPtr;
 
-  const FieldT& tRecip = *tPowers_[4];
+  const FieldT& tRecip = *tPowers_[0];
   logT    <<= log(t);
   conc    <<= tRecip * p / GasConstant; // molar concentration
   logConc <<= log(conc);
   conc    <<= conc * *mmw_; // mass concentration
 
   { // calculate the delta gibbs energy for each species for use in evaluating reversible rate constants
-    const FieldT& t2 = *tPowers_[0]; // t^2
-    const FieldT& t3 = *tPowers_[1]; // t^3
-    const FieldT& t4 = *tPowers_[2]; // t^4
-    const FieldT& t5 = *tPowers_[3]; // t^5
-
-    SpatFldPtr<FieldT> tlogTPtr = SpatialFieldStore::get<FieldT>(t); // t * log(t)
-    FieldT&            tlogT    = *tlogTPtr;
-    tlogT <<= t * logT;
-
     for( size_t n=0; n<nSpec_; ++n ){
       const int polyType = polyTypeVec_[n];
       const std::vector<double>& c = cVec_[n];
@@ -379,8 +370,8 @@ evaluate()
            * Caution: polynomials are used even if temperature is out of range
            * Note: coefficients have been divided by integers during construction of expression
            */
-          *gPtrvec[n] <<= cond( t <= c[0], c[ 6] + (c[1] - c[ 7]) * t - c[2] * t2 - c[ 3] * t3 - c[ 4] * t4 - c[ 5] * t5 - c[1] * tlogT ) // if low temp
-                              (            c[13] + (c[8] - c[14]) * t - c[9] * t2 - c[10] * t3 - c[11] * t4 - c[12] * t5 - c[8] * tlogT ); // else if high temp
+          *gPtrvec[n] <<= cond( t <= c[0], c[ 6] + t * ( c[1] - c[ 7] - c[1] * logT + t * ( -c[2] + t * ( -c[ 3] + t * ( -c[ 4] + t * -c[ 5] )))) )  // if low temp
+                              (            c[13] + t * ( c[8] - c[14] - c[8] * logT + t * ( -c[9] + t * ( -c[10] + t * ( -c[11] + t * -c[12] )))) );  // else if high temp
           break;
         }
       } // switch

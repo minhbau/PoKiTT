@@ -289,7 +289,7 @@ evaluate()
   using namespace Cantera;
   FieldT& cp = this->value();
 
-  const FieldT& recipRecipT = *tPowers_[5]; // t^-2
+  const FieldT& recipRecipT = *tPowers_[1]; // t^-2
 
   cp <<= 0.0; // set cp to 0 before starting summation
 
@@ -436,11 +436,10 @@ void
 SpeciesHeatCapacity_Cp<FieldT>::
 evaluate()
 {
-  using namespace Cantera;
   using namespace SpatialOps;
   FieldT& cp = this->value();
 
-  const FieldT& recipRecipT = *tPowers_[5]; // t^-2
+  const FieldT& recipRecipT = *tPowers_[1]; // t^-2
 
   switch (polyType_) {
   case SIMPLE:

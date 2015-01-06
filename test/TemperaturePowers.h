@@ -62,11 +62,7 @@ const Expr::TagList&
 TemperaturePowers<FieldT>::temperature_powers_tags()
 {
   using namespace Expr;
-  static TagList tags = tag_list( Tag("T^2"  ,STATE_NONE),
-                                  Tag("T^3"  ,STATE_NONE),
-                                  Tag("T^4"  ,STATE_NONE),
-                                  Tag("T^5"  ,STATE_NONE),
-                                  Tag("1/T"  ,STATE_NONE),
+  static TagList tags = tag_list( Tag("1/T"  ,STATE_NONE),
                                   Tag("1/T^2",STATE_NONE) );
   return tags;
 }
@@ -117,12 +113,8 @@ evaluate()
 {
   SpecT& powers = this->get_value_vec();
 
-  *powers[0] <<= *t_ * *t_; // t^2
-  *powers[1] <<= *t_ * *powers[0]; // t^3
-  *powers[2] <<= *t_ * *powers[1]; // t^4
-  *powers[3] <<= *t_ * *powers[2]; // t^5
-  *powers[4] <<= 1 / *t_; // t^-1
-  *powers[5] <<= 1 / *powers[0]; // t^-2
+  *powers[0] <<= 1 / *t_; // t^-1
+  *powers[1] <<= *powers[0] * *powers[0]; // t^-2
 }
 
 //--------------------------------------------------------------------

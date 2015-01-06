@@ -293,7 +293,7 @@ evaluate()
   using namespace SpatialOps;
   FieldT& cv = this->value();
 
-  const FieldT& recipRecipT = *tPowers_[5]; // t^-2
+  const FieldT& recipRecipT = *tPowers_[1]; // t^-2
 
   cv <<= 0.0; // set cv to 0 before starting summation
 
@@ -447,29 +447,29 @@ evaluate()
   using namespace SpatialOps;
   FieldT& cv = this->value();
 
-  const FieldT& recipRecipT = *tPowers_[5]; // t^-2
+  const FieldT& recipRecipT = *tPowers_[1]; // t^-2
 
   switch (polyType_) {
-    case SIMPLE:
-      cv <<= c_[3];
-      break;
-    case NASA2:
-      /* polynomials are applicable in two temperature ranges - high and low
-       * If the temperature is out of range, the value is set to the value at the min or max temp
-       */
-      cv <<= cond( *t_ <= c_[0] && *t_ >= minT_, c_[1] + *t_   * ( c_[2] + *t_   * ( c_[ 3] + *t_   * ( c_[ 4] + *t_   * c_[ 5] ))) )  // if low temp
-                 ( *t_ >  c_[0] && *t_ <= maxT_, c_[8] + *t_   * ( c_[9] + *t_   * ( c_[10] + *t_   * ( c_[11] + *t_   * c_[12] ))) )  // else if high temp
-                 ( *t_ < minT_,                  c_[1] + minT_ * ( c_[2] + minT_ * ( c_[ 3] + minT_ * ( c_[ 4] + minT_ * c_[ 5] ))) )  // else if out of bounds - low
-                 (                               c_[8] + maxT_ * ( c_[9] + maxT_ * ( c_[10] + maxT_ * ( c_[11] + maxT_ * c_[12] ))) ); // else out of bounds - high
+  case SIMPLE:
+    cv <<= c_[3];
+    break;
+  case NASA2:
+    /* polynomials are applicable in two temperature ranges - high and low
+     * If the temperature is out of range, the value is set to the value at the min or max temp
+     */
+    cv <<= cond( *t_ <= c_[0] && *t_ >= minT_, c_[1] + *t_   * ( c_[2] + *t_   * ( c_[ 3] + *t_   * ( c_[ 4] + *t_   * c_[ 5] ))) )  // if low temp
+               ( *t_ >  c_[0] && *t_ <= maxT_, c_[8] + *t_   * ( c_[9] + *t_   * ( c_[10] + *t_   * ( c_[11] + *t_   * c_[12] ))) )  // else if high temp
+               ( *t_ < minT_,                  c_[1] + minT_ * ( c_[2] + minT_ * ( c_[ 3] + minT_ * ( c_[ 4] + minT_ * c_[ 5] ))) )  // else if out of bounds - low
+               (                               c_[8] + maxT_ * ( c_[9] + maxT_ * ( c_[10] + maxT_ * ( c_[11] + maxT_ * c_[12] ))) ); // else out of bounds - high
 
-      break;
-    case SHOMATE2:
-      cv <<= cond( *t_ <= c_[0] && *t_ >= minT_, c_[1] + *t_   * ( c_[2] + *t_   * ( c_[ 3] + *t_   * c_[ 4])) + c_[ 5] * recipRecipT  )  // if low temp
-                 ( *t_ >  c_[0] && *t_ <= maxT_, c_[8] + *t_   * ( c_[9] + *t_   * ( c_[10] + *t_   * c_[11])) + c_[12] * recipRecipT  )  // else if high temp
-                 ( *t_ < minT_,                  c_[1] + minT_ * ( c_[2] + minT_ * ( c_[ 3] + minT_ * c_[ 4])) + c_[ 5] / (minT_*minT_))  // else if out of bounds - low
-                 (                               c_[8] + maxT_ * ( c_[9] + maxT_ * ( c_[10] + maxT_ * c_[11])) + c_[12] / (maxT_*maxT_)); // else out of bounds - high
+    break;
+  case SHOMATE2:
+    cv <<= cond( *t_ <= c_[0] && *t_ >= minT_, c_[1] + *t_   * ( c_[2] + *t_   * ( c_[ 3] + *t_   * c_[ 4])) + c_[ 5] * recipRecipT  )  // if low temp
+               ( *t_ >  c_[0] && *t_ <= maxT_, c_[8] + *t_   * ( c_[9] + *t_   * ( c_[10] + *t_   * c_[11])) + c_[12] * recipRecipT  )  // else if high temp
+               ( *t_ < minT_,                  c_[1] + minT_ * ( c_[2] + minT_ * ( c_[ 3] + minT_ * c_[ 4])) + c_[ 5] / (minT_*minT_))  // else if out of bounds - low
+               (                               c_[8] + maxT_ * ( c_[9] + maxT_ * ( c_[10] + maxT_ * c_[11])) + c_[12] / (maxT_*maxT_)); // else out of bounds - high
 
-      break;
+    break;
   }
 }
 

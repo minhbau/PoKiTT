@@ -179,29 +179,13 @@ bool TPowers_equal( TestHelper& status, CellFieldPtrT canteraResult, Expr::Field
   }
 # endif
 
-  *canteraTPower <<= *canteraResult * *canteraResult;
-  CellField& t2 = cellFM.field_ref(tPowerTags[0]);
-  status( field_equal(t2, *canteraTPower , 5e-4), tPowerTags[0].name() );
-
-  *canteraTPower <<= *canteraResult * *canteraResult * *canteraResult;
-  CellField& t3 = cellFM.field_ref(tPowerTags[1]);
-  status( field_equal(t3, *canteraTPower , 5e-4), tPowerTags[1].name() );
-
-  *canteraTPower <<= *canteraResult * *canteraResult * *canteraResult * *canteraResult;
-  CellField& t4 = cellFM.field_ref(tPowerTags[2]);
-  status( field_equal(t4, *canteraTPower , 5e-4), tPowerTags[2].name() );
-
-  *canteraTPower <<= *canteraResult * *canteraResult * *canteraResult * *canteraResult * *canteraResult;
-  CellField& t5 = cellFM.field_ref(tPowerTags[3]);
-  status( field_equal(t5, *canteraTPower , 5e-4), tPowerTags[3].name() );
-
   *canteraTPower <<= 1 / *canteraResult;
-  CellField& recipT = cellFM.field_ref(tPowerTags[4]);
-  status( field_equal(recipT, *canteraTPower , 5e-4), tPowerTags[4].name() );
+  CellField& recipT = cellFM.field_ref(tPowerTags[0]);
+  status( field_equal(recipT, *canteraTPower , 5e-4), tPowerTags[0].name() );
 
   *canteraTPower <<=  1 / *canteraResult / *canteraResult;
-  CellField& recipRecipT = cellFM.field_ref(tPowerTags[5]);
-  status( field_equal(recipRecipT, *canteraTPower , 5e-4), tPowerTags[5].name() );
+  CellField& recipRecipT = cellFM.field_ref(tPowerTags[1]);
+  status( field_equal(recipRecipT, *canteraTPower , 5e-4), tPowerTags[1].name() );
 
   return status.ok();
 }

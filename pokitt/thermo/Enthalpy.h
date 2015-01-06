@@ -214,15 +214,15 @@ Enthalpy( const Expr::Tag& tTag,
       c[10] /= 3;
       c[11] /= 4;
       c[1] *= 1e-3;
-       c[8] *= 1e-3;
-       c[2] *= 1e-6;
-       c[9] *= 1e-6;
-       c[3] *= 1e-9;
-       c[10] *= 1e-9;
-       c[4] *= 1e-12;
-       c[11] *= 1e-12;
-       c[5] *= 1e3;
-       c[12] *= 1e3;
+      c[8] *= 1e-3;
+      c[2] *= 1e-6;
+      c[9] *= 1e-6;
+      c[3] *= 1e-9;
+      c[10] *= 1e-9;
+      c[4] *= 1e-12;
+      c[11] *= 1e-12;
+      c[5] *= 1e3;
+      c[12] *= 1e3;
       break;
     }
     cVec_.push_back(c); // vector of polynomial coefficients
@@ -284,7 +284,7 @@ evaluate()
   using namespace SpatialOps;
   FieldT& h = this->value();
 
-  const FieldT& recipT = *tPowers_[4]; // t^-1
+  const FieldT& recipT = *tPowers_[0]; // t^-1
 
   h <<= 0.0;
 
@@ -444,7 +444,7 @@ evaluate()
   using namespace SpatialOps;
   FieldT& h = this->value();
 
-  const FieldT& recipT = *tPowers_[4]; // t^-1
+  const FieldT& recipT = *tPowers_[0]; // t^-1
 
   switch (polyType_) {
   /* polynomial can be out of bounds low, low temp, high temp, or out of bounds high
