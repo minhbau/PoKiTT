@@ -278,6 +278,10 @@ evaluate()
     recipT = SpatialFieldStore::get<FieldT>(*t_);
     *recipT <<= 1 / *t_;
   }
+# ifndef ENABLE_CUDA
+  const double maxTval = nebo_max(*t_);
+  const double minTval = nebo_min(*t_);
+# endif
 
   h <<= 0.0;
 
@@ -286,25 +290,48 @@ evaluate()
     std::vector<double>& c = cVec_[n];
     double minT = minTVec_[n];
     double maxT = maxTVec_[n];
-    switch (polyType) {
-    /* polynomial can be out of bounds low, low temp, high temp, or out of bounds high
-     * if out of bounds, enthalpy is interpolated from min or max temp using a constant cp
-     */
-    case SIMPLE: // constant heat capacity
-      h <<= h + *massFracs_[n] * ( c[1] + c[3] * (*t_ - c[0]) );
-      break;
-    case NASA2:
-      h <<= h + *massFracs_[n] * cond( *t_ <= c[0] && *t_ >= minT, c[ 6] + *t_ * ( c[1] + *t_ * ( c[2] + *t_ * ( c[ 3] + *t_ * ( c[ 4] + *t_ * c[ 5] )))) )  // if low temp
-                                     ( *t_ >  c[0] && *t_ <= maxT, c[13] + *t_ * ( c[8] + *t_ * ( c[9] + *t_ * ( c[10] + *t_ * ( c[11] + *t_ * c[12] )))) )  // else if high temp
-                                     ( *t_ < minT,                 c[ 6] + c[1] * *t_ + minT * ( 2*c[2] * *t_ + minT * ( 3*c[ 3] * *t_ - c[2] + minT * ( 4*c[ 4] * *t_ - 2*c[ 3] + minT * ( 5*c[ 5] * *t_ - 3*c[ 4] + minT * -4*c[ 5] )))) )  // else if out of bounds - low
-                                     (                             c[13] + c[8] * *t_ + maxT * ( 2*c[9] * *t_ + maxT * ( 3*c[10] * *t_ - c[9] + maxT * ( 4*c[11] * *t_ - 2*c[10] + maxT * ( 5*c[12] * *t_ - 3*c[11] + maxT * -4*c[12] )))) ); // else out of bounds - high
-      break;
-    case SHOMATE2:
-      h <<= h + *massFracs_[n] * cond( *t_ <= c[0] && *t_ >= minT, c[ 6] + *t_ * ( c[1] + *t_ * ( c[2] + *t_ * ( c[ 3] + *t_ * c[ 4] ))) - c[ 5] * *recipT ) // if low temp
-                                     ( *t_ >  c[0] && *t_ <= maxT, c[13] + *t_ * ( c[8] + *t_ * ( c[9] + *t_ * ( c[10] + *t_ * c[11] ))) - c[12] * *recipT )  // else if high range
-                                     ( *t_ <  minT,                c[ 6] + c[1] * *t_ + minT * ( 2*c[2] * *t_ + minT * ( 3*c[ 3] * *t_ - c[2] + minT * ( 4*c[ 4] * *t_ - 2*c[ 3] + minT * -3*c[ 4] ))) + ( c[ 5] * *t_ / minT - 2*c[ 5] ) / minT ) // else if out of bounds - low
-                                     (                             c[13] + c[8] * *t_ + maxT * ( 2*c[9] * *t_ + maxT * ( 3*c[10] * *t_ - c[9] + maxT * ( 4*c[11] * *t_ - 2*c[10] + maxT * -3*c[11] ))) + ( c[12] * *t_ / maxT - 2*c[12] ) / maxT ); // else out of bounds - high
-      break;
+#   ifndef ENABLE_CUDA // optimization benefits only the CPU - cond performs betters with if/else than with if/elif/elif/else
+    if( maxTval <= maxT && minTval >= minT){ // if true, temperature can only be either high or low
+      switch (polyType) {
+      /* polynomial can be out of bounds low, low temp, high temp, or out of bounds high
+       * if out of bounds, enthalpy is interpolated from min or max temp using a constant cp
+       */
+      case SIMPLE: // constant heat capacity
+        h <<= h + *massFracs_[n] * ( c[1] + c[3] * (*t_ - c[0]) );
+        break;
+      case NASA2:
+        h <<= h + *massFracs_[n] * cond( *t_ <= c[0] , c[ 6] + *t_ * ( c[1] + *t_ * ( c[2] + *t_ * ( c[ 3] + *t_ * ( c[ 4] + *t_ * c[ 5] )))) )  // if low temp
+                                       (               c[13] + *t_ * ( c[8] + *t_ * ( c[9] + *t_ * ( c[10] + *t_ * ( c[11] + *t_ * c[12] )))) );  // else if high temp
+        break;
+      case SHOMATE2:
+        h <<= h + *massFracs_[n] * cond( *t_ <= c[0] , c[ 6] + *t_ * ( c[1] + *t_ * ( c[2] + *t_ * ( c[ 3] + *t_ * c[ 4] ))) - c[ 5] * *recipT ) // if low temp
+                                       (               c[13] + *t_ * ( c[8] + *t_ * ( c[9] + *t_ * ( c[10] + *t_ * c[11] ))) - c[12] * *recipT );  // else if high range
+        break;
+      }
+    }
+    else
+#   endif
+    {
+      switch (polyType) {
+      /* polynomial can be out of bounds low, low temp, high temp, or out of bounds high
+       * if out of bounds, enthalpy is interpolated from min or max temp using a constant cp
+       */
+      case SIMPLE: // constant heat capacity
+        h <<= h + *massFracs_[n] * ( c[1] + c[3] * (*t_ - c[0]) );
+        break;
+      case NASA2:
+        h <<= h + *massFracs_[n] * cond( *t_ <= c[0] && *t_ >= minT, c[ 6] + *t_ * ( c[1] + *t_ * ( c[2] + *t_ * ( c[ 3] + *t_ * ( c[ 4] + *t_ * c[ 5] )))) )  // if low temp
+                                       ( *t_ >  c[0] && *t_ <= maxT, c[13] + *t_ * ( c[8] + *t_ * ( c[9] + *t_ * ( c[10] + *t_ * ( c[11] + *t_ * c[12] )))) )  // else if high temp
+                                       ( *t_ < minT,                 c[ 6] + c[1] * *t_ + minT * ( 2*c[2] * *t_ + minT * ( 3*c[ 3] * *t_ - c[2] + minT * ( 4*c[ 4] * *t_ - 2*c[ 3] + minT * ( 5*c[ 5] * *t_ - 3*c[ 4] + minT * -4*c[ 5] )))) )  // else if out of bounds - low
+                                       (                             c[13] + c[8] * *t_ + maxT * ( 2*c[9] * *t_ + maxT * ( 3*c[10] * *t_ - c[9] + maxT * ( 4*c[11] * *t_ - 2*c[10] + maxT * ( 5*c[12] * *t_ - 3*c[11] + maxT * -4*c[12] )))) ); // else out of bounds - high
+        break;
+      case SHOMATE2:
+        h <<= h + *massFracs_[n] * cond( *t_ <= c[0] && *t_ >= minT, c[ 6] + *t_ * ( c[1] + *t_ * ( c[2] + *t_ * ( c[ 3] + *t_ * c[ 4] ))) - c[ 5] * *recipT ) // if low temp
+                                       ( *t_ >  c[0] && *t_ <= maxT, c[13] + *t_ * ( c[8] + *t_ * ( c[9] + *t_ * ( c[10] + *t_ * c[11] ))) - c[12] * *recipT )  // else if high range
+                                       ( *t_ <  minT,                c[ 6] + c[1] * *t_ + minT * ( 2*c[2] * *t_ + minT * ( 3*c[ 3] * *t_ - c[2] + minT * ( 4*c[ 4] * *t_ - 2*c[ 3] + minT * -3*c[ 4] ))) + ( c[ 5] * *t_ / minT - 2*c[ 5] ) / minT ) // else if out of bounds - low
+                                       (                             c[13] + c[8] * *t_ + maxT * ( 2*c[9] * *t_ + maxT * ( 3*c[10] * *t_ - c[9] + maxT * ( 4*c[11] * *t_ - 2*c[10] + maxT * -3*c[11] ))) + ( c[12] * *t_ / maxT - 2*c[12] ) / maxT ); // else out of bounds - high
+        break;
+      }
     }
   }
 }

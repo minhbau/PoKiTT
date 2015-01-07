@@ -284,6 +284,11 @@ evaluate()
     *recipRecipT <<= 1 / ( *t_ * *t_ );
   }
 
+# ifndef ENABLE_CUDA
+  const double maxTval = nebo_max(*t_);
+  const double minTval = nebo_min(*t_);
+# endif
+
   cp <<= 0.0; // set cp to 0 before starting summation
 
   for( size_t n=0; n<nSpec_; ++n ){
@@ -291,25 +296,48 @@ evaluate()
     const std::vector<double>& c = cVec_[n];
     const double minT = minTVec_[n];
     const double maxT = maxTVec_[n];
-    switch (polyType) {
-    case SIMPLE:
-      cp <<= cp + *massFracs_[n] * c[3];
-      break;
-      /* polynomials are applicable in two temperature ranges - high and low
-       * If the temperature is out of range, the value is set to the value at the min or max temp
-       */
-    case NASA2:
-      cp <<= cp + *massFracs_[n] * cond( *t_ <= c[0] && *t_ >= minT, c[1] + *t_  * ( c[2] + *t_  * ( c[ 3] + *t_  * ( c[ 4] + *t_  * c[ 5] ))) )  // if low temp
-                                       ( *t_ >  c[0] && *t_ <= maxT, c[8] + *t_  * ( c[9] + *t_  * ( c[10] + *t_  * ( c[11] + *t_  * c[12] ))) )  // else if high temp
-                                       ( *t_ < minT,                 c[1] + minT * ( c[2] + minT * ( c[ 3] + minT * ( c[ 4] + minT * c[ 5] ))) )  // else if out of bounds - low
-                                       (                             c[8] + maxT * ( c[9] + maxT * ( c[10] + maxT * ( c[11] + maxT * c[12] ))) ); // else out of bounds - high
-      break;
-    case SHOMATE2:
-      cp <<= cp + *massFracs_[n] * cond( *t_ <= c[0] && *t_ >= minT, c[1] + *t_  * ( c[2] + *t_  * ( c[ 3] + *t_  * c[ 4])) + c[ 5] * *recipRecipT )  // if low temp
-                                       ( *t_ >  c[0] && *t_ <= maxT, c[8] + *t_  * ( c[9] + *t_  * ( c[10] + *t_  * c[11])) + c[12] * *recipRecipT )  // else if high temp
-                                       ( *t_ < minT,                 c[1] + minT * ( c[2] + minT * ( c[ 3] + minT * c[ 4])) + c[ 5] / (minT*minT)  )  // else if out of bounds - low
-                                       (                             c[8] + maxT * ( c[9] + maxT * ( c[10] + maxT * c[11])) + c[12] / (maxT*maxT)  ); // else out of bounds - high
-      break;
+#   ifndef ENABLE_CUDA // optimization benefits only the CPU - cond performs betters with if/else than with if/elif/elif/else
+    if( maxTval <= maxT && minTval >= minT){ // if true, temperature can only be either high or low
+      switch (polyType) {
+      case SIMPLE:
+        cp <<= cp + *massFracs_[n] * c[3];
+        break;
+        /* polynomials are applicable in two temperature ranges - high and low
+         * If the temperature is out of range, the value is set to the value at the min or max temp
+         */
+      case NASA2:
+        cp <<= cp + *massFracs_[n] * cond( *t_ <= c[0] , c[1] + *t_  * ( c[2] + *t_  * ( c[ 3] + *t_  * ( c[ 4] + *t_  * c[ 5] ))) )  // if low temp
+                                         (               c[8] + *t_  * ( c[9] + *t_  * ( c[10] + *t_  * ( c[11] + *t_  * c[12] ))) );  // else if high temp
+        break;
+      case SHOMATE2:
+        cp <<= cp + *massFracs_[n] * cond( *t_ <= c[0] , c[1] + *t_  * ( c[2] + *t_  * ( c[ 3] + *t_  * c[ 4])) + c[ 5] * *recipRecipT )  // if low temp
+                                         (               c[8] + *t_  * ( c[9] + *t_  * ( c[10] + *t_  * c[11])) + c[12] * *recipRecipT );  // else if high temp
+        break;
+      }
+    }
+    else
+#   endif
+    {
+      switch (polyType) {
+      case SIMPLE:
+        cp <<= cp + *massFracs_[n] * c[3];
+        break;
+        /* polynomials are applicable in two temperature ranges - high and low
+         * If the temperature is out of range, the value is set to the value at the min or max temp
+         */
+      case NASA2:
+        cp <<= cp + *massFracs_[n] * cond( *t_ <= c[0] && *t_ >= minT, c[1] + *t_  * ( c[2] + *t_  * ( c[ 3] + *t_  * ( c[ 4] + *t_  * c[ 5] ))) )  // if low temp
+                                         ( *t_ >  c[0] && *t_ <= maxT, c[8] + *t_  * ( c[9] + *t_  * ( c[10] + *t_  * ( c[11] + *t_  * c[12] ))) )  // else if high temp
+                                         ( *t_ < minT,                 c[1] + minT * ( c[2] + minT * ( c[ 3] + minT * ( c[ 4] + minT * c[ 5] ))) )  // else if out of bounds - low
+                                         (                             c[8] + maxT * ( c[9] + maxT * ( c[10] + maxT * ( c[11] + maxT * c[12] ))) ); // else out of bounds - high
+        break;
+      case SHOMATE2:
+        cp <<= cp + *massFracs_[n] * cond( *t_ <= c[0] && *t_ >= minT, c[1] + *t_  * ( c[2] + *t_  * ( c[ 3] + *t_  * c[ 4])) + c[ 5] * *recipRecipT )  // if low temp
+                                         ( *t_ >  c[0] && *t_ <= maxT, c[8] + *t_  * ( c[9] + *t_  * ( c[10] + *t_  * c[11])) + c[12] * *recipRecipT )  // else if high temp
+                                         ( *t_ < minT,                 c[1] + minT * ( c[2] + minT * ( c[ 3] + minT * c[ 4])) + c[ 5] / (minT*minT)  )  // else if out of bounds - low
+                                         (                             c[8] + maxT * ( c[9] + maxT * ( c[10] + maxT * c[11])) + c[12] / (maxT*maxT)  ); // else out of bounds - high
+        break;
+      }
     }
   }
 }

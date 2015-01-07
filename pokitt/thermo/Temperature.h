@@ -324,8 +324,10 @@ evaluate()
       *recipT      <<= 1/ temp;
       *recipRecipT <<= *recipT * *recipT;
     }
+#   ifndef ENABLE_CUDA
     const double maxTval = nebo_max(temp);
     const double minTval = nebo_min(temp);
+#   endif
     for( size_t n=0; n<nSpec_; ++n ){
       const int polyType = polyTypeVec_[n];
       const std::vector<double>& c = cVec_[n];
@@ -576,8 +578,10 @@ evaluate()
   FieldT& delE0 = *delE0Ptr;
   FieldT& dE0dT = *dE0dTPtr;
   FieldT& res   = *resPtr;
-
+# ifdef ENABLE_CUDA
   res.add_device(CPU_INDEX);
+# endif
+
   bool isConverged = false;
   while( !isConverged ){
     delE0 <<= *e0_ - *ke_;
@@ -625,7 +629,7 @@ evaluate()
         } // switch( polyType )
       }
       else
-#   endif
+#     endif
       {
         /* else temperature can be out of bounds low, low temp, high temp, or out of bounds high
          * if out of bounds, properties are interpolated from min or max temp using a constant cv
@@ -670,7 +674,9 @@ evaluate()
     // Newton's method to find root
     res  <<= delE0/dE0dT;
     temp <<= temp + res;
+#   ifdef ENABLE_CUDA
     res.set_device_as_active(CPU_INDEX);
+#   endif
     const double err = nebo_max( abs(res) );
 #   ifdef ENABLE_CUDA
     res.set_device_as_active(GPU_INDEX);
