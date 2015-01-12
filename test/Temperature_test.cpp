@@ -6,8 +6,6 @@
  */
 
 #include <iostream>
-#include <stdio.h>
-#include <fstream>
 #include "TestHelper.h"
 
 #include <pokitt/thermo/Temperature.h>
@@ -45,10 +43,12 @@ enum EnergyType{
 
 std::string energy_name( const EnergyType e )
 {
+  std::string name;
   switch(e){
-  case H  : return "enthalpy";
-  case E0 : return "E0";
+  case H  : name = "enthalpy"; break;
+  case E0 : name = "E0";       break;
   }
+  return name;
 }
 
 //==============================================================================
@@ -284,7 +284,7 @@ bool driver( const bool timings,
 
     tTree.lock_fields( fml );  // prevent fields from being deallocated so that we can get them after graph execution.
 
-    if( timings ) std::cout << std::endl << energy_name(energyType) << " test - " << vwindow.glob_npts() << std::endl;
+    if( timings ) std::cout << std::endl << "T from " << energy_name(energyType) << " test - " << vwindow.glob_npts() << std::endl;
 
     Timer tTimer;
     for( size_t rep = 0; rep < pokittReps; ++rep ){

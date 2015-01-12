@@ -6,8 +6,6 @@
  */
 
 #include <iostream>
-#include <stdio.h>
-#include <fstream>
 #include "TestHelper.h"
 
 #include <pokitt/transport/ThermalCondMix.h>
@@ -48,12 +46,14 @@ enum TransportQuantity{
 
 std::string transport_name( const TransportQuantity q )
 {
+  std::string name;
   switch(q){
-    case DIFF_MASS : return "Diffusion Coefficient Mass";
-    case DIFF_MOL : return "Diffusion Coefficient Mol";
-    case TCOND: return "Thermal Conductivity";
-    case VISC : return "Viscosity";
+    case DIFF_MASS: name = "Diffusion Coefficient Mass"; break;
+    case DIFF_MOL : name = "Diffusion Coefficient Mol";  break;
+    case TCOND    : name = "Thermal Conductivity";       break;
+    case VISC     : name = "Viscosity";                  break;
   }
+  return name;
 }
 
 //==============================================================================

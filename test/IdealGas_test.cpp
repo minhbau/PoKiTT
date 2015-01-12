@@ -6,8 +6,6 @@
  */
 
 #include <iostream>
-#include <stdio.h>
-#include <fstream>
 #include "TestHelper.h"
 
 #include <pokitt/thermo/Density.h>
@@ -45,10 +43,12 @@ enum GasQuantity{
 
 std::string property_name( const GasQuantity q )
 {
+  std::string name;
   switch(q){
-    case P  : return "pressure";
-    case RHO: return "density";
+    case P  : name = "pressure"; break;
+    case RHO: name = "density";  break;
   }
+  return name;
 }
 
 //==============================================================================

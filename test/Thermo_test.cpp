@@ -6,8 +6,6 @@
  */
 
 #include <iostream>
-#include <stdio.h>
-#include <fstream>
 #include "TestHelper.h"
 
 #include <pokitt/thermo/HeatCapacity_Cp.h>
@@ -46,11 +44,13 @@ enum ThermoQuantity{
 
 std::string thermo_name( const ThermoQuantity q )
 {
+  std::string name;
   switch(q){
-    case CP  : return "cp";
-    case CV  : return "cv";
-    case ENTH: return "h";
+    case CP  : name = "cp"; break;
+    case CV  : name = "cv"; break;
+    case ENTH: name = "h";  break;
   }
+  return name;
 }
 
 //==============================================================================

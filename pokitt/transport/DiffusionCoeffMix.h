@@ -465,7 +465,7 @@ evaluate()
         sum1 <<= sum1 + dInv * molecularWeightsInv_[j];
       }
     }
-    *mixD[i] <<= ( 1 - *massFracs_[i] ) / ( *p_ * sum1 * *mmw_ ); // mixing rule
+    *mixD[i] <<= ( 1 - *massFracs_[i] ) / ( p * sum1 * *mmw_ ); // mixing rule
   }
 
 }
