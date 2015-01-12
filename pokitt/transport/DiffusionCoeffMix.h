@@ -427,17 +427,10 @@ evaluate()
   // pre-compute power of log(t) for the species viscosity polynomial
   SpatFldPtr<FieldT> tThreeHalvesPtr; // t^(3/2)
   SpatFldPtr<FieldT> logtPtr   = SpatialFieldStore::get<FieldT>(*temperature_); // log(t)
-  SpatFldPtr<FieldT> logttPtr  = SpatialFieldStore::get<FieldT>(*temperature_); // log(t)*log(t)
-  SpatFldPtr<FieldT> logtttPtr = SpatialFieldStore::get<FieldT>(*temperature_); // log(t)*log(t)*log(t)
-  SpatFldPtr<FieldT> logt4Ptr; // log(t)*log(t)*log(t)*log(t)
 
   FieldT& logt   = *logtPtr;
-  FieldT& logtt  = *logttPtr;
-  FieldT& logttt = *logtttPtr;
 
   logt   <<= log( *temperature_ );
-  logtt  <<= logt * logt;
-  logttt <<= logtt * logt;
 
   SpatFldPtr<FieldT> dInvPtr = SpatialFieldStore::get<FieldT>(*temperature_);
   SpatFldPtr<FieldT> sum1Ptr = SpatialFieldStore::get<FieldT>(*temperature_);
@@ -446,10 +439,7 @@ evaluate()
   FieldT& sum1 = *sum1Ptr;
 
   if( modelType_ == Cantera::cMixtureAveraged ) { // as opposed to CK mode
-    logt4Ptr        = SpatialFieldStore::get<FieldT>(*temperature_);
     tThreeHalvesPtr = SpatialFieldStore::get<FieldT>(*temperature_);
-
-    *logt4Ptr        <<= logttt * logt;
     *tThreeHalvesPtr <<= pow( *temperature_, 1.5 );
   }
 
@@ -459,9 +449,9 @@ evaluate()
       if( j != i){
         const std::vector<double>& coefs = binaryDCoefs_[indices_[i][j]]; // coefficients for pair [i][j]
         if( modelType_ == Cantera::cMixtureAveraged )
-          dInv <<= *massFracs_[j] / ( *tThreeHalvesPtr * ( coefs[0] + coefs[1] * logt + coefs[2] * logtt + coefs[3] * logttt + coefs[4] * *logt4Ptr ) ); // polynomial in t for binary diffusion coefficients
+          dInv <<= *massFracs_[j] / ( *tThreeHalvesPtr * ( coefs[0] + logt * ( coefs[1] + logt * ( coefs[2] + logt * ( coefs[3] + logt * coefs[4] ))) )); // polynomial in t for binary diffusion coefficients
         else
-          dInv <<= *massFracs_[j] / (                exp ( coefs[0] + coefs[1] * logt + coefs[2] * logtt + coefs[3] * logttt ) );
+          dInv <<= *massFracs_[j] / (                exp ( coefs[0] + logt * ( coefs[1] + logt * ( coefs[2] + logt *   coefs[3]                    )) ));
         sum1 <<= sum1 + dInv * molecularWeightsInv_[j];
       }
     }
