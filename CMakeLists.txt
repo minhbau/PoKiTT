@@ -51,7 +51,6 @@ if( GIT_FOUND )
     if( NOT ${RESULT} EQUAL 0 )
       set( PoKiTT_REPO_HASH "\"No information available\"" )
     endif()
-    )
   execute_process(
     COMMAND ${GIT_EXECUTABLE} log -1 "--pretty=format:\"%cd\""
     WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
