@@ -46,13 +46,22 @@ if( GIT_FOUND )
     WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
     OUTPUT_VARIABLE PoKiTT_REPO_HASH 
     OUTPUT_STRIP_TRAILING_WHITESPACE
+    RESULT_VARIABLE RESULT
+    )
+    if( NOT ${RESULT} EQUAL 0 )
+      set( PoKiTT_REPO_HASH "\"No information available\"" )
+    endif()
     )
   execute_process(
     COMMAND ${GIT_EXECUTABLE} log -1 "--pretty=format:\"%cd\""
     WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
     OUTPUT_VARIABLE PoKiTT_REPO_DATE 
     OUTPUT_STRIP_TRAILING_WHITESPACE
+    RESULT_VARIABLE RESULT
     )
+    if( NOT ${RESULT} EQUAL 0 )
+      set( PoKiTT_REPO_DATE "\"No information available\"" )
+    endif()
 else( GIT_FOUND )
   set( PoKiTT_REPO_DATE "\"No information available\"" )
   set( PoKiTT_REPO_HASH "\"No information available\"" )
