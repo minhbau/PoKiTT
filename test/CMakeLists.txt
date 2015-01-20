@@ -11,9 +11,9 @@ include_directories( ${CMAKE_SOURCE_DIR} )
 
 nebo_add_executable( rxn_test ReactionRates_test.cpp )
 target_link_libraries( rxn_test pokitt )
-add_test( NAME rxn_test_h2      COMMAND rxn_test --xml-input-file=h2o2.xml         )
-add_test( NAME rxn_test_GRI     COMMAND rxn_test --xml-input-file=gri30.xml        )
-add_test( NAME rxn_test_ethanol COMMAND rxn_test --xml-input-file=ethanol_mech.xml )
+add_test( NAME rxn_test_h2      COMMAND rxn_test --xml-input-file=h2o2.xml    )
+add_test( NAME rxn_test_GRI     COMMAND rxn_test --xml-input-file=gri30.xml   )
+add_test( NAME rxn_test_ethanol COMMAND rxn_test --xml-input-file=ethanol.xml )
 
 nebo_add_executable( temperature_test Temperature_test.cpp )
 target_link_libraries( temperature_test pokitt )
