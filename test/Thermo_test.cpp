@@ -61,7 +61,7 @@ register_thermo_id( const bool mix,
                     Expr::ExpressionFactory& exprFactory,
                     const Expr::TagList& thermoTags,
                     const Expr::Tag& tTag,
-                    const Expr::Tag& yiTag,
+                    const Expr::TagList& yiTags,
                     const int nSpec)
 {
   std::set< Expr::ExpressionID > thermoID;
@@ -72,9 +72,9 @@ register_thermo_id( const bool mix,
     typedef Enthalpy       <CellField>::Builder Enthalpy;
     Expr::ExpressionBuilder* builder = NULL;
     switch( thermoQuantity ){
-      case CP  : builder = new       Cp( thermoTags[0], tTag, yiTag ); break;
-      case CV  : builder = new       Cv( thermoTags[0], tTag, yiTag ); break;
-      case ENTH: builder = new Enthalpy( thermoTags[0], tTag, yiTag ); break;
+      case CP  : builder = new       Cp( thermoTags[0], tTag, yiTags ); break;
+      case CV  : builder = new       Cv( thermoTags[0], tTag, yiTags ); break;
+      case ENTH: builder = new Enthalpy( thermoTags[0], tTag, yiTags ); break;
     } // switch( thermoQuantity )
     thermoID.insert( exprFactory.register_expression(builder) );
   }
@@ -269,7 +269,7 @@ bool driver( const bool timings,
   std::set< Expr::ExpressionID > thermoID = register_thermo_id( mix,
                                                                 thermoQuantity,
                                                                 exprFactory,
-                                                                thermoTags, tTag, yiTag,
+                                                                thermoTags, tTag, yiTags,
                                                                 nSpec);
 
   std::vector<So::IntVec> ptvec;

@@ -52,7 +52,7 @@ class HeatCapacity_Cv
 {
   typedef std::vector<double> PolyVals; // values used for polynomial
   const Expr::Tag tTag_;
-  Expr::TagList massFracTags_;
+  const Expr::TagList massFracTags_;
   const FieldT* t_;
   std::vector<const FieldT*> massFracs_;
 
@@ -64,7 +64,7 @@ class HeatCapacity_Cv
   bool shomateFlag_; // true if any polynomial is shomate
 
   HeatCapacity_Cv( const Expr::Tag& tTag,
-                   const Expr::Tag& massFracTag );
+                   const Expr::TagList& massFracTags );
 public:
   class Builder : public Expr::ExpressionBuilder
   {
@@ -77,13 +77,13 @@ public:
      */
     Builder( const Expr::Tag& resultTag,
              const Expr::Tag& tTag,
-             const Expr::Tag& massFracTag );
+             const Expr::TagList& massFracTags );
 
     Expr::ExpressionBase* build() const;
 
   private:
     const Expr::Tag tTag_;
-    const Expr::Tag massFracTag_;
+    const Expr::TagList massFracTags_;
   };
 
   ~HeatCapacity_Cv();
@@ -172,9 +172,10 @@ public:
 template< typename FieldT >
 HeatCapacity_Cv<FieldT>::
 HeatCapacity_Cv( const Expr::Tag& tTag,
-                 const Expr::Tag& massFracTag )
+                 const Expr::TagList& massFracTags )
   : Expr::Expression<FieldT>(),
     tTag_( tTag ),
+    massFracTags_( massFracTags ),
     shomateFlag_( false )
 {
   this->set_gpu_runnable( true );
@@ -183,12 +184,6 @@ HeatCapacity_Cv( const Expr::Tag& tTag,
   const Cantera::SpeciesThermo& spThermo = gasMix->speciesThermo();
 
   nSpec_ = gasMix->nSpecies();
-  massFracTags_.clear();
-  for( size_t n=0; n<nSpec_; ++n ){
-    std::ostringstream name;
-    name << massFracTag.name() << "_" << n;
-    massFracTags_.push_back( Expr::Tag(name.str(),massFracTag.context()) );
-  }
 
   const std::vector<double> molecularWeights = gasMix->molecularWeights();
   std::vector<double> c(15,0); //vector of Cantera's coefficients
@@ -351,10 +346,10 @@ template< typename FieldT >
 HeatCapacity_Cv<FieldT>::
 Builder::Builder( const Expr::Tag& resultTag,
                   const Expr::Tag& tTag,
-                  const Expr::Tag& massFracTag )
+                  const Expr::TagList& massFracTags )
   : ExpressionBuilder( resultTag ),
     tTag_( tTag ),
-    massFracTag_( massFracTag )
+    massFracTags_( massFracTags )
 {}
 
 //--------------------------------------------------------------------
@@ -364,7 +359,7 @@ Expr::ExpressionBase*
 HeatCapacity_Cv<FieldT>::
 Builder::build() const
 {
-  return new HeatCapacity_Cv<FieldT>( tTag_, massFracTag_ );
+  return new HeatCapacity_Cv<FieldT>( tTag_, massFracTags_ );
 }
 
 //--------------------------------------------------------------------
