@@ -33,12 +33,8 @@ template< typename FieldT >
 class ThermalConductivity
     : public Expr::Expression<FieldT>
 {
-  const Expr::Tag temperatureTag_;
-  const Expr::TagList massFracTags_;
-  const Expr::Tag mmwTag_;
-  const FieldT* temperature_;
-  const FieldT* mmw_; // mixture molecular weight, needed to convert from mass to mole fractions
-  std::vector<const FieldT*> massFracs_;
+  DECLARE_FIELDS( FieldT, temperature_, mmw_ )
+  DECLARE_VECTOR_OF_FIELDS( FieldT, massFracs_ )
 
   int nSpec_; //number of species to iterate over
   std::vector< std::vector<double> > tCondCoefs_;
@@ -59,11 +55,13 @@ public:
      *  @param temperatureTag temperature
      *  @param massFracTag tag for mass fraction of each species, ordering must be consistent with Cantera input
      *  @param mmwTag tag for mixture molecular weight
+     *  @param nghost the number of ghost cells to compute in
      */
     Builder( const Expr::Tag& resultTag,
              const Expr::Tag& temperatureTag,
              const Expr::TagList& massFracTags,
-             const Expr::Tag& mmwTag);
+             const Expr::Tag& mmwTag,
+             const int nghost = DEFAULT_NUMBER_OF_GHOSTS );
 
     Expr::ExpressionBase* build() const;
 
@@ -74,8 +72,6 @@ public:
   };
 
   ~ThermalConductivity();
-  void advertise_dependents( Expr::ExprDeps& exprDeps );
-  void bind_fields( const Expr::FieldManagerList& fml );
   void evaluate();
 };
 
@@ -94,12 +90,15 @@ ThermalConductivity<FieldT>::
 ThermalConductivity( const Expr::Tag& temperatureTag,
                      const Expr::TagList& massFracTags,
                      const Expr::Tag& mmwTag )
-  : Expr::Expression<FieldT>(),
-    temperatureTag_( temperatureTag ),
-    massFracTags_( massFracTags ),
-    mmwTag_( mmwTag )
+  : Expr::Expression<FieldT>()
 {
   this->set_gpu_runnable( true );
+
+  temperature_ = this->template create_field_request<FieldT>( temperatureTag );
+  mmw_         = this->template create_field_request<FieldT>( mmwTag         );
+
+  this->template create_field_vector_request<FieldT>( massFracTags, massFracs_ );
+
   Cantera::MixTransport* trans = dynamic_cast<Cantera::MixTransport*>( CanteraObjects::get_transport() ); // cast gas transport object as mix transport
   nSpec_ = trans->thermo().nSpecies();
 
@@ -124,52 +123,25 @@ ThermalConductivity<FieldT>::~ThermalConductivity(){}
 template< typename FieldT >
 void
 ThermalConductivity<FieldT>::
-advertise_dependents( Expr::ExprDeps& exprDeps )
-{
-  exprDeps.requires_expression( temperatureTag_ );
-  exprDeps.requires_expression( massFracTags_   );
-  exprDeps.requires_expression( mmwTag_         );
-}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-void
-ThermalConductivity<FieldT>::
-bind_fields( const Expr::FieldManagerList& fml )
-{
-  const typename Expr::FieldMgrSelector<FieldT>::type& fm = fml.field_manager<FieldT>();
-
-  temperature_ = &fm.field_ref( temperatureTag_ );
-  mmw_         = &fm.field_ref( mmwTag_         );
-
-  massFracs_.clear();
-  BOOST_FOREACH( const Expr::Tag& tag, massFracTags_ ){
-    massFracs_.push_back( &fm.field_ref(tag) );
-  }
-}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-void
-ThermalConductivity<FieldT>::
 evaluate()
 {
   using namespace SpatialOps;
 
   FieldT& mixTCond = this->value();
 
+  const FieldT& temp = temperature_->field_ref();
+  const FieldT& mmw  = mmw_        ->field_ref();
+
   // pre-compute powers of temperature used in polynomial evaluations
   SpatFldPtr<FieldT> sqrtTPtr;  // may be used later on
-  SpatFldPtr<FieldT> logtPtr   = SpatialFieldStore::get<FieldT>(*temperature_); // log(t)
+  SpatFldPtr<FieldT> logtPtr = SpatialFieldStore::get<FieldT>(temp); // log(t)
 
   FieldT& logt = *logtPtr;
-  logt <<= log( *temperature_ );
+  logt <<= log( temp );
 
-  SpatFldPtr<FieldT> speciesTCondPtr = SpatialFieldStore::get<FieldT>(*temperature_); // temporary to store the thermal conductivity for an individual species
-  SpatFldPtr<FieldT> sumPtr          = SpatialFieldStore::get<FieldT>(*temperature_); // for mixing rule
-  SpatFldPtr<FieldT> inverseSumPtr   = SpatialFieldStore::get<FieldT>(*temperature_); // 1/sum()
+  SpatFldPtr<FieldT> speciesTCondPtr = SpatialFieldStore::get<FieldT>(temp); // temporary to store the thermal conductivity for an individual species
+  SpatFldPtr<FieldT> sumPtr          = SpatialFieldStore::get<FieldT>(temp); // for mixing rule
+  SpatFldPtr<FieldT> inverseSumPtr   = SpatialFieldStore::get<FieldT>(temp); // 1/sum()
 
   FieldT& speciesTCond = *speciesTCondPtr;
   FieldT& sum          = *sumPtr;
@@ -179,21 +151,22 @@ evaluate()
   inverseSum <<= 0.0; // set inverse sum to 0 before loop
 
   if( modelType_ == Cantera::cMixtureAveraged ) { // as opposed to CK mode
-    sqrtTPtr = SpatialFieldStore::get<FieldT>(*temperature_);
-    *sqrtTPtr <<= sqrt( *temperature_ );
+    sqrtTPtr = SpatialFieldStore::get<FieldT>(temp);
+    *sqrtTPtr <<= sqrt( temp );
   }
 
   for( size_t n = 0; n < nSpec_; ++n){
+    const FieldT& yi = massFracs_[n]->field_ref();
     const std::vector<double>& tCondCoefs = tCondCoefs_[n];
     if( modelType_ == Cantera::cMixtureAveraged )
       speciesTCond <<= *sqrtTPtr * ( tCondCoefs[0] + logt * ( tCondCoefs[1] + logt * ( tCondCoefs[2] + logt * ( tCondCoefs[3] + logt * tCondCoefs[4] ))) );
     else
       speciesTCond <<=         exp ( tCondCoefs[0] + logt * ( tCondCoefs[1] + logt * ( tCondCoefs[2] + logt *   tCondCoefs[3]                         )) );
-    sum        <<= sum        + *massFracs_[n] * speciesTCond * molecularWeightsInv_[n];
-    inverseSum <<= inverseSum + *massFracs_[n] / speciesTCond * molecularWeightsInv_[n];
+    sum        <<= sum        + yi * speciesTCond * molecularWeightsInv_[n];
+    inverseSum <<= inverseSum + yi / speciesTCond * molecularWeightsInv_[n];
   }
 
-  mixTCond <<= 0.5 * ( sum * *mmw_ + 1 / (inverseSum * *mmw_) ); // mixing rule
+  mixTCond <<= 0.5 * ( sum * mmw + 1 / (inverseSum * mmw) ); // mixing rule
 }
 
 //--------------------------------------------------------------------
@@ -203,8 +176,9 @@ ThermalConductivity<FieldT>::
 Builder::Builder( const Expr::Tag& resultTag,
                   const Expr::Tag& temperatureTag,
                   const Expr::TagList& massFracTags,
-                  const Expr::Tag& mmwTag )
-: ExpressionBuilder( resultTag ),
+                  const Expr::Tag& mmwTag,
+                  const int nghost )
+: ExpressionBuilder( resultTag, nghost ),
   temperatureTag_( temperatureTag ),
   massFracTags_( massFracTags ),
   mmwTag_( mmwTag )

@@ -34,14 +34,8 @@ template< typename FieldT >
 class DiffusionCoeff
     : public Expr::Expression<FieldT>
 {
-  const Expr::Tag temperatureTag_;
-  const Expr::Tag pTag_;
-  const Expr::TagList massFracTags_;
-  const Expr::Tag mmwTag_;
-  const FieldT* temperature_;
-  const FieldT* p_;
-  const FieldT* mmw_; // mixture molecular weight
-  std::vector<const FieldT*> massFracs_;
+  DECLARE_FIELDS( FieldT, temperature_, p_, mmw_ )
+  DECLARE_VECTOR_OF_FIELDS( FieldT, massFracs_ )
 
   int nSpec_; //number of species to iterate over
   int modelType_; // type of model used by Cantera to estimate pure viscosity
@@ -69,12 +63,14 @@ public:
      *  @param pTag pressure
      *  @param massFracTags tag for mass fractions of each species, ordering is consistent with Cantera input
      *  @param mmwTag tag for mixture molecular weight
+     *  @param nghost the number of ghost cells to compute in
      */
     Builder( const Expr::TagList& resultTags,
              const Expr::Tag& temperatureTag,
              const Expr::Tag& pTag,
              const Expr::TagList& massFracTags,
-             const Expr::Tag& mmwTag );
+             const Expr::Tag& mmwTag,
+             const int nghost = DEFAULT_NUMBER_OF_GHOSTS );
 
     Expr::ExpressionBase* build() const;
 
@@ -86,8 +82,6 @@ public:
   };
 
   ~DiffusionCoeff(){}
-  void advertise_dependents( Expr::ExprDeps& exprDeps );
-  void bind_fields( const Expr::FieldManagerList& fml );
   void evaluate();
 };
 
@@ -122,14 +116,8 @@ template< typename FieldT >
 class DiffusionCoeffMol
     : public Expr::Expression<FieldT>
 {
-  const Expr::Tag temperatureTag_;
-  const Expr::Tag pTag_;
-  const Expr::TagList massFracTags_;
-  const Expr::Tag mmwTag_;
-  const FieldT* temperature_;
-  const FieldT* p_;
-  const FieldT* mmw_; // mixture molecular weight
-  std::vector<const FieldT*> massFracs_;
+  DECLARE_FIELDS( FieldT, temperature_, p_, mmw_ )
+  DECLARE_VECTOR_OF_FIELDS( FieldT, massFracs_ )
 
   int nSpec_; //number of species to iterate over
   int modelType_; // type of model used by Cantera to estimate pure viscosity
@@ -157,12 +145,14 @@ public:
      *  @param pTag pressure
      *  @param massFracTags tag for mass fractions of each species, ordering is consistent with Cantera input
      *  @param mmwTag tag for mixture molecular weight
+     *  @param nghost the number of ghost cells to compute in
      */
     Builder( const Expr::TagList& resultTags,
              const Expr::Tag& temperatureTag,
              const Expr::Tag& pTag,
              const Expr::TagList& massFracTags,
-             const Expr::Tag& mmwTag );
+             const Expr::Tag& mmwTag,
+             const int nghost = DEFAULT_NUMBER_OF_GHOSTS );
 
     Expr::ExpressionBase* build() const;
 
@@ -174,8 +164,6 @@ public:
   };
 
   ~DiffusionCoeffMol(){}
-  void advertise_dependents( Expr::ExprDeps& exprDeps );
-  void bind_fields( const Expr::FieldManagerList& fml );
   void evaluate();
 };
 
@@ -195,13 +183,17 @@ DiffusionCoeff( const Expr::Tag& temperatureTag,
                 const Expr::Tag& pTag,
                 const Expr::TagList& massFracTags,
                 const Expr::Tag& mmwTag )
-  : Expr::Expression<FieldT>(),
-    temperatureTag_( temperatureTag ),
-    pTag_( pTag ),
-    massFracTags_( massFracTags ),
-    mmwTag_( mmwTag )
+  : Expr::Expression<FieldT>()
 {
   this->set_gpu_runnable( true );
+
+  temperature_ = this->template create_field_request<FieldT>( temperatureTag );
+  p_           = this->template create_field_request<FieldT>( pTag           );
+  mmw_         = this->template create_field_request<FieldT>( mmwTag         );
+
+  this->template create_field_vector_request<FieldT>( massFracTags, massFracs_ );
+
+
   Cantera::MixTransport* trans = dynamic_cast<Cantera::MixTransport*>( CanteraObjects::get_transport() ); // cast gas transport object as mix transport
   nSpec_ = trans->thermo().nSpecies();
 
@@ -231,79 +223,53 @@ DiffusionCoeff( const Expr::Tag& temperatureTag,
 template< typename FieldT >
 void
 DiffusionCoeff<FieldT>::
-advertise_dependents( Expr::ExprDeps& exprDeps )
-{
-  exprDeps.requires_expression( temperatureTag_ );
-  exprDeps.requires_expression( pTag_ );
-  exprDeps.requires_expression( massFracTags_ );
-  exprDeps.requires_expression( mmwTag_ );
-}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-void
-DiffusionCoeff<FieldT>::
-bind_fields( const Expr::FieldManagerList& fml )
-{
-  const typename Expr::FieldMgrSelector<FieldT>::type& fm = fml.field_manager<FieldT>();
-  temperature_ = &fm.field_ref( temperatureTag_ );
-  p_ = &fm.field_ref( pTag_ );
-  mmw_ = &fm.field_ref( mmwTag_ );
-  massFracs_.clear();
-  BOOST_FOREACH( const Expr::Tag& tag, massFracTags_ ){
-    massFracs_.push_back( &fm.field_ref(tag) );
-  }
-}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-void
-DiffusionCoeff<FieldT>::
 evaluate()
 {
   using namespace SpatialOps;
   std::vector< FieldT* >& mixD = this->get_value_vec();
 
-  const FieldT& p = *p_;
+  const FieldT& p    = p_          ->field_ref();
+  const FieldT& temp = temperature_->field_ref();
+  const FieldT& mmw  = mmw_        ->field_ref();
 
   // pre-compute power of log(t) for the species viscosity polynomial
   SpatFldPtr<FieldT> tThreeHalvesPtr; // t^(3/2)
-  SpatFldPtr<FieldT> logtPtr   = SpatialFieldStore::get<FieldT>(*temperature_); // log(t)
+  SpatFldPtr<FieldT> logtPtr   = SpatialFieldStore::get<FieldT>(temp); // log(t)
 
   FieldT& logt   = *logtPtr;
 
-  logt   <<= log( *temperature_ );
+  logt   <<= log( temp );
 
-  SpatFldPtr<FieldT> dPtr    = SpatialFieldStore::get<FieldT>(*temperature_);
-  SpatFldPtr<FieldT> sum1Ptr = SpatialFieldStore::get<FieldT>(*temperature_);
-  SpatFldPtr<FieldT> sum2Ptr = SpatialFieldStore::get<FieldT>(*temperature_);
+  SpatFldPtr<FieldT> dPtr    = SpatialFieldStore::get<FieldT>(temp);
+  SpatFldPtr<FieldT> sum1Ptr = SpatialFieldStore::get<FieldT>(temp);
+  SpatFldPtr<FieldT> sum2Ptr = SpatialFieldStore::get<FieldT>(temp);
 
   FieldT& d    = *dPtr;
   FieldT& sum1 = *sum1Ptr;
   FieldT& sum2 = *sum2Ptr;
 
   if( modelType_ == Cantera::cMixtureAveraged ) { // as opposed to CK mode
-    tThreeHalvesPtr = SpatialFieldStore::get<FieldT>(*temperature_);
-    *tThreeHalvesPtr <<= pow( *temperature_, 1.5 );
+    tThreeHalvesPtr = SpatialFieldStore::get<FieldT>(temp);
+    *tThreeHalvesPtr <<= pow( temp, 1.5 );
   }
 
   for( size_t i=0; i<nSpec_; ++i){
+    const FieldT& yi = massFracs_[i]->field_ref();
     sum1 <<= 0.0;
     sum2 <<= 0.0;
     for( size_t j=0; j<nSpec_; ++j){
+      const FieldT& yj = massFracs_[j]->field_ref();
       if( j != i){
         const std::vector<double>& coefs = binaryDCoefs_[indices_[i][j]]; // coefficients for pair [i][j]
         if( modelType_ == Cantera::cMixtureAveraged )
-          d <<= *massFracs_[j] / ( *tThreeHalvesPtr * ( coefs[0] + logt * ( coefs[1] + logt * ( coefs[2] + logt * ( coefs[3] + logt * coefs[4] ))) )); // polynomial in t for binary diffusion coefficients
+          d <<= yj / ( *tThreeHalvesPtr * ( coefs[0] + logt * ( coefs[1] + logt * ( coefs[2] + logt * ( coefs[3] + logt * coefs[4] ))) )); // polynomial in t for binary diffusion coefficients
         else
-          d <<= *massFracs_[j] / (                exp ( coefs[0] + logt * ( coefs[1] + logt * ( coefs[2] + logt *   coefs[3]                    )) ));
+          d <<= yj / (                exp ( coefs[0] + logt * ( coefs[1] + logt * ( coefs[2] + logt *   coefs[3]                    )) ));
         sum1 <<= sum1 + d * molecularWeightsInv_[j];
         sum2 <<= sum2 + d;
       }
     }
-    *mixD[i] <<= 1 / ( p * *mmw_ * ( sum1 + sum2 * *massFracs_[i] / ( molecularWeights_[i] - molecularWeights_[i] * *massFracs_[i] ) ) ); // mixing rule
+    *mixD[i] <<= 1 / ( p * mmw * ( sum1 + sum2 * yi / ( molecularWeights_[i] - molecularWeights_[i] * yi ) ) ); // mixing rule
   }
 
 }
@@ -316,8 +282,9 @@ Builder::Builder( const Expr::TagList& resultTags,
                   const Expr::Tag& temperatureTag,
                   const Expr::Tag& pTag,
                   const Expr::TagList& massFracTags,
-                  const Expr::Tag& mmwTag )
-: ExpressionBuilder( resultTags ),
+                  const Expr::Tag& mmwTag,
+                  const int nghost )
+: ExpressionBuilder( resultTags, nghost ),
   temperatureTag_( temperatureTag ),
   pTag_( pTag ),
   massFracTags_( massFracTags ),
@@ -349,13 +316,17 @@ DiffusionCoeffMol( const Expr::Tag& temperatureTag,
                    const Expr::Tag& pTag,
                    const Expr::TagList& massFracTags,
                    const Expr::Tag& mmwTag )
-  : Expr::Expression<FieldT>(),
-    temperatureTag_( temperatureTag ),
-    pTag_( pTag ),
-    massFracTags_( massFracTags ),
-    mmwTag_( mmwTag )
+  : Expr::Expression<FieldT>()
 {
   this->set_gpu_runnable( true );
+
+  temperature_ = this->template create_field_request<FieldT>( temperatureTag );
+  p_           = this->template create_field_request<FieldT>( pTag           );
+  mmw_         = this->template create_field_request<FieldT>( mmwTag         );
+
+  this->template create_field_vector_request<FieldT>( massFracTags, massFracs_ );
+
+
   Cantera::MixTransport* trans = dynamic_cast<Cantera::MixTransport*>( CanteraObjects::get_transport() ); // cast gas transport object as mix transport
   nSpec_ = trans->thermo().nSpecies();
 
@@ -385,77 +356,49 @@ DiffusionCoeffMol( const Expr::Tag& temperatureTag,
 template< typename FieldT >
 void
 DiffusionCoeffMol<FieldT>::
-advertise_dependents( Expr::ExprDeps& exprDeps )
-{
-  exprDeps.requires_expression( temperatureTag_ );
-  exprDeps.requires_expression( pTag_           );
-  exprDeps.requires_expression( massFracTags_   );
-  exprDeps.requires_expression( mmwTag_         );
-}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-void
-DiffusionCoeffMol<FieldT>::
-bind_fields( const Expr::FieldManagerList& fml )
-{
-  const typename Expr::FieldMgrSelector<FieldT>::type& fm = fml.field_manager<FieldT>();
-
-  temperature_ = &fm.field_ref( temperatureTag_ );
-  p_           = &fm.field_ref( pTag_           );
-  mmw_         = &fm.field_ref( mmwTag_         );
-
-  massFracs_.clear();
-  BOOST_FOREACH( const Expr::Tag& tag, massFracTags_ ){
-    massFracs_.push_back( &fm.field_ref(tag) );
-  }
-}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-void
-DiffusionCoeffMol<FieldT>::
 evaluate()
 {
   using namespace SpatialOps;
   std::vector< FieldT* >& mixD = this->get_value_vec();
 
-  const FieldT& p = *p_;
+  const FieldT& p    = p_          ->field_ref();
+  const FieldT& temp = temperature_->field_ref();
+  const FieldT& mmw  = mmw_        ->field_ref();
 
   // pre-compute power of log(t) for the species viscosity polynomial
   SpatFldPtr<FieldT> tThreeHalvesPtr; // t^(3/2)
-  SpatFldPtr<FieldT> logtPtr   = SpatialFieldStore::get<FieldT>(*temperature_); // log(t)
+  SpatFldPtr<FieldT> logtPtr   = SpatialFieldStore::get<FieldT>(temp); // log(t)
 
   FieldT& logt   = *logtPtr;
 
-  logt   <<= log( *temperature_ );
+  logt   <<= log( temp );
 
-  SpatFldPtr<FieldT> dInvPtr = SpatialFieldStore::get<FieldT>(*temperature_);
-  SpatFldPtr<FieldT> sum1Ptr = SpatialFieldStore::get<FieldT>(*temperature_);
+  SpatFldPtr<FieldT> dInvPtr = SpatialFieldStore::get<FieldT>(temp);
+  SpatFldPtr<FieldT> sum1Ptr = SpatialFieldStore::get<FieldT>(temp);
 
   FieldT& dInv    = *dInvPtr;
   FieldT& sum1 = *sum1Ptr;
 
   if( modelType_ == Cantera::cMixtureAveraged ) { // as opposed to CK mode
-    tThreeHalvesPtr = SpatialFieldStore::get<FieldT>(*temperature_);
-    *tThreeHalvesPtr <<= pow( *temperature_, 1.5 );
+    tThreeHalvesPtr = SpatialFieldStore::get<FieldT>(temp);
+    *tThreeHalvesPtr <<= pow( temp, 1.5 );
   }
 
   for( size_t i=0; i<nSpec_; ++i){
+    const FieldT& yi = massFracs_[i]->field_ref();
     sum1 <<= 0.0;
     for( size_t j=0; j<nSpec_; ++j){
+    const FieldT& yj = massFracs_[j]->field_ref();
       if( j != i){
         const std::vector<double>& coefs = binaryDCoefs_[indices_[i][j]]; // coefficients for pair [i][j]
         if( modelType_ == Cantera::cMixtureAveraged )
-          dInv <<= *massFracs_[j] / ( *tThreeHalvesPtr * ( coefs[0] + logt * ( coefs[1] + logt * ( coefs[2] + logt * ( coefs[3] + logt * coefs[4] ))) )); // polynomial in t for binary diffusion coefficients
+          dInv <<= yj / ( *tThreeHalvesPtr * ( coefs[0] + logt * ( coefs[1] + logt * ( coefs[2] + logt * ( coefs[3] + logt * coefs[4] ))) )); // polynomial in t for binary diffusion coefficients
         else
-          dInv <<= *massFracs_[j] / (                exp ( coefs[0] + logt * ( coefs[1] + logt * ( coefs[2] + logt *   coefs[3]                    )) ));
+          dInv <<= yj / (                exp ( coefs[0] + logt * ( coefs[1] + logt * ( coefs[2] + logt *   coefs[3]                    )) ));
         sum1 <<= sum1 + dInv * molecularWeightsInv_[j];
       }
     }
-    *mixD[i] <<= ( 1 - *massFracs_[i] ) / ( p * sum1 * *mmw_ ); // mixing rule
+    *mixD[i] <<= ( 1 - yi ) / ( p * sum1 * mmw ); // mixing rule
   }
 
 }
@@ -468,8 +411,9 @@ Builder::Builder( const Expr::TagList& resultTags,
                   const Expr::Tag& temperatureTag,
                   const Expr::Tag& pTag,
                   const Expr::TagList& massFracTags,
-                  const Expr::Tag& mmwTag )
-: ExpressionBuilder( resultTags ),
+                  const Expr::Tag& mmwTag,
+                  const int nghost )
+: ExpressionBuilder( resultTags, nghost ),
   temperatureTag_( temperatureTag ),
   pTag_( pTag ),
   massFracTags_( massFracTags ),

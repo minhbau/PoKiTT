@@ -41,10 +41,8 @@ template< typename FieldT >
 class Viscosity
     : public Expr::Expression<FieldT>
 {
-  const Expr::Tag temperatureTag_;
-  const Expr::TagList massFracTags_;
-  const FieldT* temperature_;
-  std::vector<const FieldT*> massFracs_;
+  DECLARE_FIELD( FieldT, temp_ )
+  DECLARE_VECTOR_OF_FIELDS( FieldT, massFracs_ )
 
   int nSpec_; //number of species to iterate over
   std::vector< std::vector<double> > viscosityCoefs_; // Cantera's vector of coefficients for the pure viscosity polynomials
@@ -65,10 +63,12 @@ public:
      *  @param resultTag tag for the mixture averaged viscosity
      *  @param temperatureTag temperature
      *  @param massFracTags tag for mass fraction of each species, ordering must be consistent with Cantera input
+     *  @param nghost the number of ghost cells to compute in
      */
     Builder( const Expr::Tag& resultTag,
              const Expr::Tag& temperatureTag,
-             const Expr::TagList& massFracTags );
+             const Expr::TagList& massFracTags,
+             const int nghost = DEFAULT_NUMBER_OF_GHOSTS );
 
     Expr::ExpressionBase* build() const;
 
@@ -78,8 +78,6 @@ public:
   };
 
   ~Viscosity(){}
-  void advertise_dependents( Expr::ExprDeps& exprDeps );
-  void bind_fields( const Expr::FieldManagerList& fml );
   void evaluate();
 };
 
@@ -104,8 +102,8 @@ class SutherlandViscosity
   : public Expr::Expression<FieldT>
 {
   const double c_, refVisc_, refTemp_;
-  const Expr::Tag tTag_;
-  const FieldT* temp_;
+
+  DECLARE_FIELD( FieldT, temp_ )
 
   SutherlandViscosity( const double c,
                        const double refVisc,
@@ -113,8 +111,6 @@ class SutherlandViscosity
                        const Expr::Tag& temperatureTag );
 
   void evaluate();
-  void advertise_dependents( Expr::ExprDeps& exprDeps );
-  void bind_fields( const Expr::FieldManagerList& fml );
 
 public:
 
@@ -130,19 +126,23 @@ public:
      *  @param suthConstant Constant for use in the viscosity correlation (K)
      *  @param refVisc reference viscosity (Pa s)
      *  @param refTemp reference temperature (K)
+     *  @param nghost the number of ghost cells to compute in
      */
     Builder( const Expr::Tag& result,
              const Expr::Tag& temperatureTag,
              const double suthConstant,
              const double refVisc,
-             const double refTemp );
+             const double refTemp,
+             const int nghost = DEFAULT_NUMBER_OF_GHOSTS );
     /**
      *  @brief Build a SutherlandViscosity expression
      *  @param result tag for the viscosity
      *  @param temperatureTag temperature
+     *  @param nghost the number of ghost cells to compute in
      */
     Builder( const Expr::Tag& result,
-             const Expr::Tag& temperatureTag );
+             const Expr::Tag& temperatureTag,
+             const int nghost = DEFAULT_NUMBER_OF_GHOSTS );
 
     Expr::ExpressionBase* build() const;
   };
@@ -161,11 +161,14 @@ template< typename FieldT >
 Viscosity<FieldT>::
 Viscosity( const Expr::Tag& temperatureTag,
            const Expr::TagList& massFracTags )
-  : Expr::Expression<FieldT>(),
-    temperatureTag_( temperatureTag ),
-    massFracTags_( massFracTags )
+  : Expr::Expression<FieldT>()
 {
   this->set_gpu_runnable( true );
+
+  temp_ = this->template create_field_request<FieldT>( temperatureTag );
+
+  this->template create_field_vector_request<FieldT>( massFracTags, massFracs_ );
+
 
   Cantera::MixTransport* trans = dynamic_cast<Cantera::MixTransport*>( CanteraObjects::get_transport() ); // cast gas transport object as mix transport
   nSpec_ = trans->thermo().nSpecies();
@@ -213,52 +216,28 @@ Viscosity( const Expr::Tag& temperatureTag,
 template< typename FieldT >
 void
 Viscosity<FieldT>::
-advertise_dependents( Expr::ExprDeps& exprDeps )
-{
-  exprDeps.requires_expression( temperatureTag_ );
-  exprDeps.requires_expression( massFracTags_   );
-}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-void
-Viscosity<FieldT>::
-bind_fields( const Expr::FieldManagerList& fml )
-{
-  const typename Expr::FieldMgrSelector<FieldT>::type& fm = fml.field_manager<FieldT>();
-  temperature_ = &fm.field_ref( temperatureTag_ );
-  massFracs_.clear();
-  BOOST_FOREACH( const Expr::Tag& tag, massFracTags_ ){
-    massFracs_.push_back( &fm.field_ref(tag) );
-  }
-}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-void
-Viscosity<FieldT>::
 evaluate()
 {
   using namespace SpatialOps;
 
   FieldT& mixVis = this->value();
 
+  const FieldT& temp = temp_->field_ref();
+
   std::vector< SpatFldPtr<FieldT> > sqrtSpeciesVis;
   for( size_t n=0; n<nSpec_; ++n)
-    sqrtSpeciesVis.push_back(SpatialFieldStore::get<FieldT>(*temperature_));
+    sqrtSpeciesVis.push_back(SpatialFieldStore::get<FieldT>(temp));
 
   // pre-compute power of log(t) for the species viscosity polynomial
   SpatFldPtr<FieldT> tOneFourthPtr; // t^(1/4) -- may be used later on
-  SpatFldPtr<FieldT> logtPtr = SpatialFieldStore::get<FieldT>(*temperature_);
+  SpatFldPtr<FieldT> logtPtr = SpatialFieldStore::get<FieldT>(temp);
 
   FieldT& logt = *logtPtr;
-  logt <<= log( *temperature_ );
+  logt <<= log( temp );
 
   if( modelType_ == Cantera::cMixtureAveraged ) { // as opposed to CK mode
-    tOneFourthPtr = SpatialFieldStore::get<FieldT>(*temperature_);
-    *tOneFourthPtr <<= pow( *temperature_, 0.25 );
+    tOneFourthPtr = SpatialFieldStore::get<FieldT>(temp);
+    *tOneFourthPtr <<= pow( temp, 0.25 );
   }
 
   for( size_t n = 0; n<nSpec_; ++n ){
@@ -271,39 +250,45 @@ evaluate()
 
   mixVis <<= 0.0; // set result to 0 before summing species contributions
 # ifdef NFIELDS // requires nSpec_ temporary fields
-  SpatFldPtr<FieldT> phiPtr  = SpatialFieldStore::get<FieldT>(*temperature_);
+  SpatFldPtr<FieldT> phiPtr  = SpatialFieldStore::get<FieldT>(temp);
   FieldT& phi = *phiPtr;
 
   for( size_t k=0; k!=nSpec_; ++k){ // start looping over species contributions
-    phi <<= *massFracs_[k]; // begin sum with the k=j case when phi = y_k
+    const FieldT& yk = massFracs_[k]->field_ref();
+    phi <<= yk; // begin sum with the k=j case when phi = y_k
     for( size_t j=0; j!=nSpec_; ++j){
+      const FieldT& yj = massFracs_[j]->field_ref();
       if( j!=k )
-        phi <<= phi + *massFracs_[j] * ( 1 + *sqrtSpeciesVis[k] / *sqrtSpeciesVis[j] * molecularWeightRatios_[j][k] ) * ( 1 + *sqrtSpeciesVis[k] / *sqrtSpeciesVis[j] * molecularWeightRatios_[j][k] ) * denominator_[j][k]; // mixing rule
+        phi <<= phi + yj * ( 1 + *sqrtSpeciesVis[k] / *sqrtSpeciesVis[j] * molecularWeightRatios_[j][k] ) * ( 1 + *sqrtSpeciesVis[k] / *sqrtSpeciesVis[j] * molecularWeightRatios_[j][k] ) * denominator_[j][k]; // mixing rule
     }
-    mixVis <<= mixVis + *sqrtSpeciesVis[k] * *sqrtSpeciesVis[k] * *massFracs_[k] / phi; // mixing rule
+    mixVis <<= mixVis + *sqrtSpeciesVis[k] * *sqrtSpeciesVis[k] * yk / phi; // mixing rule
   }
 # else // requires 2*nSpec_ temporary fields
-  SpatFldPtr<FieldT> temporary = SpatialFieldStore::get<FieldT>(*temperature_);
+  SpatFldPtr<FieldT> temporary = SpatialFieldStore::get<FieldT>(temp);
   std::vector< SpatFldPtr<FieldT> > phivec;
 
   for(size_t k=0; k<nSpec_; ++k){
-    phivec.push_back(SpatialFieldStore::get<FieldT>(*temperature_));
-    *phivec[k] <<= *massFracs_[k] * molecularWeightsInv_[k]; // begin sum with the k=j case, phi = y_k / M_k
+    phivec.push_back(SpatialFieldStore::get<FieldT>(temp));
+    const FieldT& yk = massFracs_[k]->field_ref();
+    *phivec[k] <<= yk * molecularWeightsInv_[k]; // begin sum with the k=j case, phi = y_k / M_k
   }
 
   for( size_t k=0; k!=nSpec_; ++k){
+    const FieldT& yk = massFracs_[k]->field_ref();
     for( size_t j=0; j!=k; ++j){
+      const FieldT& yj = massFracs_[j]->field_ref();
       *temporary <<= ( 1 + *sqrtSpeciesVis[k] / *sqrtSpeciesVis[j] * molecularWeightRatios_[j][k] ) * ( 1 + *sqrtSpeciesVis[k] / *sqrtSpeciesVis[j] * molecularWeightRatios_[j][k] ) * denominator_[j][k]; // mixing rule
-      *phivec[k] <<= *phivec[k] + *massFracs_[j] * *temporary;
+      *phivec[k] <<= *phivec[k] + yj * *temporary;
       /* phi[j][k] is proportional to phi[k][j]
        * This saves some evaluation time at the cost of doubling memory requirements
        */
-      *phivec[j] <<= *phivec[j] + *massFracs_[k] * *temporary * *sqrtSpeciesVis[j] * *sqrtSpeciesVis[j] / ( *sqrtSpeciesVis[k] * *sqrtSpeciesVis[k] );
+      *phivec[j] <<= *phivec[j] + yk * *temporary * *sqrtSpeciesVis[j] * *sqrtSpeciesVis[j] / ( *sqrtSpeciesVis[k] * *sqrtSpeciesVis[k] );
     }
   }
 
   for( size_t k=0; k!=nSpec_; ++k){
-    mixVis <<= mixVis + *massFracs_[k] * ( *sqrtSpeciesVis[k] * *sqrtSpeciesVis[k] ) / ( *phivec[k] * molecularWeights_[k] ); // mixing rule
+    const FieldT& yk = massFracs_[k]->field_ref();
+    mixVis <<= mixVis + yk * ( *sqrtSpeciesVis[k] * *sqrtSpeciesVis[k] ) / ( *phivec[k] * molecularWeights_[k] ); // mixing rule
   }
 # endif
 
@@ -315,8 +300,9 @@ template< typename FieldT >
 Viscosity<FieldT>::
 Builder::Builder( const Expr::Tag& resultTag,
                   const Expr::Tag& temperatureTag,
-                  const Expr::TagList& massFracTags )
-: ExpressionBuilder( resultTag ),
+                  const Expr::TagList& massFracTags,
+                  const int nghost )
+: ExpressionBuilder( resultTag, nghost ),
   temperatureTag_( temperatureTag ),
   massFracTags_( massFracTags )
 {}
@@ -346,30 +332,10 @@ SutherlandViscosity( const double c,
  : Expr::Expression<FieldT>(),
    c_( c ),
    refVisc_( refVisc ),
-   refTemp_( refTemp ),
-   tTag_( temperatureTag )
+   refTemp_( refTemp )
 {
   this->set_gpu_runnable(true);
-}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-void
-SutherlandViscosity<FieldT>::
-advertise_dependents( Expr::ExprDeps& exprDeps )
-{
-  exprDeps.requires_expression( tTag_ );
-}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-void
-SutherlandViscosity<FieldT>::
-bind_fields( const Expr::FieldManagerList& fml )
-{
-  temp_ = &fml.field_manager<FieldT>().field_ref( tTag_ );
+  temp_ = this->template create_field_request<FieldT>(temperatureTag);
 }
 
 //--------------------------------------------------------------------
@@ -381,7 +347,8 @@ evaluate()
 {
   using namespace SpatialOps;
   FieldT& visc = this->value();
-  visc <<= refVisc_ * ( refTemp_ + c_ ) / ( *temp_ + c_ ) * pow( *temp_ / refTemp_, 1.5 );
+  const FieldT& temp = temp_->field_ref();
+  visc <<= refVisc_ * ( refTemp_ + c_ ) / ( temp + c_ ) * pow( temp / refTemp_, 1.5 );
 }
 
 //--------------------------------------------------------------------
@@ -389,8 +356,9 @@ evaluate()
 template< typename FieldT >
 SutherlandViscosity<FieldT>::Builder::
 Builder( const Expr::Tag& result,
-         const Expr::Tag& temperatureTag )
-  : ExpressionBuilder(result),
+         const Expr::Tag& temperatureTag,
+         const int nghost )
+  : ExpressionBuilder(result,nghost),
     c_  ( 120      ), // constant for air (K)
     mu0_( 18.27e-6 ), // ref visc for air (Pa s)
     t0_( 291.15    ), // ref temp for air (K)
@@ -405,8 +373,9 @@ Builder( const Expr::Tag& result,
          const Expr::Tag& temperatureTag,
          const double suthConstant,
          const double refVisc,
-         const double refTemp )
-  : ExpressionBuilder(result),
+         const double refTemp,
+         const int nghost )
+  : ExpressionBuilder(result,nghost),
     c_( suthConstant ),
     mu0_( refVisc ), // ref visc for air (Pa s)
     t0_( refTemp ),  // ref temp for air (K)

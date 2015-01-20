@@ -38,10 +38,8 @@ class Enthalpy
     : public Expr::Expression<FieldT>
 {
   typedef std::vector<double> PolyVals; // values used for polynomial
-  const Expr::Tag tTag_;
-  const Expr::TagList massFracTags_;
-  const FieldT* t_;
-  std::vector<const FieldT*> massFracs_;
+  DECLARE_FIELD( FieldT, t_ )
+  DECLARE_VECTOR_OF_FIELDS( FieldT, massFracs_ )
 
   int nSpec_; // number of species
   PolyVals minTVec_; // vector of minimum temperatures for polynomial evaluations
@@ -73,11 +71,8 @@ public:
     const Expr::TagList massFracTags_;
   };
 
-  ~Enthalpy();
-  void advertise_dependents( Expr::ExprDeps& exprDeps );
-  void bind_fields( const Expr::FieldManagerList& fml );
+  ~Enthalpy(){}
   void evaluate();
-
 };
 
 /**
@@ -101,15 +96,13 @@ template< typename FieldT >
 class SpeciesEnthalpy
  : public Expr::Expression<FieldT>
 {
-  const Expr::Tag tTag_;
-  const FieldT* t_;
+  DECLARE_FIELD( FieldT, t_ )
 
   const int n_; //index of species to be evaluated
   double minT_; // minimum temperature for polynomial evaluation
   double maxT_; // maximum temperature for polynomial evaluation
   std::vector<double> c_; // vector of polynomial coefficients
   int polyType_; // polynomial type
-
 
   SpeciesEnthalpy( const Expr::Tag& tTag,
                    const int n );
@@ -134,9 +127,7 @@ public:
     const int n_;
   };
 
-  ~SpeciesEnthalpy();
-  void advertise_dependents( Expr::ExprDeps& exprDeps );
-  void bind_fields( const Expr::FieldManagerList& fml );
+  ~SpeciesEnthalpy(){}
   void evaluate();
 };
 
@@ -153,11 +144,12 @@ Enthalpy<FieldT>::
 Enthalpy( const Expr::Tag& tTag,
           const Expr::TagList& massFracTags )
   : Expr::Expression<FieldT>(),
-    tTag_( tTag ),
-    massFracTags_( massFracTags ),
     shomateFlag_( false )
 {
   this->set_gpu_runnable( true );
+
+  t_ = this->template create_field_request<FieldT>(tTag);
+  this->template create_field_vector_request<FieldT>( massFracTags, massFracs_ );
 
   Cantera_CXX::IdealGasMix* const gasMix = CanteraObjects::get_gasmix();
   const Cantera::SpeciesThermo& spThermo = gasMix->speciesThermo();
@@ -226,41 +218,6 @@ Enthalpy( const Expr::Tag& tTag,
 //--------------------------------------------------------------------
 
 template< typename FieldT >
-Enthalpy<FieldT>::
-~Enthalpy()
-{}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-void
-Enthalpy<FieldT>::
-advertise_dependents( Expr::ExprDeps& exprDeps )
-{
-  exprDeps.requires_expression( tTag_         );
-  exprDeps.requires_expression( massFracTags_ );
-}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-void
-Enthalpy<FieldT>::
-bind_fields( const Expr::FieldManagerList& fml )
-{
-  const typename Expr::FieldMgrSelector<FieldT>::type& fm = fml.field_manager<FieldT>();
-
-  t_ = &fm.field_ref( tTag_ );
-
-  massFracs_.clear();
-  BOOST_FOREACH( const Expr::Tag& tag, massFracTags_ ){
-    massFracs_.push_back( &fm.field_ref(tag) );
-  }
-}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
 void
 Enthalpy<FieldT>::
 evaluate()
@@ -268,19 +225,22 @@ evaluate()
   using namespace SpatialOps;
   FieldT& h = this->value();
 
+  const FieldT& temp = t_->field_ref();
+
   SpatFldPtr<FieldT> recipT;      // may be used for Shomate polynomial
   if( shomateFlag_ ) {
-    recipT = SpatialFieldStore::get<FieldT>(*t_);
-    *recipT <<= 1 / *t_;
+    recipT = SpatialFieldStore::get<FieldT>(temp);
+    *recipT <<= 1 / temp;
   }
 # ifndef ENABLE_CUDA
-  const double maxTval = nebo_max(*t_);
-  const double minTval = nebo_min(*t_);
+  const double maxTval = nebo_max(temp);
+  const double minTval = nebo_min(temp);
 # endif
 
   h <<= 0.0;
 
   for( size_t n=0; n<nSpec_; ++n ){
+    const FieldT& yi = massFracs_[n]->field_ref();
     int polyType = polyTypeVec_[n];
     std::vector<double>& c = cVec_[n];
     double minT = minTVec_[n];
@@ -292,15 +252,15 @@ evaluate()
        * if out of bounds, enthalpy is interpolated from min or max temp using a constant cp
        */
       case SIMPLE: // constant heat capacity
-        h <<= h + *massFracs_[n] * ( c[1] + c[3] * (*t_ - c[0]) );
+        h <<= h + yi * ( c[1] + c[3] * (temp - c[0]) );
         break;
       case NASA2:
-        h <<= h + *massFracs_[n] * cond( *t_ <= c[0] , c[ 6] + *t_ * ( c[1] + *t_ * ( c[2] + *t_ * ( c[ 3] + *t_ * ( c[ 4] + *t_ * c[ 5] )))) )  // if low temp
-                                       (               c[13] + *t_ * ( c[8] + *t_ * ( c[9] + *t_ * ( c[10] + *t_ * ( c[11] + *t_ * c[12] )))) );  // else if high temp
+        h <<= h + yi * cond( temp <= c[0] , c[ 6] + temp * ( c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * ( c[ 4] + temp * c[ 5] )))) )  // if low temp
+                           (                c[13] + temp * ( c[8] + temp * ( c[9] + temp * ( c[10] + temp * ( c[11] + temp * c[12] )))) );  // else if high temp
         break;
       case SHOMATE2:
-        h <<= h + *massFracs_[n] * cond( *t_ <= c[0] , c[ 6] + *t_ * ( c[1] + *t_ * ( c[2] + *t_ * ( c[ 3] + *t_ * c[ 4] ))) - c[ 5] * *recipT ) // if low temp
-                                       (               c[13] + *t_ * ( c[8] + *t_ * ( c[9] + *t_ * ( c[10] + *t_ * c[11] ))) - c[12] * *recipT );  // else if high range
+        h <<= h + yi * cond( temp <= c[0] , c[ 6] + temp * ( c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * c[ 4] ))) - c[ 5] * *recipT ) // if low temp
+                           (                c[13] + temp * ( c[8] + temp * ( c[9] + temp * ( c[10] + temp * c[11] ))) - c[12] * *recipT );  // else if high range
         break;
       }
     }
@@ -312,19 +272,19 @@ evaluate()
        * if out of bounds, enthalpy is interpolated from min or max temp using a constant cp
        */
       case SIMPLE: // constant heat capacity
-        h <<= h + *massFracs_[n] * ( c[1] + c[3] * (*t_ - c[0]) );
+        h <<= h + yi * ( c[1] + c[3] * (temp - c[0]) );
         break;
       case NASA2:
-        h <<= h + *massFracs_[n] * cond( *t_ <= c[0] && *t_ >= minT, c[ 6] + *t_ * ( c[1] + *t_ * ( c[2] + *t_ * ( c[ 3] + *t_ * ( c[ 4] + *t_ * c[ 5] )))) )  // if low temp
-                                       ( *t_ >  c[0] && *t_ <= maxT, c[13] + *t_ * ( c[8] + *t_ * ( c[9] + *t_ * ( c[10] + *t_ * ( c[11] + *t_ * c[12] )))) )  // else if high temp
-                                       ( *t_ < minT,                 c[ 6] + c[1] * *t_ + minT * ( 2*c[2] * *t_ + minT * ( 3*c[ 3] * *t_ - c[2] + minT * ( 4*c[ 4] * *t_ - 2*c[ 3] + minT * ( 5*c[ 5] * *t_ - 3*c[ 4] + minT * -4*c[ 5] )))) )  // else if out of bounds - low
-                                       (                             c[13] + c[8] * *t_ + maxT * ( 2*c[9] * *t_ + maxT * ( 3*c[10] * *t_ - c[9] + maxT * ( 4*c[11] * *t_ - 2*c[10] + maxT * ( 5*c[12] * *t_ - 3*c[11] + maxT * -4*c[12] )))) ); // else out of bounds - high
+        h <<= h + yi * cond( temp <= c[0] && temp >= minT, c[ 6] + temp * ( c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * ( c[ 4] + temp * c[ 5] )))) )  // if low temp
+                           ( temp >  c[0] && temp <= maxT, c[13] + temp * ( c[8] + temp * ( c[9] + temp * ( c[10] + temp * ( c[11] + temp * c[12] )))) )  // else if high temp
+                           ( temp < minT,                  c[ 6] + c[1] * temp + minT * ( 2*c[2] * temp + minT * ( 3*c[ 3] * temp - c[2] + minT * ( 4*c[ 4] * temp - 2*c[ 3] + minT * ( 5*c[ 5] * temp - 3*c[ 4] + minT * -4*c[ 5] )))) )  // else if out of bounds - low
+                           (                               c[13] + c[8] * temp + maxT * ( 2*c[9] * temp + maxT * ( 3*c[10] * temp - c[9] + maxT * ( 4*c[11] * temp - 2*c[10] + maxT * ( 5*c[12] * temp - 3*c[11] + maxT * -4*c[12] )))) ); // else out of bounds - high
         break;
       case SHOMATE2:
-        h <<= h + *massFracs_[n] * cond( *t_ <= c[0] && *t_ >= minT, c[ 6] + *t_ * ( c[1] + *t_ * ( c[2] + *t_ * ( c[ 3] + *t_ * c[ 4] ))) - c[ 5] * *recipT ) // if low temp
-                                       ( *t_ >  c[0] && *t_ <= maxT, c[13] + *t_ * ( c[8] + *t_ * ( c[9] + *t_ * ( c[10] + *t_ * c[11] ))) - c[12] * *recipT )  // else if high range
-                                       ( *t_ <  minT,                c[ 6] + c[1] * *t_ + minT * ( 2*c[2] * *t_ + minT * ( 3*c[ 3] * *t_ - c[2] + minT * ( 4*c[ 4] * *t_ - 2*c[ 3] + minT * -3*c[ 4] ))) + ( c[ 5] * *t_ / minT - 2*c[ 5] ) / minT ) // else if out of bounds - low
-                                       (                             c[13] + c[8] * *t_ + maxT * ( 2*c[9] * *t_ + maxT * ( 3*c[10] * *t_ - c[9] + maxT * ( 4*c[11] * *t_ - 2*c[10] + maxT * -3*c[11] ))) + ( c[12] * *t_ / maxT - 2*c[12] ) / maxT ); // else out of bounds - high
+        h <<= h + yi * cond( temp <= c[0] && temp >= minT, c[ 6] + temp * ( c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * c[ 4] ))) - c[ 5] * *recipT ) // if low temp
+                           ( temp >  c[0] && temp <= maxT, c[13] + temp * ( c[8] + temp * ( c[9] + temp * ( c[10] + temp * c[11] ))) - c[12] * *recipT )  // else if high range
+                           ( temp <  minT,                 c[ 6] + c[1] * temp + minT * ( 2*c[2] * temp + minT * ( 3*c[ 3] * temp - c[2] + minT * ( 4*c[ 4] * temp - 2*c[ 3] + minT * -3*c[ 4] ))) + ( c[ 5] * temp / minT - 2*c[ 5] ) / minT ) // else if out of bounds - low
+                           (                               c[13] + c[8] * temp + maxT * ( 2*c[9] * temp + maxT * ( 3*c[10] * temp - c[9] + maxT * ( 4*c[11] * temp - 2*c[10] + maxT * -3*c[11] ))) + ( c[12] * temp / maxT - 2*c[12] ) / maxT ); // else out of bounds - high
         break;
       }
     }
@@ -358,11 +318,12 @@ template< typename FieldT >
 SpeciesEnthalpy<FieldT>::
 SpeciesEnthalpy( const Expr::Tag& tTag,
                  const int n )
-    : Expr::Expression<FieldT>(),
-      tTag_( tTag ),
-      n_ ( n )
+  : Expr::Expression<FieldT>(),
+    n_ ( n )
 {
   this->set_gpu_runnable( true );
+
+  t_ = this->template create_field_request<FieldT>( tTag );
 
   Cantera_CXX::IdealGasMix* const gasMix = CanteraObjects::get_gasmix();
   const Cantera::SpeciesThermo& spThermo = gasMix->speciesThermo();
@@ -418,33 +379,6 @@ SpeciesEnthalpy( const Expr::Tag& tTag,
 //--------------------------------------------------------------------
 
 template< typename FieldT >
-SpeciesEnthalpy<FieldT>::~SpeciesEnthalpy(){}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-void
-SpeciesEnthalpy<FieldT>::
-advertise_dependents( Expr::ExprDeps& exprDeps )
-{
-  exprDeps.requires_expression( tTag_ );
-}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-void
-SpeciesEnthalpy<FieldT>::
-bind_fields( const Expr::FieldManagerList& fml )
-{
-  const typename Expr::FieldMgrSelector<FieldT>::type& fm = fml.field_manager<FieldT>();
-
-  t_ = &fm.field_ref( tTag_ );
-}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
 void
 SpeciesEnthalpy<FieldT>::
 evaluate()
@@ -452,24 +386,26 @@ evaluate()
   using namespace SpatialOps;
   FieldT& h = this->value();
 
+  const FieldT& temp = t_->field_ref();
+
   switch (polyType_) {
   /* polynomial can be out of bounds low, low temp, high temp, or out of bounds high
    * if out of bounds, enthalpy is interpolated from min or max temp using a constant cp
    */
   case SIMPLE:
-    h <<= c_[1] + c_[3] * (*t_ - c_[0]);
+    h <<= c_[1] + c_[3] * (temp - c_[0]);
     break;
   case NASA2:
-    h <<= cond( *t_ <= c_[0] && *t_ >= minT_, c_[ 6] + *t_ * ( c_[1] + *t_ * ( c_[2] + *t_ * ( c_[ 3] + *t_ * ( c_[ 4] + *t_ * c_[ 5] )))) )  // if low temp
-              ( *t_ >  c_[0] && *t_ <= maxT_, c_[13] + *t_ * ( c_[8] + *t_ * ( c_[9] + *t_ * ( c_[10] + *t_ * ( c_[11] + *t_ * c_[12] )))) )  // else if high temp
-              ( *t_ < minT_,                  c_[ 6] + c_[1] * *t_ + minT_ * ( 2*c_[2] * *t_ + minT_ * ( 3*c_[ 3] * *t_ - c_[2] + minT_ * ( 4*c_[ 4] * *t_ - 2*c_[ 3] + minT_ * ( 5*c_[ 5] * *t_ - 3*c_[ 4] + minT_ * -4*c_[ 5] )))) )  // else if out of bounds - low
-              (                               c_[13] + c_[8] * *t_ + maxT_ * ( 2*c_[9] * *t_ + maxT_ * ( 3*c_[10] * *t_ - c_[9] + maxT_ * ( 4*c_[11] * *t_ - 2*c_[10] + maxT_ * ( 5*c_[12] * *t_ - 3*c_[11] + maxT_ * -4*c_[12] )))) ); // else out of bounds - high
+    h <<= cond( temp <= c_[0] && temp >= minT_, c_[ 6] + temp * ( c_[1] + temp * ( c_[2] + temp * ( c_[ 3] + temp * ( c_[ 4] + temp * c_[ 5] )))) )  // if low temp
+              ( temp >  c_[0] && temp <= maxT_, c_[13] + temp * ( c_[8] + temp * ( c_[9] + temp * ( c_[10] + temp * ( c_[11] + temp * c_[12] )))) )  // else if high temp
+              ( temp < minT_,                   c_[ 6] + c_[1] * temp + minT_ * ( 2*c_[2] * temp + minT_ * ( 3*c_[ 3] * temp - c_[2] + minT_ * ( 4*c_[ 4] * temp - 2*c_[ 3] + minT_ * ( 5*c_[ 5] * temp - 3*c_[ 4] + minT_ * -4*c_[ 5] )))) )  // else if out of bounds - low
+              (                                 c_[13] + c_[8] * temp + maxT_ * ( 2*c_[9] * temp + maxT_ * ( 3*c_[10] * temp - c_[9] + maxT_ * ( 4*c_[11] * temp - 2*c_[10] + maxT_ * ( 5*c_[12] * temp - 3*c_[11] + maxT_ * -4*c_[12] )))) ); // else out of bounds - high
     break;
   case SHOMATE2:
-    h <<= cond( *t_ <= c_[0] && *t_ >= minT_, c_[ 6] + *t_ * ( c_[1] + *t_ * ( c_[2] + *t_ * ( c_[ 3] + *t_ * c_[ 4] ))) - c_[ 5] / *t_ ) // if low temp
-              ( *t_ >  c_[0] && *t_ <= maxT_, c_[13] + *t_ * ( c_[8] + *t_ * ( c_[9] + *t_ * ( c_[10] + *t_ * c_[11] ))) - c_[12] / *t_ )  // else if high range
-              ( *t_ <  minT_,                 c_[ 6] + c_[1] * *t_ + minT_ * ( 2*c_[2] * *t_ + minT_ * ( 3*c_[ 3] * *t_ - c_[2] + minT_ * ( 4*c_[ 4] * *t_ - 2*c_[ 3] + minT_ * -3*c_[ 4] ))) + ( c_[ 5] * *t_ / minT_ - 2*c_[ 5] ) / minT_ ) // else if out of bounds - low
-              (                               c_[13] + c_[8] * *t_ + maxT_ * ( 2*c_[9] * *t_ + maxT_ * ( 3*c_[10] * *t_ - c_[9] + maxT_ * ( 4*c_[11] * *t_ - 2*c_[10] + maxT_ * -3*c_[11] ))) + ( c_[12] * *t_ / maxT_ - 2*c_[12] ) / maxT_ ); // else out of bounds - high
+    h <<= cond( temp <= c_[0] && temp >= minT_, c_[ 6] + temp * ( c_[1] + temp * ( c_[2] + temp * ( c_[ 3] + temp * c_[ 4] ))) - c_[ 5] / temp ) // if low temp
+              ( temp >  c_[0] && temp <= maxT_, c_[13] + temp * ( c_[8] + temp * ( c_[9] + temp * ( c_[10] + temp * c_[11] ))) - c_[12] / temp )  // else if high range
+              ( temp <  minT_,                  c_[ 6] + c_[1] * temp + minT_ * ( 2*c_[2] * temp + minT_ * ( 3*c_[ 3] * temp - c_[2] + minT_ * ( 4*c_[ 4] * temp - 2*c_[ 3] + minT_ * -3*c_[ 4] ))) + ( c_[ 5] * temp / minT_ - 2*c_[ 5] ) / minT_ ) // else if out of bounds - low
+              (                                 c_[13] + c_[8] * temp + maxT_ * ( 2*c_[9] * temp + maxT_ * ( 3*c_[10] * temp - c_[9] + maxT_ * ( 4*c_[11] * temp - 2*c_[10] + maxT_ * -3*c_[11] ))) + ( c_[12] * temp / maxT_ - 2*c_[12] ) / maxT_ ); // else out of bounds - high
     break;
   }
 }

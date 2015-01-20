@@ -50,8 +50,9 @@ class Temperature
   typedef std::vector<double> PolyVals; // values used for polynomial
   const Expr::Tag enthTag_;
   const Expr::TagList massFracTags_;
-  const FieldT* enth_;
-  std::vector<const FieldT*> massFracs_;
+
+  DECLARE_FIELD( FieldT, enth_ );
+  DECLARE_VECTOR_OF_FIELDS( FieldT, massFracs_ )
 
   PolyVals minTVec_; // vector of minimum temperatures for polynomial evaluations
   PolyVals maxTVec_; // vector of maximum temperatures for polynomial evaluations
@@ -77,7 +78,8 @@ public:
      */
     Builder( const Expr::Tag& resultTag,
              const Expr::TagList& massFracTags,
-             const Expr::Tag& enthTag  );
+             const Expr::Tag& enthTag,
+             const int nghos = DEFAULT_NUMBER_OF_GHOSTS );
 
     Expr::ExpressionBase* build() const;
 
@@ -87,8 +89,6 @@ public:
   };
 
   ~Temperature(){}
-  void advertise_dependents( Expr::ExprDeps& exprDeps );
-  void bind_fields( const Expr::FieldManagerList& fml );
   void evaluate();
 };
 
@@ -130,12 +130,11 @@ class TemperatureFromE0
 {
   typedef std::vector<FieldT*> SpecT;
   typedef std::vector<double> PolyVals; // values used for polynomial
-  const Expr::Tag e0Tag_;
-  const Expr::Tag keTag_;
-  const Expr::TagList massFracTags_;
-  const FieldT* e0_;
-  const FieldT* ke_;
-  std::vector<const FieldT*> massFracs_;
+
+  const double tol_; // tolerance for Newton's method
+
+  DECLARE_FIELDS( FieldT, e0_, ke_ )
+  DECLARE_VECTOR_OF_FIELDS( FieldT, massFracs_ )
 
   PolyVals minTVec_; // vector of minimum temperatures for polynomial evaluations
   PolyVals maxTVec_; // vector of maximum temperatures for polynomial evaluations
@@ -147,7 +146,8 @@ class TemperatureFromE0
 
   TemperatureFromE0( const Expr::TagList& massFracTags,
                      const Expr::Tag& e0Tag,
-                     const Expr::Tag& keTag );
+                     const Expr::Tag& keTag,
+                     const double tol);
 public:
 
   class Builder : public Expr::ExpressionBuilder
@@ -163,19 +163,20 @@ public:
     Builder( const Expr::Tag& resultTag,
              const Expr::TagList& massFracTags,
              const Expr::Tag& e0Tag,
-             const Expr::Tag& keTag );
+             const Expr::Tag& keTag,
+             const double tol=1e-3,
+             const int nghost = DEFAULT_NUMBER_OF_GHOSTS );
 
     Expr::ExpressionBase* build() const;
 
   private:
+    const double tol_;
     const Expr::Tag e0Tag_;
     const Expr::TagList massFracTags_;
     const Expr::Tag keTag_;
   };
 
   ~TemperatureFromE0(){}
-  void advertise_dependents( Expr::ExprDeps& exprDeps );
-  void bind_fields( const Expr::FieldManagerList& fml );
   void evaluate();
 };
 
@@ -190,11 +191,13 @@ Temperature<FieldT>::
 Temperature( const Expr::TagList& massFracTags,
              const Expr::Tag& enthTag )
   : Expr::Expression<FieldT>(),
-    enthTag_( enthTag ),
-    massFracTags_( massFracTags ),
     shomateFlag_ ( false )
 {
   this->set_gpu_runnable( true );
+
+  enth_ = this->template create_field_request<FieldT>( enthTag );
+  this->template create_field_vector_request<FieldT>( massFracTags, massFracs_ );
+
   Cantera_CXX::IdealGasMix* const gasMix = CanteraObjects::get_gasmix();
   const Cantera::SpeciesThermo& spThermo = gasMix->speciesThermo();
 
@@ -266,37 +269,13 @@ Temperature( const Expr::TagList& massFracTags,
 template< typename FieldT >
 void
 Temperature<FieldT>::
-advertise_dependents( Expr::ExprDeps& exprDeps )
-{
-  exprDeps.requires_expression( massFracTags_ );
-  exprDeps.requires_expression( enthTag_      );
-}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-void
-Temperature<FieldT>::
-bind_fields( const Expr::FieldManagerList& fml )
-{
-  const typename Expr::FieldMgrSelector<FieldT>::type& fm = fml.field_manager<FieldT>();
-  massFracs_.clear();
-  BOOST_FOREACH( const Expr::Tag& tag, massFracTags_ ){
-    massFracs_.push_back( &fm.field_ref(tag) );
-  }
-  enth_ = &fm.field_ref( enthTag_ );
-}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-void
-Temperature<FieldT>::
 evaluate()
 {
   using namespace SpatialOps;
   using namespace Cantera;
   FieldT& temp = this->value();
+
+  const FieldT& enth = enth_->field_ref();
 
   SpatFldPtr<FieldT> recipT;      // may be used for Shomate polynomial
   SpatFldPtr<FieldT> recipRecipT; // may be used for Shomate polynomial
@@ -317,7 +296,7 @@ evaluate()
 # endif
   bool isConverged = false;
   while( !isConverged ){
-    delH <<= *enth_;
+    delH <<= enth;
     dhdT <<= 0.0;
     // pre-compute powers of temperature used in polynomial evaluations
     if( shomateFlag_ == true ){
@@ -329,6 +308,7 @@ evaluate()
     const double minTval = nebo_min(temp);
 #   endif
     for( size_t n=0; n<nSpec_; ++n ){
+      const FieldT& yi = massFracs_[n]->field_ref();
       const int polyType = polyTypeVec_[n];
       const std::vector<double>& c = cVec_[n];
       const std::vector<double>& cFrac = cFracVec_[n];
@@ -338,24 +318,24 @@ evaluate()
       if( maxTval <= maxT && minTval >= minT){ // if true, temperature can only be either high or low
         switch (polyType) {
         case SIMPLE: // constant cp
-          delH <<= delH - *massFracs_[n] * ( c[1] + c[3]*(temp-c[0]) );
-          dhdT <<= dhdT + *massFracs_[n] * c[3];
+          delH <<= delH - yi * ( c[1] + c[3]*(temp-c[0]) );
+          dhdT <<= dhdT + yi * c[3];
           break;
         case NASA2:
-          delH <<= delH - *massFracs_[n]
+          delH <<= delH - yi
                  * cond( temp <= c[0], c[ 6] + temp * ( c[1] + temp * ( cFrac[2] + temp * ( cFrac[ 3] + temp * ( cFrac[ 4] + temp * cFrac[ 5] )))) )  // if low temp
                        (               c[13] + temp * ( c[8] + temp * ( cFrac[9] + temp * ( cFrac[10] + temp * ( cFrac[11] + temp * cFrac[12] )))) );  // else if high temp
 
-          dhdT <<= dhdT + *massFracs_[n]
+          dhdT <<= dhdT + yi
                  * cond( temp <= c[0], c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * ( c[ 4] + temp * c[ 5] ))) )  // if low temp
                        (               c[8] + temp * ( c[9] + temp * ( c[10] + temp * ( c[11] + temp * c[12] ))) );  // else if high temp
           break;
         case SHOMATE2:
-          delH <<= delH - *massFracs_[n]
+          delH <<= delH - yi
                  * cond( temp <= c[0], c[ 6] + temp*1e-3 * ( c[1] + temp*1e-3 * ( cFrac[2] + temp*1e-3 * ( cFrac[ 3] + temp*1e-3 * cFrac[ 4] ))) - c[ 5] * *recipT*1e3 ) // if low temp
                        (               c[13] + temp*1e-3 * ( c[8] + temp*1e-3 * ( cFrac[9] + temp*1e-3 * ( cFrac[10] + temp*1e-3 * cFrac[11] ))) - c[12] * *recipT*1e3 );  // else if high range
 
-          dhdT <<= dhdT + *massFracs_[n] * 1e-3 // 1e-3 is a factor for units conversion
+          dhdT <<= dhdT + yi * 1e-3 // 1e-3 is a factor for units conversion
                  * cond( temp <= c[0], c[1] + temp*1e-3 * ( c[2] + temp*1e-3 * ( c[ 3] + temp*1e-3 * c[ 4] )) + c[ 5] * *recipRecipT*1e6 )  // if low temp
                        (               c[8] + temp*1e-3 * ( c[9] + temp*1e-3 * ( c[10] + temp*1e-3 * c[11] )) + c[12] * *recipRecipT*1e6 );  // else if high temp
           break;
@@ -369,17 +349,17 @@ evaluate()
          */
         switch (polyType){
         case SIMPLE: // constant cp
-          delH<<=delH - *massFracs_[n] * ( c[1] + c[3]*(temp-c[0]) );
-          dhdT<<=dhdT + *massFracs_[n] * c[3];
+          delH<<=delH - yi * ( c[1] + c[3]*(temp-c[0]) );
+          dhdT<<=dhdT + yi * c[3];
           break;
         case NASA2:
-          delH <<= delH - *massFracs_[n]
+          delH <<= delH - yi
                  * cond( temp <= c[0] && temp >= minT, c[ 6] + temp * ( c[1] + temp * ( cFrac[2] + temp * ( cFrac[ 3] + temp * ( cFrac[ 4] + temp * cFrac[ 5] )))) )  // if low temp
                        ( temp >  c[0] && temp <= maxT, c[13] + temp * ( c[8] + temp * ( cFrac[9] + temp * ( cFrac[10] + temp * ( cFrac[11] + temp * cFrac[12] )))) )  // else if high temp
                        ( temp < minT,                  c[ 6] + c[1] * temp + minT * ( c[2] * temp + minT * ( c[ 3] * temp - cFrac[2] + minT * ( c[ 4] * temp - 2*cFrac[ 3] + minT * ( c[ 5] * temp - 3*cFrac[ 4] + minT * -4*cFrac[ 5] )))) )  // else if out of bounds - low
                        (                               c[13] + c[8] * temp + maxT * ( c[9] * temp + maxT * ( c[10] * temp - cFrac[9] + maxT * ( c[11] * temp - 2*cFrac[10] + maxT * ( c[12] * temp - 3*cFrac[11] + maxT * -4*cFrac[12] )))) ); // else out of bounds - high
 
-          dhdT <<= dhdT + *massFracs_[n]
+          dhdT <<= dhdT + yi
                  * cond( temp <= c[0] && temp >= minT, c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * ( c[ 4] + temp * c[ 5] ))) )  // if low temp
                        ( temp >  c[0] && temp <= maxT, c[8] + temp * ( c[9] + temp * ( c[10] + temp * ( c[11] + temp * c[12] ))) )  // else if high temp
                        ( temp < minT,                  c[1] + minT * ( c[2] + minT * ( c[ 3] + minT * ( c[ 4] + minT * c[ 5] ))) )  // else if out of bounds - low
@@ -387,13 +367,13 @@ evaluate()
 
           break;
         case SHOMATE2:
-          delH <<= delH - *massFracs_[n]
+          delH <<= delH - yi
                  * cond( temp <= c[0] && temp >= minT, c[ 6] + temp*1e-3 * ( c[1] + temp*1e-3 * ( cFrac[2] + temp*1e-3 * ( cFrac[ 3] + temp*1e-3 * cFrac[ 4] ))) - c[ 5] * *recipT*1e3 ) // if low temp
                        ( temp >  c[0] && temp <= maxT, c[13] + temp*1e-3 * ( c[8] + temp*1e-3 * ( cFrac[9] + temp*1e-3 * ( cFrac[10] + temp*1e-3 * cFrac[11] ))) - c[12] * *recipT*1e3 )  // else if high range
                        ( temp <  minT,                 c[ 6] + c[1] * temp*1e-3 + minT*1e-3 * ( c[2] * temp*1e-3 + minT*1e-3 * ( c[ 3] * temp*1e-3 - cFrac[2] + minT*1e-3 * ( c[ 4] * temp*1e-3 - 2*cFrac[ 3] + minT*1e-3 * -3*cFrac[ 4] ))) + ( c[ 5] * temp / minT - 2*c[ 5] ) / (minT*1e-3) ) // else if out of bounds - low
                        (                               c[13] + c[8] * temp*1e-3 + maxT*1e-3 * ( c[9] * temp*1e-3 + maxT*1e-3 * ( c[10] * temp*1e-3 - cFrac[9] + maxT*1e-3 * ( c[11] * temp*1e-3 - 2*cFrac[10] + maxT*1e-3 * -3*cFrac[11] ))) + ( c[12] * temp / maxT - 2*c[12] ) / (maxT*1e-3) ); // else out of bounds - high
 
-          dhdT <<= dhdT + *massFracs_[n] * 1e-3 // 1e-3 is a factor for units conversion
+          dhdT <<= dhdT + yi * 1e-3 // 1e-3 is a factor for units conversion
                  * cond( temp <= c[0] && temp >= minT, c[1] + temp*1e-3 * ( c[2] + temp*1e-3 * ( c[ 3] + temp*1e-3 * c[ 4] )) + c[ 5] * *recipRecipT*1e6  )  // if low temp
                        ( temp >  c[0] && temp <= maxT, c[8] + temp*1e-3 * ( c[9] + temp*1e-3 * ( c[10] + temp*1e-3 * c[11] )) + c[12] * *recipRecipT*1e6  )  // else if high temp
                        ( temp < minT,                  c[1] + minT*1e-3 * ( c[2] + minT*1e-3 * ( c[ 3] + minT*1e-3 * c[ 4] )) + c[ 5] / (minT*minT*1e-6) )  // else if out of bounds - low
@@ -423,8 +403,9 @@ template< typename FieldT >
 Temperature<FieldT>::
 Builder::Builder( const Expr::Tag& resultTag,
                   const Expr::TagList& massFracTags,
-                  const Expr::Tag& enthTag )
-: ExpressionBuilder( resultTag ),
+                  const Expr::Tag& enthTag,
+                  const int nghost )
+: ExpressionBuilder( resultTag, nghost ),
   massFracTags_( massFracTags ),
   enthTag_( enthTag )
 {}
@@ -445,14 +426,18 @@ template< typename FieldT >
 TemperatureFromE0<FieldT>::
 TemperatureFromE0( const Expr::TagList& massFracTags,
                    const Expr::Tag& e0Tag,
-                   const Expr::Tag& keTag )
+                   const Expr::Tag& keTag,
+                   const double tol )
   : Expr::Expression<FieldT>(),
-    e0Tag_( e0Tag ),
-    keTag_( keTag ),
-    massFracTags_( massFracTags ),
+    tol_( tol ),
     shomateFlag_ ( false )
 {
   this->set_gpu_runnable( true );
+
+  e0_ = this->template create_field_request<FieldT>( e0Tag );
+  ke_ = this->template create_field_request<FieldT>( keTag );
+  this->template create_field_vector_request<FieldT>( massFracTags, massFracs_ );
+
   Cantera_CXX::IdealGasMix* const gasMix = CanteraObjects::get_gasmix();
   const Cantera::SpeciesThermo& spThermo = gasMix->speciesThermo();
 
@@ -530,39 +515,14 @@ TemperatureFromE0( const Expr::TagList& massFracTags,
 template< typename FieldT >
 void
 TemperatureFromE0<FieldT>::
-advertise_dependents( Expr::ExprDeps& exprDeps )
-{
-  exprDeps.requires_expression( massFracTags_ );
-  exprDeps.requires_expression( e0Tag_        );
-  exprDeps.requires_expression( keTag_        );
-}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-void
-TemperatureFromE0<FieldT>::
-bind_fields( const Expr::FieldManagerList& fml )
-{
-  const typename Expr::FieldMgrSelector<FieldT>::type& fm = fml.field_manager<FieldT>();
-  massFracs_.clear();
-  BOOST_FOREACH( const Expr::Tag& tag, massFracTags_ ){
-    massFracs_.push_back( &fm.field_ref(tag) );
-  }
-  e0_ = &fm.field_ref( e0Tag_ );
-  ke_ = &fm.field_ref( keTag_ );
-}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-void
-TemperatureFromE0<FieldT>::
 evaluate()
 {
   using namespace SpatialOps;
   using namespace Cantera;
   FieldT& temp = this->value();
+
+  const FieldT& e0 = e0_->field_ref();
+  const FieldT& ke = ke_->field_ref();
 
   SpatFldPtr<FieldT> recipT;      // may be used for Shomate polynomial
   SpatFldPtr<FieldT> recipRecipT; // may be used for Shomate polynomial
@@ -583,71 +543,76 @@ evaluate()
 # endif
 
   bool isConverged = false;
-  while( !isConverged ){
-    delE0 <<= *e0_ - *ke_;
-    dE0dT <<= 0.0;
-    // pre-compute powers of temperature used in polynomial evaluations
-    if( shomateFlag_ == true ){
-      *recipT      <<= 1/ temp;
-      *recipRecipT <<= *recipT * *recipT;
-    }
-#   ifndef ENABLE_CUDA
-    const double maxTval = nebo_max(temp);
-    const double minTval = nebo_min(temp);
-#   endif
-    for( size_t n=0; n<nSpec_; ++n){
-      const int polyType = polyTypeVec_[n];
-      const std::vector<double>& c = cVec_[n];
-      const std::vector<double>& cFrac = cFracVec_[n];
-      const double minT = minTVec_[n];
-      const double maxT = maxTVec_[n];
-#     ifndef ENABLE_CUDA // optimization benefits only the CPU - cond performs betters with if/else than with if/elif/elif/else
-      if( maxTval <= maxT && minTval >= minT){ // if true, temperature can only be either high or low
-        switch (polyType) {
+  int iterations = 0;
+  const int maxIts = 20;
+  const double exceptionTemp = 3000; // maximum temperature before exception is thrown
+  try{
+    while( !isConverged ){
+      delE0 <<= e0 - ke;
+      dE0dT <<= 0.0;
+      // pre-compute powers of temperature used in polynomial evaluations
+      if( shomateFlag_ == true ){
+        *recipT      <<= 1/ temp;
+        *recipRecipT <<= *recipT * *recipT;
+      }
+#     ifndef ENABLE_CUDA
+      const double maxTval = nebo_max(temp);
+      const double minTval = nebo_min(temp);
+#     endif
+      for( size_t n=0; n<nSpec_; ++n){
+        const FieldT& yi = massFracs_[n]->field_ref();
+        const int polyType = polyTypeVec_[n];
+        const std::vector<double>& c = cVec_[n];
+        const std::vector<double>& cFrac = cFracVec_[n];
+        const double minT = minTVec_[n];
+        const double maxT = maxTVec_[n];
+#       ifndef ENABLE_CUDA // optimization benefits only the CPU - cond performs betters with if/else than with if/elif/elif/else
+        if( maxTval <= maxT && minTval >= minT){ // if true, temperature can only be either high or low
+          switch (polyType) {
           case SIMPLE: // constant cv
-            delE0 <<= delE0 - *massFracs_[n] * ( c[1] + c[3]*(temp-c[0]) );
-            dE0dT <<= dE0dT + *massFracs_[n] * c[3];
+            delE0 <<= delE0 - yi * ( c[1] + c[3]*(temp-c[0]) );
+            dE0dT <<= dE0dT + yi * c[3];
             break;
           case NASA2:
-            delE0 <<= delE0 - *massFracs_[n]
+            delE0 <<= delE0 - yi
                     * cond( temp <= c[0], c[ 6] + temp * ( c[1] + temp * ( cFrac[2] + temp * ( cFrac[ 3] + temp * ( cFrac[ 4] + temp * cFrac[ 5] )))) )  // if low temp
                           (               c[13] + temp * ( c[8] + temp * ( cFrac[9] + temp * ( cFrac[10] + temp * ( cFrac[11] + temp * cFrac[12] )))) );  // else if high temp
 
-            dE0dT <<= dE0dT + *massFracs_[n]
+            dE0dT <<= dE0dT + yi
                     * cond( temp <= c[0], c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * ( c[ 4] + temp * c[ 5] ))) )  // if low temp
                           (               c[8] + temp * ( c[9] + temp * ( c[10] + temp * ( c[11] + temp * c[12] ))) );  // else if high temp
             break;
           case SHOMATE2:
-            delE0 <<= delE0 - *massFracs_[n]
+            delE0 <<= delE0 - yi
                     * cond( temp <= c[0], c[ 6] + temp*1e-3 * ( c[1] + temp*1e-3 * ( cFrac[2] + temp*1e-3 * ( cFrac[ 3] + temp*1e-3 * cFrac[ 4] ))) - c[ 5] * *recipT*1e3 ) // if low temp
                           (               c[13] + temp*1e-3 * ( c[8] + temp*1e-3 * ( cFrac[9] + temp*1e-3 * ( cFrac[10] + temp*1e-3 * cFrac[11] ))) - c[12] * *recipT*1e3 );  // else if high range
 
-            dE0dT <<= dE0dT + *massFracs_[n] * 1e-3 // 1e-3 is a factor for units conversion
+            dE0dT <<= dE0dT + yi * 1e-3 // 1e-3 is a factor for units conversion
                     * cond( temp <= c[0], c[1] + temp*1e-3 * ( c[2] + temp*1e-3 * ( c[ 3] + temp*1e-3 * c[ 4])) + c[ 5] * *recipRecipT*1e6  )  // if low temp
                           (               c[8] + temp*1e-3 * ( c[9] + temp*1e-3 * ( c[10] + temp*1e-3 * c[11])) + c[12] * *recipRecipT*1e6  );  // else if high temp
             break;
-        } // switch( polyType )
-      }
-      else
-#     endif
-      {
-        /* else temperature can be out of bounds low, low temp, high temp, or out of bounds high
-         * if out of bounds, properties are interpolated from min or max temp using a constant cv
-         */
-        switch (polyType) {
+          } // switch( polyType )
+        }
+        else
+#       endif
+        {
+          /* else temperature can be out of bounds low, low temp, high temp, or out of bounds high
+           * if out of bounds, properties are interpolated from min or max temp using a constant cv
+           */
+          switch (polyType) {
           case SIMPLE: // constant cv
-            delE0 <<= delE0 - *massFracs_[n] * ( c[1] + c[3] * (temp-c[0]) );
-            dE0dT <<= dE0dT + *massFracs_[n] * c[3];
+            delE0 <<= delE0 - yi * ( c[1] + c[3] * (temp-c[0]) );
+            dE0dT <<= dE0dT + yi * c[3];
             break;
           case NASA2:
-            delE0 <<= delE0 - *massFracs_[n]
+            delE0 <<= delE0 - yi
                     * cond( temp <= c[0] && temp >= minT, c[ 6] + temp * ( c[1] + temp * ( cFrac[2] + temp * ( cFrac[ 3] + temp * ( cFrac[ 4] + temp * cFrac[ 5] )))) )  // if low temp
                           ( temp >  c[0] && temp <= maxT, c[13] + temp * ( c[8] + temp * ( cFrac[9] + temp * ( cFrac[10] + temp * ( cFrac[11] + temp * cFrac[12] )))) )  // else if high temp
                           ( temp < minT,                  c[ 6] + c[1] * temp + minT * ( c[2] * temp + minT * ( c[ 3] * temp - cFrac[2] + minT * ( c[ 4] * temp - 2*cFrac[ 3] + minT * ( c[ 5] * temp - 3*cFrac[ 4] + minT * -4*cFrac[ 5] )))) )  // else if out of bounds - low
                           (                               c[13] + c[8] * temp + maxT * ( c[9] * temp + maxT * ( c[10] * temp - cFrac[9] + maxT * ( c[11] * temp - 2*cFrac[10] + maxT * ( c[12] * temp - 3*cFrac[11] + maxT * -4*cFrac[12] )))) ); // else out of bounds - high
 
 
-            dE0dT <<= dE0dT + *massFracs_[n]
+            dE0dT <<= dE0dT + yi
                     * cond( temp <= c[0] && temp >= minT, c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * ( c[ 4] + temp * c[ 5] ))) )  // if low temp
                           ( temp >  c[0] && temp <= maxT, c[8] + temp * ( c[9] + temp * ( c[10] + temp * ( c[11] + temp * c[12] ))) )  // else if high temp
                           ( temp < minT,                  c[1] + minT * ( c[2] + minT * ( c[ 3] + minT * ( c[ 4] + minT * c[ 5] ))) )  // else if out of bounds - low
@@ -656,32 +621,82 @@ evaluate()
 
             break;
           case SHOMATE2:
-            delE0 <<= delE0 - *massFracs_[n]
+            delE0 <<= delE0 - yi
                     * cond( temp <= c[0] && temp >= minT, c[ 6] + temp*1e-3 * ( c[1] + temp*1e-3 * ( cFrac[2] + temp*1e-3 * ( cFrac[ 3] + temp*1e-3 * cFrac[ 4] ))) - c[ 5] * *recipT*1e3 ) // if low temp
                           ( temp >  c[0] && temp <= maxT, c[13] + temp*1e-3 * ( c[8] + temp*1e-3 * ( cFrac[9] + temp*1e-3 * ( cFrac[10] + temp*1e-3 * cFrac[11] ))) - c[12] * *recipT*1e3 )  // else if high range
                           ( temp <  minT,                 c[ 6] + c[1] * temp*1e-3 + minT*1e-3 * ( c[2] * temp*1e-3 + minT*1e-3 * ( c[ 3] * temp*1e-3 - cFrac[2] + minT*1e-3 * ( c[ 4] * temp*1e-3 - 2*cFrac[ 3] + minT*1e-3 * -3*cFrac[ 4] ))) + ( c[ 5] * temp / minT - 2*c[ 5] ) / (minT*1e-3) ) // else if out of bounds - low
                           (                               c[13] + c[8] * temp*1e-3 + maxT*1e-3 * ( c[9] * temp*1e-3 + maxT*1e-3 * ( c[10] * temp*1e-3 - cFrac[9] + maxT*1e-3 * ( c[11] * temp*1e-3 - 2*cFrac[10] + maxT*1e-3 * -3*cFrac[11] ))) + ( c[12] * temp / maxT - 2*c[12] ) / (maxT*1e-3) ); // else out of bounds - high
 
-            dE0dT <<= dE0dT + *massFracs_[n] * 1e-3 // 1e-3 is a factor for units conversion
+            dE0dT <<= dE0dT + yi * 1e-3 // 1e-3 is a factor for units conversion
                     * cond( temp <= c[0] && temp >= minT, c[1] + temp*1e-3 * ( c[2] + temp*1e-3 * ( c[ 3] + temp*1e-3 * c[ 4])) + c[ 5] * *recipRecipT*1e6  )  // if low temp
                           ( temp >  c[0] && temp <= maxT, c[8] + temp*1e-3 * ( c[9] + temp*1e-3 * ( c[10] + temp*1e-3 * c[11])) + c[12] * *recipRecipT*1e6  )  // else if high temp
                           ( temp < minT,                  c[1] + minT*1e-3 * ( c[2] + minT*1e-3 * ( c[ 3] + minT*1e-3 * c[ 4])) + c[ 5] / (minT*minT*1e-6) )  // else if out of bounds - low
                           (                               c[8] + maxT*1e-3 * ( c[9] + maxT*1e-3 * ( c[10] + maxT*1e-3 * c[11])) + c[12] / (maxT*maxT*1e-6) ); // else out of bounds - high
             break;
-        } // switch( polyType )
+          } // switch( polyType )
+        }
+      } // species loop
+      // Newton's method to find root
+      res  <<= delE0/dE0dT;
+      temp <<= temp + res;
+#     ifdef ENABLE_CUDA
+      res.set_device_as_active(CPU_INDEX);
+#     endif
+      const double err = nebo_max( abs(res) );
+#     ifdef ENABLE_CUDA
+      res.set_device_as_active(GPU_INDEX);
+#     endif
+      isConverged = ( err < tol_ ); // Converged when the temperature has changed by less than set tolerance
+      ++iterations;
+
+      // error trapping
+#     ifndef ENABLE_CUDA
+      if( nebo_min(dE0dT) <= 0 )
+        throw( err );
+      if( nebo_min(temp) <= 0 )
+        throw( err );
+      if( nebo_max(temp) > exceptionTemp )
+        throw( err );
+      if( !isConverged && iterations == maxIts )
+        throw( err );
+#     endif
+
+    }
+  }
+  catch( const double err ){
+    std::ostringstream msg;
+    msg << std::endl
+        << "Error in pokitt::TemperatureFromE0::evaluate()." << std::endl;
+
+    if( iterations == maxIts ){
+      msg << "Maximum iteration count exceeded " << std::endl;
+    }
+    else{
+      msg << "Bad field(s) detected:" << std::endl;
+      if( nebo_min(dE0dT) < 0 ){
+        msg << "Cv is negative" << std::endl;
       }
-    } // species loop
-    // Newton's method to find root
-    res  <<= delE0/dE0dT;
-    temp <<= temp + res;
-#   ifdef ENABLE_CUDA
-    res.set_device_as_active(CPU_INDEX);
-#   endif
-    const double err = nebo_max( abs(res) );
-#   ifdef ENABLE_CUDA
-    res.set_device_as_active(GPU_INDEX);
-#   endif
-    isConverged = err < 1e-3; // Converged when the temperature has changed by less than 1e-3
+      if( nebo_min(dE0dT) == 0 ){
+        msg << "Cv is zero" << std::endl;
+      }
+      if( nebo_min(temp) < 0 ){
+        msg << "Temperature is negative" << std::endl;
+      }
+      if( nebo_min(temp) == 0 ){
+        msg << "Temperature is zero" << std::endl;
+      }
+      if( nebo_max(temp) > exceptionTemp ){
+        msg << "Temperature is above " << exceptionTemp << std::endl;
+      }
+      msg << std::endl;
+    }
+
+    msg << "Total   iterations = " << iterations << std::endl
+        << "Maximum iterations = " << maxIts << std::endl
+        << "Set tolerance              = " << tol_ << std::endl
+        << "Largest pointwise residual = " << err << std::endl
+        << __FILE__ << " : " << __LINE__ << std::endl;
+    throw std::runtime_error( msg.str() );
   }
 }
 
@@ -693,11 +708,14 @@ TemperatureFromE0<FieldT>::
 Builder::Builder( const Expr::Tag& resultTag,
                   const Expr::TagList& massFracTags,
                   const Expr::Tag& e0Tag,
-                  const Expr::Tag& keTag )
-: ExpressionBuilder( resultTag ),
+                  const Expr::Tag& keTag,
+                  const double tol,
+                  const int nghost )
+: ExpressionBuilder( resultTag, nghost ),
   massFracTags_( massFracTags ),
   e0Tag_( e0Tag ),
-  keTag_( keTag )
+  keTag_( keTag ),
+  tol_( tol )
 {}
 
 //--------------------------------------------------------------------
@@ -707,7 +725,7 @@ Expr::ExpressionBase*
 TemperatureFromE0<FieldT>::
 Builder::build() const
 {
-  return new TemperatureFromE0<FieldT>( massFracTags_, e0Tag_, keTag_ );
+  return new TemperatureFromE0<FieldT>( massFracTags_, e0Tag_, keTag_, tol_ );
 }
 
 } // namespace pokitt

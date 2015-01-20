@@ -29,12 +29,7 @@ template< typename FieldT >
 class Density
     : public Expr::Expression<FieldT>
 {
-  const Expr::Tag tTag_;
-  const Expr::Tag pTag_;
-  const Expr::Tag mmwTag_;
-  const FieldT* t_;
-  const FieldT* p_;
-  const FieldT* mmw_;
+  DECLARE_FIELDS( FieldT, t_, p_, mmw_ )
 
   Density( const Expr::Tag& tTag,
            const Expr::Tag& pTag,
@@ -53,7 +48,8 @@ public:
     Builder( const Expr::Tag& resultTag,
              const Expr::Tag& tTag,
              const Expr::Tag& pTag,
-             const Expr::Tag& mmwTag );
+             const Expr::Tag& mmwTag,
+             const int nghost = DEFAULT_NUMBER_OF_GHOSTS );
 
     Expr::ExpressionBase* build() const;
 
@@ -64,8 +60,6 @@ public:
   };
 
   ~Density();
-  void advertise_dependents( Expr::ExprDeps& exprDeps );
-  void bind_fields( const Expr::FieldManagerList& fml );
   void evaluate();
 
 };
@@ -81,12 +75,13 @@ Density<FieldT>::
 Density( const Expr::Tag& tTag,
          const Expr::Tag& pTag,
          const Expr::Tag& mmwTag )
-  : Expr::Expression<FieldT>(),
-    tTag_( tTag ),
-    pTag_( pTag ),
-    mmwTag_( mmwTag )
+  : Expr::Expression<FieldT>()
 {
   this->set_gpu_runnable( true );
+
+  t_   = this->template create_field_request<FieldT>( tTag   );
+  p_   = this->template create_field_request<FieldT>( pTag   );
+  mmw_ = this->template create_field_request<FieldT>( mmwTag );
 }
 
 //--------------------------------------------------------------------
@@ -101,37 +96,14 @@ Density<FieldT>::
 template< typename FieldT >
 void
 Density<FieldT>::
-advertise_dependents( Expr::ExprDeps& exprDeps )
-{
-  exprDeps.requires_expression( tTag_ );
-  exprDeps.requires_expression( pTag_ );
-  exprDeps.requires_expression( mmwTag_ );
-}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-void
-Density<FieldT>::
-bind_fields( const Expr::FieldManagerList& fml )
-{
-  const typename Expr::FieldMgrSelector<FieldT>::type& fm = fml.field_manager<FieldT>();
-
-  t_ =   &fm.field_ref( tTag_   );
-  p_ =   &fm.field_ref( pTag_   );
-  mmw_ = &fm.field_ref( mmwTag_ );
-}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-void
-Density<FieldT>::
 evaluate()
 {
   using namespace SpatialOps;
   FieldT& rho = this->value();
-  rho <<= *p_ * *mmw_ / ( *t_ * Cantera::GasConstant );
+  const FieldT& t   =   t_->field_ref();
+  const FieldT& p   =   p_->field_ref();
+  const FieldT& mmw = mmw_->field_ref();
+  rho <<= p * mmw / ( t * Cantera::GasConstant );
 }
 //--------------------------------------------------------------------
 
@@ -140,8 +112,9 @@ Density<FieldT>::
 Builder::Builder( const Expr::Tag& resultTag,
          const Expr::Tag& tTag,
          const Expr::Tag& pTag,
-         const Expr::Tag& mmwTag )
-: ExpressionBuilder( resultTag ),
+         const Expr::Tag& mmwTag,
+         const int nghost )
+: ExpressionBuilder( resultTag, nghost ),
   tTag_( tTag ),
   pTag_( pTag ),
   mmwTag_( mmwTag )

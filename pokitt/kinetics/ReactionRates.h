@@ -78,16 +78,8 @@ class ReactionRates
 {
   typedef std::vector<FieldT*> SpecT;
 
-  const Expr::Tag tTag_;
-  const Expr::Tag pTag_;
-  const Expr::Tag mmwTag_;
-  const Expr::TagList massFracTags_;
-
-  const FieldT* t_;
-  const FieldT* p_;
-  const FieldT* mmw_; // mixture molecular weight
-
-  std::vector<const FieldT*> massFracs_;
+  DECLARE_FIELDS( FieldT, t_, p_, mmw_ )
+  DECLARE_VECTOR_OF_FIELDS( FieldT, massFracs_ )
 
   std::vector<Cantera::ReactionData> rxnDataVec_;
 
@@ -127,7 +119,8 @@ public:
              const Expr::Tag& tTag,
              const Expr::Tag& pTag,
              const Expr::TagList& massFracTags,
-             const Expr::Tag& mmwTag );
+             const Expr::Tag& mmwTag,
+             const int nghost = DEFAULT_NUMBER_OF_GHOSTS );
 
     Expr::ExpressionBase* build() const;
 
@@ -139,8 +132,6 @@ public:
   };
 
   ~ReactionRates(){}
-  void advertise_dependents( Expr::ExprDeps& exprDeps );
-  void bind_fields( const Expr::FieldManagerList& fml );
   void evaluate();
 };
 
@@ -160,13 +151,16 @@ ReactionRates( const Expr::Tag& tTag,
                const Expr::Tag& pTag,
                const Expr::TagList& massFracTags,
                const Expr::Tag& mmwTag )
-  : Expr::Expression<FieldT>(),
-    tTag_( tTag ),
-    pTag_( pTag ),
-    massFracTags_( massFracTags ),
-    mmwTag_( mmwTag )
+  : Expr::Expression<FieldT>()
 {
   this->set_gpu_runnable( true );
+
+  t_   = this->template create_field_request<FieldT>( tTag   );
+  p_   = this->template create_field_request<FieldT>( pTag   );
+  mmw_ = this->template create_field_request<FieldT>( mmwTag );
+
+  this->template create_field_vector_request<FieldT>( massFracTags, massFracs_ );
+
   Cantera_CXX::IdealGasMix* const gasMix = CanteraObjects::get_gasmix();
 
   nSpec_ = gasMix->nSpecies();
@@ -273,46 +267,15 @@ ReactionRates( const Expr::Tag& tTag,
 template< typename FieldT >
 void
 ReactionRates<FieldT>::
-advertise_dependents( Expr::ExprDeps& exprDeps )
-{
-  exprDeps.requires_expression( tTag_         );
-  exprDeps.requires_expression( pTag_         );
-  exprDeps.requires_expression( massFracTags_ );
-  exprDeps.requires_expression( mmwTag_       );
-}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-void
-ReactionRates<FieldT>::
-bind_fields( const Expr::FieldManagerList& fml )
-{
-  const typename Expr::FieldMgrSelector<FieldT>::type& fm = fml.field_manager<FieldT>();
-  t_ = &fm.field_ref( tTag_ );
-
-  p_ = &fm.field_ref( pTag_ );
-  mmw_ = &fm.field_ref( mmwTag_ );
-
-  massFracs_.clear();
-  BOOST_FOREACH( const Expr::Tag& tag, massFracTags_ ){
-    massFracs_.push_back( &fm.field_ref(tag) );
-  }
-}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-void
-ReactionRates<FieldT>::
 evaluate()
 {
   using namespace SpatialOps;
   using namespace Cantera;
 
   SpecT& rRates = this->get_value_vec();
-  const FieldT& t = *t_;
-  const FieldT& p = *p_;
+  const FieldT& t   =   t_->field_ref();
+  const FieldT& p   =   p_->field_ref();
+  const FieldT& mmw = mmw_->field_ref();
 
   SpatFldPtr<FieldT> concPtr    = SpatialFieldStore::get<FieldT>(t); // total mass concentration [kg/m^3]
   SpatFldPtr<FieldT> conc2Ptr   = SpatialFieldStore::get<FieldT>(t); // total mass concentration squared
@@ -345,7 +308,7 @@ evaluate()
   tRecip  <<= 1/t;
   conc    <<= tRecip * p / GasConstant; // molar concentration
   logConc <<= log(conc);
-  conc    <<= conc * *mmw_; // mass concentration
+  conc    <<= conc * mmw; // mass concentration
 
   { // calculate the delta gibbs energy for each species for use in evaluating reversible rate constants
     for( size_t n=0; n<nSpec_; ++n ){
@@ -388,9 +351,11 @@ evaluate()
       SpatFldPtr<FieldT> mPtr  = SpatialFieldStore::get<FieldT>(t); // third body enhancement factor
       FieldT& m = *mPtr;
 
-      m <<= rxnData.default_3b_eff * conc / *mmw_; // evaluate default third body enhancement
-      for( std::map<int, double>::const_iterator iEff = rxnData.thirdBodyEfficiencies.begin(); iEff!= rxnData.thirdBodyEfficiencies.end(); ++iEff)
-        m <<= m + *massFracs_[iEff->first] * conc * ( iEff->second - rxnData.default_3b_eff ) * molecularWeightsInv_[iEff->first]; // correct for non-default species;
+      m <<= rxnData.default_3b_eff * conc / mmw; // evaluate default third body enhancement
+      for( std::map<int, double>::const_iterator iEff = rxnData.thirdBodyEfficiencies.begin(); iEff!= rxnData.thirdBodyEfficiencies.end(); ++iEff){
+        const FieldT& yi = massFracs_[iEff->first]->field_ref();
+        m <<= m + yi * conc * ( iEff->second - rxnData.default_3b_eff ) * molecularWeightsInv_[iEff->first]; // correct for non-default species;
+      }
 
       const int fallType = rxnData.falloffType;
       if( fallType == 0 ) // no falloff
@@ -475,50 +440,46 @@ evaluate()
       kr <<= 0.0; // 0 if not reversible
 
     iStoich = rStoich.begin();
-      for( iSpec=reactants.begin(); iSpec!=reactants.end(); ++iSpec, ++iStoich){ // calculate r_f = k*C_i^stoich
+    for( iSpec=reactants.begin(); iSpec!=reactants.end(); ++iSpec, ++iStoich){ // calculate r_f = k*C_i^stoich
+      const FieldT& yi = massFracs_[*iSpec]->field_ref();
+      switch ( *iStoich ){
+        case 1:  k <<= k * yi      * conc * molecularWeightsInv_[*iSpec];
+        break;
+        case 2:  k <<= k * yi * yi * conc * molecularWeightsInv_[*iSpec]      * conc * molecularWeightsInv_[*iSpec];
+        break;
+        case 3:  k <<= k * yi      * conc * molecularWeightsInv_[*iSpec] * yi * conc * molecularWeightsInv_[*iSpec] * yi * conc * molecularWeightsInv_[*iSpec];
+        break;
+        default:{
+          std::ostringstream msg;
+          msg << "Error in " << __FILE__ << " : " << __LINE__ << std::endl
+              <<" Non-integer reactant stoichiometric coefficient" << std::endl
+              <<" Reaction # "<< r <<", stoichiometric coefficient = " << *iStoich << std::endl;
+          throw std::runtime_error( msg.str() );
+        }
+      }
+    }
+
+    if( rxnData.reversible == true){
+      iStoich = pStoich.begin();
+      for( iSpec=products.begin(); iSpec!=products.end(); ++iSpec, ++iStoich ){ // calculate r_r = kr*C_i^stoich
+        const FieldT& yi = massFracs_[*iSpec]->field_ref();
         switch ( *iStoich ){
-          case 1:
-            k <<= k * *massFracs_[*iSpec] * conc * molecularWeightsInv_[*iSpec];
-            break;
-          case 2:
-            k <<= k * *massFracs_[*iSpec] * *massFracs_[*iSpec] * conc * molecularWeightsInv_[*iSpec] * conc * molecularWeightsInv_[*iSpec];
-            break;
-          case 3:
-            k <<= k * *massFracs_[*iSpec] * conc * molecularWeightsInv_[*iSpec] * *massFracs_[*iSpec] * conc * molecularWeightsInv_[*iSpec] * *massFracs_[*iSpec] * conc * molecularWeightsInv_[*iSpec];
+          case 1: kr <<= kr * yi      * conc * molecularWeightsInv_[*iSpec];
+          break;
+          case 2: kr <<= kr * yi * yi * conc * molecularWeightsInv_[*iSpec]      * conc * molecularWeightsInv_[*iSpec];
+          break;
+          case 3: kr <<= kr * yi      * conc * molecularWeightsInv_[*iSpec] * yi * conc * molecularWeightsInv_[*iSpec] * yi * conc * molecularWeightsInv_[*iSpec];
             break;
           default:{
             std::ostringstream msg;
             msg << "Error in " << __FILE__ << " : " << __LINE__ << std::endl
-                <<" Non-integer reactant stoichiometric coefficient" << std::endl
+                <<" Non-integer product stoichiometric coefficient" << std::endl
                 <<" Reaction # "<< r <<", stoichiometric coefficient = " << *iStoich << std::endl;
             throw std::runtime_error( msg.str() );
           }
         }
       }
-
-      if( rxnData.reversible == true){
-        iStoich = pStoich.begin();
-          for( iSpec=products.begin(); iSpec!=products.end(); ++iSpec, ++iStoich ){ // calculate r_r = kr*C_i^stoich
-            switch ( *iStoich ){
-              case 1:
-                kr <<= kr * *massFracs_[*iSpec] * conc * molecularWeightsInv_[*iSpec];
-                break;
-              case 2:
-                kr <<= kr * *massFracs_[*iSpec] * *massFracs_[*iSpec] * conc * molecularWeightsInv_[*iSpec] * conc * molecularWeightsInv_[*iSpec];
-                break;
-              case 3:
-                kr <<= kr * *massFracs_[*iSpec] * conc * molecularWeightsInv_[*iSpec] * *massFracs_[*iSpec] * conc * molecularWeightsInv_[*iSpec] * *massFracs_[*iSpec] * conc * molecularWeightsInv_[*iSpec];
-                break;
-              default:{
-                std::ostringstream msg;
-                msg << "Error in " << __FILE__ << " : " << __LINE__ << std::endl
-                    <<" Non-integer product stoichiometric coefficient" << std::endl
-                    <<" Reaction # "<< r <<", stoichiometric coefficient = " << *iStoich << std::endl;
-                throw std::runtime_error( msg.str() );
-              }
-            }
-          }
-      }
+    }
 
 
     iStoich = rStoich.begin();
@@ -540,8 +501,9 @@ Builder::Builder( const Expr::TagList& resultTags,
                   const Expr::Tag& tTag,
                   const Expr::Tag& pTag,
                   const Expr::TagList& massFracTags,
-                  const Expr::Tag& mmwTag )
-: ExpressionBuilder( resultTags ),
+                  const Expr::Tag& mmwTag,
+                  const int nghost )
+: ExpressionBuilder( resultTags, nghost ),
   tTag_( tTag ),
   pTag_( pTag ),
   massFracTags_( massFracTags ),

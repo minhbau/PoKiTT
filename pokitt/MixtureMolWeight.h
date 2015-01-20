@@ -14,11 +14,11 @@ template< typename FieldT >
 class MixtureMolWeight
  : public Expr::Expression<FieldT>
 {
-  const Expr::TagList massFracTags_;
   const std::vector<double>& specMW_;
   std::vector<double> molecularWeightsInv_;
   const int nSpec_;
-  std::vector<const FieldT*> massFracs_;
+
+  DECLARE_VECTOR_OF_FIELDS( FieldT, massFracs_ )
 
   MixtureMolWeight( const Expr::TagList& massFracTags,
                     const std::vector<double>& specMw  );
@@ -43,8 +43,6 @@ public:
   };
 
   ~MixtureMolWeight(){}
-  void advertise_dependents( Expr::ExprDeps& exprDeps );
-  void bind_fields( const Expr::FieldManagerList& fml );
   void evaluate();
 };
 
@@ -63,38 +61,18 @@ MixtureMolWeight<FieldT>::
 MixtureMolWeight( const Expr::TagList& massFracTags,
                   const std::vector<double>& specMW )
   : Expr::Expression<FieldT>(),
-    massFracTags_( massFracTags ),
     specMW_(specMW),
     nSpec_( specMW.size() )
 {
+  this->set_gpu_runnable( true );
+
   assert( massFracTags.size() == nSpec_ );
+
   molecularWeightsInv_.resize(nSpec_);
   for( size_t n=0; n<nSpec_; ++n)
     molecularWeightsInv_[n] = 1 / specMW_[n];
-}
 
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-void
-MixtureMolWeight<FieldT>::
-advertise_dependents( Expr::ExprDeps& exprDeps )
-{
-  exprDeps.requires_expression( massFracTags_ );
-}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-void
-MixtureMolWeight<FieldT>::
-bind_fields( const Expr::FieldManagerList& fml )
-{
-  const typename Expr::FieldMgrSelector<FieldT>::type& fm = fml.field_manager<FieldT>();
-  massFracs_.clear();
-  BOOST_FOREACH( const Expr::Tag& tag, massFracTags_ ){
-    massFracs_.push_back( &fm.field_ref(tag) );
-  }
+  this->template create_field_vector_request<FieldT>( massFracTags, massFracs_ );
 }
 
 //--------------------------------------------------------------------
@@ -107,9 +85,12 @@ evaluate()
   using namespace SpatialOps;
   FieldT& mixMW = this->value();
 
-  mixMW <<= *massFracs_[0] * molecularWeightsInv_[0];
+  const FieldT& y0 = massFracs_[0]->field_ref();
+
+  mixMW <<= y0 * molecularWeightsInv_[0];
   for( size_t n=1; n<nSpec_; ++n ){
-    mixMW <<= mixMW + *massFracs_[n] * molecularWeightsInv_[n];
+    const FieldT& yi = massFracs_[n]->field_ref();
+    mixMW <<= mixMW + yi * molecularWeightsInv_[n];
   }
   mixMW <<= 1.0 / mixMW;
 }

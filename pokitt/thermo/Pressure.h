@@ -29,12 +29,7 @@ template< typename FieldT >
 class Pressure
     : public Expr::Expression<FieldT>
 {
-  const Expr::Tag tTag_;
-  const Expr::Tag rhoTag_;
-  const Expr::Tag mmwTag_;
-  const FieldT* t_;
-  const FieldT* rho_;
-  const FieldT* mmw_;
+  DECLARE_FIELDS( FieldT, t_, rho_, mmw_ )
 
   Pressure( const Expr::Tag& tTag,
             const Expr::Tag& rhoTag,
@@ -53,7 +48,8 @@ public:
     Builder( const Expr::Tag& resultTag,
              const Expr::Tag& tTag,
              const Expr::Tag& rhoTag,
-             const Expr::Tag& mmwTag );
+             const Expr::Tag& mmwTag,
+             const int nghost = DEFAULT_NUMBER_OF_GHOSTS );
 
     Expr::ExpressionBase* build() const;
 
@@ -64,8 +60,6 @@ public:
   };
 
   ~Pressure();
-  void advertise_dependents( Expr::ExprDeps& exprDeps );
-  void bind_fields( const Expr::FieldManagerList& fml );
   void evaluate();
 
 };
@@ -81,12 +75,13 @@ Pressure<FieldT>::
 Pressure( const Expr::Tag& tTag,
           const Expr::Tag& rhoTag,
           const Expr::Tag& mmwTag )
-  : Expr::Expression<FieldT>(),
-    tTag_( tTag ),
-    rhoTag_( rhoTag ),
-    mmwTag_( mmwTag )
+  : Expr::Expression<FieldT>()
 {
   this->set_gpu_runnable( true );
+
+  t_   = this->template create_field_request<FieldT>(   tTag );
+  rho_ = this->template create_field_request<FieldT>( rhoTag );
+  mmw_ = this->template create_field_request<FieldT>( mmwTag );
 }
 
 //--------------------------------------------------------------------
@@ -101,46 +96,24 @@ Pressure<FieldT>::
 template< typename FieldT >
 void
 Pressure<FieldT>::
-advertise_dependents( Expr::ExprDeps& exprDeps )
-{
-  exprDeps.requires_expression( tTag_ );
-  exprDeps.requires_expression( rhoTag_ );
-  exprDeps.requires_expression( mmwTag_ );
-}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-void
-Pressure<FieldT>::
-bind_fields( const Expr::FieldManagerList& fml )
-{
-  const typename Expr::FieldMgrSelector<FieldT>::type& fm = fml.field_manager<FieldT>();
-
-  t_ = &fm.field_ref( tTag_ );
-  rho_ = &fm.field_ref( rhoTag_ );
-  mmw_ = &fm.field_ref( mmwTag_ );
-}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-void
-Pressure<FieldT>::
 evaluate()
 {
   using namespace SpatialOps;
-  this->value() <<= *rho_ * Cantera::GasConstant * *t_ / *mmw_;
+  const FieldT& rho = rho_->field_ref();
+  const FieldT& t   = t_  ->field_ref();
+  const FieldT& mmw = mmw_->field_ref();
+  this->value() <<= rho * Cantera::GasConstant * t / mmw;
 }
 //--------------------------------------------------------------------
 
 template< typename FieldT >
 Pressure<FieldT>::
 Builder::Builder( const Expr::Tag& resultTag,
-         const Expr::Tag& tTag,
-         const Expr::Tag& rhoTag,
-         const Expr::Tag& mmwTag )
-: ExpressionBuilder( resultTag ),
+                  const Expr::Tag& tTag,
+                  const Expr::Tag& rhoTag,
+                  const Expr::Tag& mmwTag,
+                  const int nghost )
+: ExpressionBuilder( resultTag, nghost ),
   tTag_( tTag ),
   rhoTag_( rhoTag ),
   mmwTag_( mmwTag )
