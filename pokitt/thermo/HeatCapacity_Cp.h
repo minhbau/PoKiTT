@@ -183,6 +183,8 @@ HeatCapacity_Cp( const Expr::Tag& tTag,
   Cantera_CXX::IdealGasMix* const gasMix = CanteraObjects::get_gasmix();
   const Cantera::SpeciesThermo& spThermo = gasMix->speciesThermo();
 
+  nSpec_ = gasMix->nSpecies();
+
   const std::vector<double> molecularWeights = gasMix->molecularWeights();
   std::vector<double> c(15,0); //vector of Cantera's coefficients
   int polyType; // type of polynomial - const_cp, shomate, or NASA
