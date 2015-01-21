@@ -100,7 +100,7 @@ CanteraObjects::build_new()
     Cantera::showErrors();
     throw std::runtime_error("Error initializing cantera.  Check for proper location of input files.\n");
   }
-  available_.push( make_pair(gas,trans) );
+  available_.push( std::make_pair(gas,trans) );
   gtm_.left.insert( GasTransMap::left_value_type( gas, trans ) );
 }
 
@@ -143,7 +143,7 @@ CanteraObjects::restore_transport( Cantera::Transport* const trans )
   assert( co.hasBeenSetup_ );
   const GasTransMap::right_iterator itg = co.gtm_.right.find(trans);
   assert( itg != co.gtm_.right.end() );
-  co.available_.push( make_pair(itg->second,itg->first) );
+  co.available_.push( std::make_pair(itg->second,itg->first) );
 }
 
 //--------------------------------------------------------------------
