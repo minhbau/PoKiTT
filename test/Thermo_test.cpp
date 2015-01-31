@@ -11,6 +11,7 @@
 #include <pokitt/thermo/HeatCapacity_Cp.h>
 #include <pokitt/thermo/HeatCapacity_Cv.h>
 #include <pokitt/thermo/Enthalpy.h>
+#include <pokitt/thermo/InternalEnergy.h>
 
 #include <expression/ExprLib.h>
 
@@ -39,7 +40,8 @@ using namespace pokitt;
 enum ThermoQuantity{
   CP,
   CV,
-  ENTH
+  ENTH,
+  E
 };
 
 std::string thermo_name( const ThermoQuantity q )
@@ -49,6 +51,7 @@ std::string thermo_name( const ThermoQuantity q )
     case CP  : name = "cp"; break;
     case CV  : name = "cv"; break;
     case ENTH: name = "h";  break;
+    case E   : name = "e";  break;
   }
   return name;
 }
@@ -70,11 +73,13 @@ register_thermo_id( const bool mix,
     typedef HeatCapacity_Cp<CellField>::Builder Cp;
     typedef HeatCapacity_Cv<CellField>::Builder Cv;
     typedef Enthalpy       <CellField>::Builder Enthalpy;
+    typedef InternalEnergy <CellField>::Builder IntEnergy;
     Expr::ExpressionBuilder* builder = NULL;
     switch( thermoQuantity ){
-      case CP  : builder = new       Cp( thermoTags[0], tTag, yiTags ); break;
-      case CV  : builder = new       Cv( thermoTags[0], tTag, yiTags ); break;
-      case ENTH: builder = new Enthalpy( thermoTags[0], tTag, yiTags ); break;
+      case CP  : builder = new        Cp( thermoTags[0], tTag, yiTags ); break;
+      case CV  : builder = new        Cv( thermoTags[0], tTag, yiTags ); break;
+      case ENTH: builder = new  Enthalpy( thermoTags[0], tTag, yiTags ); break;
+      case E   : builder = new IntEnergy( thermoTags[0], tTag, yiTags ); break;
     } // switch( thermoQuantity )
     thermoID.insert( exprFactory.register_expression(builder) );
   }
@@ -82,11 +87,13 @@ register_thermo_id( const bool mix,
     typedef SpeciesHeatCapacity_Cp<CellField>::Builder SpecCp;
     typedef SpeciesHeatCapacity_Cv<CellField>::Builder SpecCv;
     typedef SpeciesEnthalpy       <CellField>::Builder SpecEnth;
+    typedef SpeciesInternalEnergy <CellField>::Builder SpecE;
     for( size_t n=0; n<nSpec; ++n ){
       switch( thermoQuantity ){
         case CP  : thermoID.insert(exprFactory.register_expression( new SpecCp  (thermoTags[n], tTag, n) )); break;
         case CV  : thermoID.insert(exprFactory.register_expression( new SpecCv  (thermoTags[n], tTag, n) )); break;
         case ENTH: thermoID.insert(exprFactory.register_expression( new SpecEnth(thermoTags[n], tTag, n) )); break;
+        case E   : thermoID.insert(exprFactory.register_expression( new SpecE   (thermoTags[n], tTag, n) )); break;
       } // switch(thermoQuantity)
     } // species loop
   }
@@ -180,9 +187,10 @@ get_cantera_results( const bool mix,
       for( CellField::iterator iCant = canteraResult->begin(); iCant!=iCantEnd; ++iTemp, ++iMass, ++iCant ){
         gasMix.setState_TPY( *iTemp, refPressure, &(*iMass)[0]);
         switch(thermoQuantity){
-        case CP  : *iCant=gasMix.cp_mass();       break;
-        case CV  : *iCant=gasMix.cv_mass();       break;
-        case ENTH: *iCant=gasMix.enthalpy_mass(); break;
+        case CP  : *iCant=gasMix.cp_mass();        break;
+        case CV  : *iCant=gasMix.cv_mass();        break;
+        case ENTH: *iCant=gasMix.enthalpy_mass();  break;
+        case E   : *iCant=gasMix.intEnergy_mass(); break;
         } // switch(thermoQuantity)
       }
     }
@@ -203,9 +211,10 @@ get_cantera_results( const bool mix,
       for( iTemp = temp.begin(); iTemp != iTempEnd; ++iTemp, ++iMass, ++i){
         gasMix.setState_TPY( *iTemp, refPressure, &(*iMass)[0]);
         switch( thermoQuantity ){
-        case CP  : gasMix.getPartialMolarCp(&thermoResult[0]);         break;
-        case CV  : gasMix.getPartialMolarCp(&thermoResult[0]);         break;
-        case ENTH: gasMix.getPartialMolarEnthalpies(&thermoResult[0]); break;
+        case CP  : gasMix.getPartialMolarCp(&thermoResult[0]);          break;
+        case CV  : gasMix.getPartialMolarCp(&thermoResult[0]);          break;
+        case ENTH: gasMix.getPartialMolarEnthalpies(&thermoResult[0]);  break;
+        case E   : gasMix.getPartialMolarIntEnergies(&thermoResult[0]); break;
         }
         for( size_t n=0; n<nSpec; ++n ){
           (*canteraResults[n])[i] = thermoResult[n];
@@ -216,6 +225,7 @@ get_cantera_results( const bool mix,
         case CP  : *canteraResults[n] <<=   *canteraResults[n] / molecularWeights[n];                           break; // convert to mass basis for field comparison
         case CV  : *canteraResults[n] <<= ( *canteraResults[n] - Cantera::GasConstant ) / molecularWeights[n];  break; // convert from molar cp to mass cv for field comparison
         case ENTH: *canteraResults[n] <<=   *canteraResults[n] / molecularWeights[n];                           break; // convert to mass basis for field comparison
+        case E   : *canteraResults[n] <<=   *canteraResults[n] / molecularWeights[n];                           break; // convert to mass basis for field comparison
         }
       }
     }
@@ -362,6 +372,7 @@ bool driver( const bool timings,
           status( field_equal( thermo, **iCantera, 1e-14 ) || field_equal_abs( thermo, **iCantera, 1e-11 ), thermoTag.name() );
           break;
         }
+        case E   :
         case ENTH: {
           status( field_equal( thermo, **iCantera, 1e-11 ) || field_equal_abs( thermo, **iCantera, 1e-8 ), thermoTag.name() );
           break;
@@ -430,6 +441,7 @@ int main( int iarg, char* carg[] )
     status( driver(  timings, pokittReps, canteraReps, mix, CP   ), thermo_name(CP  ) );
     status( driver(  timings, pokittReps, canteraReps, mix, CV   ), thermo_name(CV  ) );
     status( driver(  timings, pokittReps, canteraReps, mix, ENTH ), thermo_name(ENTH) );
+    status( driver(  timings, pokittReps, canteraReps, mix, E    ), thermo_name(E   ) );
 
     if( status.ok() ){
       std::cout << "\nPASS\n";
