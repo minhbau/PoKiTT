@@ -51,7 +51,7 @@ class Temperature
   const Expr::Tag enthTag_;
   const Expr::TagList massFracTags_;
 
-  DECLARE_FIELD( FieldT, enth_ );
+  DECLARE_FIELD( FieldT, enth_ )
   DECLARE_VECTOR_OF_FIELDS( FieldT, massFracs_ )
 
   PolyVals minTVec_; // vector of minimum temperatures for polynomial evaluations
