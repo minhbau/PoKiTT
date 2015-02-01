@@ -24,12 +24,11 @@
 #include <boost/foreach.hpp>
 #include <boost/program_options.hpp>
 
-#include <cantera/kernel/ct_defs.h> // contains value of Cantera::GasConstant
 #include <cantera/IdealGasMix.h>
 
-namespace So = SpatialOps;
-typedef So::SVolField  CellField;
-typedef So::SpatFldPtr<CellField> CellFieldPtrT;
+namespace SO = SpatialOps;
+typedef SO::SVolField  CellField;
+typedef SO::SpatFldPtr<CellField> CellFieldPtrT;
 
 namespace Cantera_CXX{ class IdealGasMix; } //location of polynomial
 
@@ -109,13 +108,14 @@ get_cantera_result( const bool timings,
   press.set_device_as_active ( CPU_INDEX );
   volume.set_device_as_active( CPU_INDEX );
 # endif
-  CellFieldPtrT canteraResult = So::SpatialFieldStore::get<CellField>(temp, CPU_INDEX);
+  CellFieldPtrT canteraResult = SO::SpatialFieldStore::get<CellField>(temp, CPU_INDEX);
 
   std::vector< std::vector<double> >::const_iterator iMass;
   CellField::const_iterator                          iTemp;
   CellField::const_iterator                          iEnergy;
   CellField::const_iterator                          iVolume;
   CellField::const_iterator                          iPress;
+  CellField::iterator                                iCant;
   Timer tTime;
   tTime.start();
   for( size_t rep=0; rep < canteraReps; ++rep ){
@@ -124,11 +124,11 @@ get_cantera_result( const bool timings,
     iPress  = press.begin();
     iTemp   = temp.begin();
     iMass   = massFracs.begin();
-    for(CellField::iterator iCant = canteraResult->begin(); iCant!=canteraResult->end(); ++iVolume, ++iPress, ++iEnergy, ++iTemp, ++iMass, ++iCant){
+    for( iCant = canteraResult->begin(); iCant != canteraResult->end(); ++iVolume, ++iPress, ++iEnergy, ++iTemp, ++iMass, ++iCant){
       gasMix.setState_TPY( *iTemp, *iPress, &(*iMass)[0]);
       switch( energyType ){
-      case H:  gasMix.setState_HP( *iEnergy, *iPress ); break;
-      case E0: gasMix.setState_UV( *iEnergy, *iVolume    ); break;
+      case H:  gasMix.setState_HP( *iEnergy, *iPress  ); break;
+      case E0: gasMix.setState_UV( *iEnergy, *iVolume ); break;
       }
       *iCant=gasMix.temperature();
     }
@@ -179,13 +179,13 @@ bool driver( const bool timings,
     typedef Expr::LinearFunction  <CellField>::Builder Temperature;
     typedef Expr::LinearFunction  <CellField>::Builder TPerturbation;
 
-    initFactory.register_expression(       new XCoord       ( xTag )                           );
-    initFactory.register_expression(       new MassFracs    ( yiTags, xTag )                   );
-    initFactory.register_expression(       new Pressure     ( pTag, gasMix->pressure() )       );
-    initFactory.register_expression(       new MixMolWeight ( mmwTag, yiTags )                 );
-    initFactory.register_expression(       new Temperature  ( tInputTag ,xTag, 1000, 500 )     );
-    rID = initFactory.register_expression( new Density      (rhoTag, tInputTag, pTag, mmwTag ) );
-    tID = initFactory.register_expression( new TPerturbation( tTag ,tInputTag, 1.1, -50 )      );
+    initFactory.register_expression(       new XCoord       ( xTag )                            );
+    initFactory.register_expression(       new MassFracs    ( yiTags, xTag )                    );
+    initFactory.register_expression(       new Pressure     ( pTag, gasMix->pressure() )        );
+    initFactory.register_expression(       new MixMolWeight ( mmwTag, yiTags )                  );
+    initFactory.register_expression(       new Temperature  ( tInputTag ,xTag, 1000, 500 )      );
+    rID = initFactory.register_expression( new Density      ( rhoTag, tInputTag, pTag, mmwTag ) );
+    tID = initFactory.register_expression( new TPerturbation( tTag ,tInputTag, 1.1, -50 )       );
     if( energyType == H )
       eID = initFactory.register_expression( new Enthalpy ( energyTag, tInputTag, yiTags ) );
     else
@@ -237,26 +237,26 @@ bool driver( const bool timings,
   execTree.bind_fields( fml );
   execTree.lock_fields( fml );
 
-  std::vector<So::IntVec> sizeVec;
+  std::vector<SO::IntVec> sizeVec;
   if( timings ){
-    sizeVec.push_back( So::IntVec(126,126,126) );
-    sizeVec.push_back( So::IntVec( 62, 62, 62) );
-    sizeVec.push_back( So::IntVec( 30, 30, 30) );
-    sizeVec.push_back( So::IntVec( 14, 14, 14) );
-    sizeVec.push_back( So::IntVec(  6,  6,  6) );
+    sizeVec.push_back( SO::IntVec(126,126,126) );
+    sizeVec.push_back( SO::IntVec( 62, 62, 62) );
+    sizeVec.push_back( SO::IntVec( 30, 30, 30) );
+    sizeVec.push_back( SO::IntVec( 14, 14, 14) );
+    sizeVec.push_back( SO::IntVec(  6,  6,  6) );
   }
   else{
-    sizeVec.push_back( So::IntVec(20,1,1) );
+    sizeVec.push_back( SO::IntVec(20,1,1) );
   }
 
-  for( std::vector<So::IntVec>::iterator iSize = sizeVec.begin(); iSize!= sizeVec.end(); ++iSize){
+  for( std::vector<SO::IntVec>::iterator iSize = sizeVec.begin(); iSize!= sizeVec.end(); ++iSize){
 
-    So::IntVec gridSize = *iSize;
+    SO::IntVec gridSize = *iSize;
     fml.allocate_fields( Expr::FieldAllocInfo( gridSize, 0, 0, false, false, false ) );
-    So::Grid grid( gridSize, So::DoubleVec(1,1,1) );
+    SO::Grid grid( gridSize, SO::DoubleVec(1,1,1) );
 
     CellField& xcoord = fml.field_ref< CellField >( xTag );
-    grid.set_coord<So::XDIR>( xcoord );
+    grid.set_coord<SO::XDIR>( xcoord );
     const int nPoints = xcoord.window_with_ghost().glob_npts();
 #   ifdef ENABLE_CUDA
     xcoord.set_device_as_active( GPU_INDEX );
