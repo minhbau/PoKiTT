@@ -9,7 +9,7 @@
 #include "TestHelper.h"
 #include "LinearMassFracs.h"
 #include <pokitt/thermo/Temperature.h>
-#include <pokitt/thermo/Density.h>
+#include <pokitt/thermo/SpecificVol.h>
 #include <pokitt/thermo/Enthalpy.h>
 #include <pokitt/thermo/InternalEnergy.h>
 #include <pokitt/MixtureMolWeight.h>
@@ -90,18 +90,16 @@ get_cantera_result( const bool timings,
                     const Expr::Tag& tTag,
                     const Expr::TagList& yiTags,
                     const Expr::Tag& energyTag,
-                    const Expr::Tag& rhoTag,
+                    const Expr::Tag& nuTag,
                     const Expr::Tag& pTag)
 {
-  using namespace SpatialOps;
   const std::vector< std::vector<double> > massFracs = extract_mass_fracs( yiTags, fml );
   const int nSpec=gasMix.nSpecies();
 
   CellField& temp   = fml.field_ref< CellField >( tTag );
   CellField& energy = fml.field_ref< CellField >( energyTag );
   CellField& press  = fml.field_ref< CellField >( pTag );
-  CellField& volume = fml.field_ref< CellField >( rhoTag ); // we calculated density but we want volume
-  volume <<= 1/ volume;
+  CellField& volume = fml.field_ref< CellField >( nuTag );
 # ifdef ENABLE_CUDA
   temp.set_device_as_active  ( CPU_INDEX );
   energy.set_device_as_active( CPU_INDEX );
@@ -156,7 +154,7 @@ bool driver( const bool timings,
   }
   const Expr::Tag tInputTag( "Input Temperature",        Expr::STATE_NONE);
   const Expr::Tag pTag     ( "Pressure",                 Expr::STATE_NONE);
-  const Expr::Tag rhoTag   ( "Density",                  Expr::STATE_NONE);
+  const Expr::Tag nuTag    ( "Specific Volume",          Expr::STATE_NONE);
   const Expr::Tag mmwTag   ( "Mixture Molecular Weight", Expr::STATE_NONE);
   const Expr::Tag energyTag( energy_name(energyType) ,   Expr::STATE_NONE);
   const Expr::Tag keTag    ( "kinetic energy",           Expr::STATE_NONE);
@@ -167,13 +165,13 @@ bool driver( const bool timings,
   std::set<Expr::ExpressionID> initIDs;
   Expr::ExpressionID tID; // perturbed temperature
   Expr::ExpressionID eID; // input energy for T solver
-  Expr::ExpressionID rID; // density
+  Expr::ExpressionID vID; // specific volume
   Expr::ExpressionID kID; // kinetic energy
   {
     typedef Expr::PlaceHolder     <CellField>::Builder XCoord;
     typedef       LinearMassFracs <CellField>::Builder MassFracs;
     typedef Expr::ConstantExpr    <CellField>::Builder Pressure;
-    typedef       Density         <CellField>::Builder Density;
+    typedef       SpecificVol     <CellField>::Builder SpecVol;
     typedef       MixtureMolWeight<CellField>::Builder MixMolWeight;
     typedef       Enthalpy        <CellField>::Builder Enthalpy;
     typedef       InternalEnergy  <CellField>::Builder IntEnergy;
@@ -181,13 +179,13 @@ bool driver( const bool timings,
     typedef Expr::LinearFunction  <CellField>::Builder Temperature;
     typedef Expr::LinearFunction  <CellField>::Builder TPerturbation;
 
-    initFactory.register_expression(        new XCoord       ( xTag )                            );
-    initFactory.register_expression(        new MassFracs    ( yiTags, xTag )                    );
-    initFactory.register_expression(        new Pressure     ( pTag, gasMix->pressure() )        );
-    initFactory.register_expression(        new MixMolWeight ( mmwTag, yiTags )                  );
-    initFactory.register_expression(        new Temperature  ( tInputTag ,xTag, 1000, 500 )      );
-    rID = initFactory.register_expression(  new Density      ( rhoTag, tInputTag, pTag, mmwTag ) );
-    tID = initFactory.register_expression(  new TPerturbation( tTag ,tInputTag, 1.1, -50 )       );
+    initFactory.register_expression(        new XCoord       ( xTag )                           );
+    initFactory.register_expression(        new MassFracs    ( yiTags, xTag )                   );
+    initFactory.register_expression(        new Pressure     ( pTag, gasMix->pressure() )       );
+    initFactory.register_expression(        new MixMolWeight ( mmwTag, yiTags )                 );
+    initFactory.register_expression(        new Temperature  ( tInputTag ,xTag, 1000, 500 )     );
+    vID = initFactory.register_expression(  new SpecVol      ( nuTag, tInputTag, pTag, mmwTag ) );
+    tID = initFactory.register_expression(  new TPerturbation( tTag ,tInputTag, 1.1, -50 )      );
     switch( energyType ){
     case H:
       eID = initFactory.register_expression( new Enthalpy ( energyTag, tInputTag, yiTags ) );
@@ -199,7 +197,7 @@ bool driver( const bool timings,
     }
     initIDs.insert( tID );
     initIDs.insert( eID );
-    initIDs.insert( rID );
+    initIDs.insert( vID );
   }
 
   Expr::ExpressionFactory execFactory;
@@ -282,7 +280,7 @@ bool driver( const bool timings,
     if( timings ) std::cout << "PoKiTT  T from " + energy_name(energyType) + " time " << tTimer.elapsed_time()/pokittReps << std::endl;
 
     initTree.execute_tree(); // set initial guess for Cantera
-    CellFieldPtrT canteraResult = get_cantera_result( timings, canteraReps, energyType, *gasMix, fml, tTag, yiTags, energyTag, rhoTag, pTag );
+    CellFieldPtrT canteraResult = get_cantera_result( timings, canteraReps, energyType, *gasMix, fml, tTag, yiTags, energyTag, nuTag, pTag );
     execTree.execute_tree(); // resolve to compare with Cantera
     CellField& temp = fml.field_ref< CellField >( tTag );
     status( field_equal(temp, *canteraResult, 5e-4), tTag.name() );
