@@ -22,12 +22,11 @@
 #include <boost/foreach.hpp>
 #include <boost/program_options.hpp>
 
-#include <cantera/kernel/ct_defs.h> // contains value of Cantera::GasConstant
 #include <cantera/IdealGasMix.h>
 
-namespace So = SpatialOps;
-typedef So::SVolField  CellField;
-typedef So::SpatFldPtr<CellField> CellFieldPtrT;
+namespace SO = SpatialOps;
+typedef SO::SVolField  CellField;
+typedef SO::SpatFldPtr<CellField> CellFieldPtrT;
 
 namespace Cantera_CXX{ class IdealGasMix; }
 
@@ -92,27 +91,28 @@ get_cantera_result( const bool timings,
                     const Expr::Tag& tTag,
                     const Expr::Tag& refTag )
 {
-  CellField& temp = fml.field_ref< CellField >( tTag );
-  CellField& refQuantity = fml.field_ref< CellField >( refTag );
   const std::vector< std::vector<double> > massFracs = extract_mass_fracs( yiTags, fml );
+
+  CellField& temp        = fml.field_ref< CellField >( tTag );
+  CellField& refQuantity = fml.field_ref< CellField >( refTag );
 # ifdef ENABLE_CUDA
   temp.set_device_as_active       ( CPU_INDEX );
   refQuantity.set_device_as_active( CPU_INDEX );
 # endif
-  const int nSpec=gasMix.nSpecies();
 
-  CellFieldPtrT canteraResult = So::SpatialFieldStore::get<CellField>(temp, CPU_INDEX);
+  CellFieldPtrT canteraResult = SO::SpatialFieldStore::get<CellField>(temp, CPU_INDEX);
 
-  std::vector< std::vector<double> >::const_iterator iMass = massFracs.begin();
-  CellField::const_iterator iTemp;
-  CellField::const_iterator iRef;
+  std::vector< std::vector<double> >::const_iterator iMass;
+  CellField::const_iterator                          iTemp;
+  CellField::const_iterator                          iRef;
+  CellField::iterator                                iCant;
   Timer gasTime;
   gasTime.start();
   for( size_t rep=0; rep < canteraReps; ++rep ){
     iTemp = temp.begin();
     iMass = massFracs.begin();
     iRef  = refQuantity.begin();
-    for(CellField::iterator iCant = canteraResult->begin(); iCant!=canteraResult->end(); ++iTemp, ++iRef, ++iMass, ++iCant){
+    for(iCant = canteraResult->begin(); iCant!=canteraResult->end(); ++iTemp, ++iRef, ++iMass, ++iCant){
       switch( gasQuantity ){
       case P:
         gasMix.setState_TRY( *iTemp, *iRef, &(*iMass)[0]);
@@ -143,17 +143,7 @@ bool driver( const bool timings,
 {
   TestHelper status( !timings );
   Cantera_CXX::IdealGasMix* const gasMix = CanteraObjects::get_gasmix();
-
   const int nSpec = gasMix->nSpecies();
-
-  typedef Expr::PlaceHolder     <CellField>::Builder XCoord;
-  typedef Expr::LinearFunction  <CellField>::Builder Temperature;
-  typedef Expr::ConstantExpr    <CellField>::Builder RefQuantity;
-  typedef       LinearMassFracs <CellField>::Builder MassFracs;
-  typedef       MixtureMolWeight<CellField>::Builder MixtureMolWeight;
-  typedef       Pressure        <CellField>::Builder Pressure;
-  typedef       Density         <CellField>::Builder Density;
-  typedef       SpecificVol     <CellField>::Builder SpecVol;
 
   const Expr::Tag xTag( "XCoord",      Expr::STATE_NONE );
   const Expr::Tag tTag( "Temperature", Expr::STATE_NONE );
@@ -166,64 +156,100 @@ bool driver( const bool timings,
   switch( gasQuantity ){
   case P:   refTag = Expr::Tag( "Density",  Expr::STATE_NONE ); break;
   case RHO: refTag = Expr::Tag( "Pressure", Expr::STATE_NONE ); break;
-  case NU:  refTag = Expr::Tag( "SpecVol",  Expr::STATE_NONE ); break;
+  case NU:  refTag = Expr::Tag( "Pressure", Expr::STATE_NONE ); break;
   }
   const Expr::Tag gasTag (property_name(gasQuantity), Expr::STATE_NONE);
 
-  Expr::ExpressionFactory exprFactory;
+  // we use an initialization tree to avoid recalculations when timing the execution
+  Expr::ExpressionFactory initFactory;
+  std::set<Expr::ExpressionID> initIDs;
+  Expr::ExpressionID tID; // temperature
+  Expr::ExpressionID rID; // reference quantity
+  Expr::ExpressionID mID; // mixture mol weight
+  {
+    typedef Expr::PlaceHolder     <CellField>::Builder XCoord;
+    typedef Expr::LinearFunction  <CellField>::Builder Temperature;
+    typedef Expr::ConstantExpr    <CellField>::Builder RefQuantity;
+    typedef       LinearMassFracs <CellField>::Builder MassFracs;
+    typedef       MixtureMolWeight<CellField>::Builder MixtureMolWeight;
 
-  exprFactory.register_expression( new XCoord          ( xTag           ) );
-  exprFactory.register_expression( new MassFracs       ( yiTags, xTag   ) );
-  exprFactory.register_expression( new Temperature     ( tTag,   xTag, 1000, 500 ) );
-  exprFactory.register_expression( new MixtureMolWeight( mmwTag, yiTags ) );
-
-  Expr::ExpressionID gas_id;
-  switch( gasQuantity ){
-  case P:
-
-    gas_id = exprFactory.register_expression( new Pressure   ( gasTag, tTag, refTag, mmwTag) );
-    exprFactory.register_expression(          new RefQuantity( refTag, gasMix->density()   ) );
-    break;
-  case RHO:
-    gas_id = exprFactory.register_expression( new Density    ( gasTag, tTag, refTag, mmwTag) );
-    exprFactory.register_expression(          new RefQuantity( refTag, gasMix->pressure() ) );
-    break;
-  case NU:
-    gas_id = exprFactory.register_expression( new SpecVol    ( gasTag, tTag, refTag, mmwTag) );
-    exprFactory.register_expression(          new RefQuantity( refTag, gasMix->pressure() ) );
-    break;
+    initFactory.register_expression(       new XCoord          ( xTag                    ) );
+    initFactory.register_expression(       new MassFracs       ( yiTags, xTag            ) );
+    tID = initFactory.register_expression( new Temperature     ( tTag,   xTag, 1000, 500 ) );
+    mID = initFactory.register_expression( new MixtureMolWeight( mmwTag, yiTags          ) );
+    switch( gasQuantity ){
+    case P:   rID = initFactory.register_expression( new RefQuantity( refTag, gasMix->density()  ) ); break;
+    case RHO: rID = initFactory.register_expression( new RefQuantity( refTag, gasMix->pressure() ) ); break;
+    case NU:  rID = initFactory.register_expression( new RefQuantity( refTag, gasMix->pressure() ) ); break;
+    }
+    initIDs.insert( tID );
+    initIDs.insert( rID );
+    initIDs.insert( mID );
   }
 
-  Expr::ExpressionTree gasTree( gas_id , exprFactory, 0 );
+  Expr::ExpressionFactory execFactory;
+  Expr::ExpressionID execID;
+  {
+    typedef Expr::PlaceHolder<CellField>::Builder MixtureMolWeight;
+    typedef Expr::PlaceHolder<CellField>::Builder RefQuantity;
+    typedef Expr::PlaceHolder<CellField>::Builder Temperature;
+    typedef       Pressure   <CellField>::Builder Pressure;
+    typedef       Density    <CellField>::Builder Density;
+    typedef       SpecificVol<CellField>::Builder SpecVol;
+
+    execFactory.register_expression( new MixtureMolWeight ( mmwTag ) );
+    execFactory.register_expression( new RefQuantity      ( refTag ) );
+    execFactory.register_expression( new Temperature      ( tTag   ) );
+    switch( gasQuantity ){
+    case P:
+      execID = execFactory.register_expression( new Pressure ( gasTag, tTag, refTag, mmwTag) ); break;
+    case RHO:
+      execID = execFactory.register_expression( new Density  ( gasTag, tTag, refTag, mmwTag) ); break;
+    case NU:
+      execID = execFactory.register_expression( new SpecVol  ( gasTag, tTag, refTag, mmwTag) ); break;
+    }
+  }
+
+  Expr::ExpressionTree initTree( initIDs, initFactory, 0 );
+  Expr::ExpressionTree execTree( execID , execFactory, 0 );
+  {
+    std::ofstream gasGraph( "IdealGas_init.dot" );
+    initTree.write_tree( gasGraph );
+  }
   {
     std::ofstream gasGraph( "IdealGas.dot" );
-    gasTree.write_tree( gasGraph );
+    execTree.write_tree( gasGraph );
   }
-  Expr::FieldManagerList fml;
-  gasTree.register_fields( fml );
-  gasTree.bind_fields( fml );
-  gasTree.lock_fields( fml );
 
-  std::vector<So::IntVec> sizeVec;
+  Expr::FieldManagerList fml;
+  initTree.register_fields( fml );
+  initTree.bind_fields( fml );
+  initTree.lock_fields( fml );
+
+  execTree.register_fields( fml );
+  execTree.bind_fields( fml );
+  execTree.lock_fields( fml );
+
+  std::vector<SO::IntVec> sizeVec;
   if( timings ){
-    sizeVec.push_back( So::IntVec(126,126,126) );
-    sizeVec.push_back( So::IntVec( 62, 62, 62) );
-    sizeVec.push_back( So::IntVec( 30, 30, 30) );
-    sizeVec.push_back( So::IntVec( 14, 14, 14) );
-    sizeVec.push_back( So::IntVec(  6,  6,  6) );
+    sizeVec.push_back( SO::IntVec(126,126,126) );
+    sizeVec.push_back( SO::IntVec( 62, 62, 62) );
+    sizeVec.push_back( SO::IntVec( 30, 30, 30) );
+    sizeVec.push_back( SO::IntVec( 14, 14, 14) );
+    sizeVec.push_back( SO::IntVec(  6,  6,  6) );
   }
   else{
-    sizeVec.push_back( So::IntVec( 20,  1,  1) );
+    sizeVec.push_back( SO::IntVec( 20,  1,  1) );
   }
 
-  for( std::vector<So::IntVec>::iterator iSize = sizeVec.begin(); iSize!= sizeVec.end(); ++iSize){
+  for( std::vector<SO::IntVec>::iterator iSize = sizeVec.begin(); iSize!= sizeVec.end(); ++iSize){
 
-    So::IntVec gridSize = *iSize;
+    SO::IntVec gridSize = *iSize;
     fml.allocate_fields( Expr::FieldAllocInfo( gridSize, 0, 0, false, false, false ) );
-    So::Grid grid( gridSize, So::DoubleVec(1,1,1) );
+    SO::Grid grid( gridSize, SO::DoubleVec(1,1,1) );
 
     CellField& xcoord = fml.field_ref< CellField >( xTag );
-    grid.set_coord<So::XDIR>( xcoord );
+    grid.set_coord<SO::XDIR>( xcoord );
     const int nPoints = xcoord.window_with_ghost().glob_npts();
 #   ifdef ENABLE_CUDA
     xcoord.set_device_as_active( GPU_INDEX );
@@ -231,10 +257,11 @@ bool driver( const bool timings,
 
     if( timings ) std::cout << std::endl << property_name(gasQuantity) + " test - " << nPoints << std::endl;
 
+    initTree.execute_tree();
     Timer gasTimer;
     gasTimer.start();
     for( size_t rep = 0; rep < pokittReps; ++rep ){
-      gasTree.execute_tree();
+      execTree.execute_tree();
     }
     gasTimer.stop();
 

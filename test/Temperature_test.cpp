@@ -94,7 +94,6 @@ get_cantera_result( const bool timings,
                     const Expr::Tag& pTag)
 {
   const std::vector< std::vector<double> > massFracs = extract_mass_fracs( yiTags, fml );
-  const int nSpec=gasMix.nSpecies();
 
   CellField& temp   = fml.field_ref< CellField >( tTag );
   CellField& energy = fml.field_ref< CellField >( energyTag );
