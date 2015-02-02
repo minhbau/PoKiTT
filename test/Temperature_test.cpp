@@ -168,6 +168,7 @@ bool driver( const bool timings,
   Expr::ExpressionID tID; // perturbed temperature
   Expr::ExpressionID eID; // input energy for T solver
   Expr::ExpressionID rID; // density
+  Expr::ExpressionID kID; // kinetic energy
   {
     typedef Expr::PlaceHolder     <CellField>::Builder XCoord;
     typedef       LinearMassFracs <CellField>::Builder MassFracs;
@@ -176,20 +177,26 @@ bool driver( const bool timings,
     typedef       MixtureMolWeight<CellField>::Builder MixMolWeight;
     typedef       Enthalpy        <CellField>::Builder Enthalpy;
     typedef       InternalEnergy  <CellField>::Builder IntEnergy;
+    typedef Expr::ConstantExpr    <CellField>::Builder KinEnergy;
     typedef Expr::LinearFunction  <CellField>::Builder Temperature;
     typedef Expr::LinearFunction  <CellField>::Builder TPerturbation;
 
-    initFactory.register_expression(       new XCoord       ( xTag )                            );
-    initFactory.register_expression(       new MassFracs    ( yiTags, xTag )                    );
-    initFactory.register_expression(       new Pressure     ( pTag, gasMix->pressure() )        );
-    initFactory.register_expression(       new MixMolWeight ( mmwTag, yiTags )                  );
-    initFactory.register_expression(       new Temperature  ( tInputTag ,xTag, 1000, 500 )      );
-    rID = initFactory.register_expression( new Density      ( rhoTag, tInputTag, pTag, mmwTag ) );
-    tID = initFactory.register_expression( new TPerturbation( tTag ,tInputTag, 1.1, -50 )       );
-    if( energyType == H )
+    initFactory.register_expression(        new XCoord       ( xTag )                            );
+    initFactory.register_expression(        new MassFracs    ( yiTags, xTag )                    );
+    initFactory.register_expression(        new Pressure     ( pTag, gasMix->pressure() )        );
+    initFactory.register_expression(        new MixMolWeight ( mmwTag, yiTags )                  );
+    initFactory.register_expression(        new Temperature  ( tInputTag ,xTag, 1000, 500 )      );
+    rID = initFactory.register_expression(  new Density      ( rhoTag, tInputTag, pTag, mmwTag ) );
+    tID = initFactory.register_expression(  new TPerturbation( tTag ,tInputTag, 1.1, -50 )       );
+    switch( energyType ){
+    case H:
       eID = initFactory.register_expression( new Enthalpy ( energyTag, tInputTag, yiTags ) );
-    else
+      break;
+    case E0:
       eID = initFactory.register_expression( new IntEnergy( energyTag, tInputTag, yiTags ) );
+      kID = initFactory.register_expression( new KinEnergy( keTag, 0.0                   ) );
+      initIDs.insert( kID );
+    }
     initIDs.insert( tID );
     initIDs.insert( eID );
     initIDs.insert( rID );
@@ -200,7 +207,7 @@ bool driver( const bool timings,
   {
     typedef Expr::PlaceHolder      <CellField>::Builder MassFracs;
     typedef Expr::PlaceHolder      <CellField>::Builder Energy;
-    typedef Expr::ConstantExpr     <CellField>::Builder KineticEnergy;
+    typedef Expr::PlaceHolder      <CellField>::Builder KineticEnergy;
     typedef       TemperatureFromE0<CellField>::Builder TemperatureE0;
     typedef       Temperature      <CellField>::Builder Temperature;
 
@@ -208,10 +215,10 @@ bool driver( const bool timings,
     execFactory.register_expression( new Energy    ( energyTag ) );
     switch( energyType ){
     case H:
-      execID = execFactory.register_expression( new Temperature (tTag, yiTags, energyTag) );
+      execID = execFactory.register_expression( new Temperature ( tTag, yiTags, energyTag ) );
       break;
     case E0:
-      execFactory.register_expression(          new KineticEnergy (keTag, 0.0)                     );
+      execFactory.register_expression(          new KineticEnergy (keTag )                         );
       execID = execFactory.register_expression( new TemperatureE0 (tTag, yiTags, energyTag, keTag) );
       break;
     }
@@ -246,7 +253,7 @@ bool driver( const bool timings,
     sizeVec.push_back( SO::IntVec(  6,  6,  6) );
   }
   else{
-    sizeVec.push_back( SO::IntVec(20,1,1) );
+    sizeVec.push_back( SO::IntVec( 20,  1,  1) );
   }
 
   for( std::vector<SO::IntVec>::iterator iSize = sizeVec.begin(); iSize!= sizeVec.end(); ++iSize){
