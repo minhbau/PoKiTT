@@ -6,14 +6,12 @@
  */
 
 #include <iostream>
-#include <stdio.h>
-#include <fstream>
 #include "TestHelper.h"
-
-#include <expression/ExprLib.h>
-
+#include "LinearMassFracs.h"
 #include <pokitt/MixtureMolWeight.h>
 #include <pokitt/kinetics/ReactionRates.h>
+
+#include <expression/ExprLib.h>
 
 #include <spatialops/structured/Grid.h>
 #include <spatialops/structured/FieldComparisons.h>
@@ -27,9 +25,9 @@
 
 namespace Cantera_CXX{ class IdealGasMix; }
 
-namespace So = SpatialOps;
-typedef   So::SVolField   CellField;
-typedef So::SpatFldPtr<CellField> CellFieldPtrT;
+namespace SO = SpatialOps;
+typedef SO::SVolField  CellField;
+typedef SO::SpatFldPtr<CellField> CellFieldPtrT;
 
 namespace po = boost::program_options;
 
@@ -38,38 +36,25 @@ using namespace pokitt;
 //==============================================================================
 
 const std::vector< std::vector<double> >
-calculate_mass_fracs(const int nSpec, CellField& xcoord, const Expr::TagList yiTags, Expr::FieldManagerList& fml){
-  Expr::FieldMgrSelector<CellField>::type& cellFM = fml.field_manager<CellField>();
-  CellField& yi = cellFM.field_ref(yiTags[0]);
-  CellFieldPtrT sum = So::SpatialFieldStore::get<CellField>(yi);
-  *sum<<=0.0;
-  for( size_t n=0; n<nSpec; ++n ){
-    CellField& yi = cellFM.field_ref(yiTags[n]);
-    yi <<= n + 1 + xcoord;
-    *sum <<= *sum + yi;
-  }
-  BOOST_FOREACH( Expr::Tag yiTag, yiTags){
-    CellField& yi = cellFM.field_ref(yiTag);
-    yi <<= yi / *sum;
-  }
+extract_mass_fracs( const Expr::TagList yiTags, Expr::FieldManagerList& fml ){
+  CellField& yi0 = fml.field_ref< CellField >(yiTags[0]);
+  const size_t nPts = yi0.window_with_ghost().glob_npts();
+  const int nSpec = yiTags.size();
+
   std::vector< std::vector<double> > massFracs;
-  size_t nPts = xcoord.window_with_ghost().glob_npts();
   for( size_t i=0; i<nPts; ++i ){
     std::vector<double> massFrac( nSpec, 0.0 );
     massFracs.push_back(massFrac);
   }
   for( size_t n=0; n<nSpec; ++n ){
-    CellField& yi = cellFM.field_ref(yiTags[n]);
+    CellField& yi = fml.field_ref< CellField >( yiTags[n] );
 #   ifdef ENABLE_CUDA
     yi.set_device_as_active( CPU_INDEX );
 #   endif
     size_t i=0;
-    for( CellField::iterator iY = yi.begin(); iY != yi.end(); ++iY, ++i ){
+    for( CellField::const_iterator iY = yi.begin(); iY != yi.end(); ++iY, ++i ){
       massFracs[i][n] = *iY;
     }
-#   ifdef ENABLE_CUDA
-    yi.set_device_as_active( GPU_INDEX );
-#   endif
   }
   return massFracs;
 }
@@ -80,43 +65,50 @@ const std::vector< CellFieldPtrT >
 get_cantera_results( const bool timings,
                      const size_t canteraReps,
                      Cantera_CXX::IdealGasMix& gasMix,
-                     const std::vector< std::vector<double> >& massFracs,
-                     CellField& temp){
-  using namespace SpatialOps;
+                     Expr::FieldManagerList& fml,
+                     const Expr::Tag& tTag,
+                     const Expr::TagList& yiTags,
+                     const Expr::Tag& pTag){
 
-  const double refPressure=gasMix.pressure();
   const std::vector<double>& molecularWeights = gasMix.molecularWeights();
   const int nSpec = gasMix.nSpecies();
 
+  const std::vector< std::vector<double> > massFracs = extract_mass_fracs( yiTags, fml );
+
+  CellField& temp   = fml.field_ref< CellField >( tTag );
+  CellField& press  = fml.field_ref< CellField >( pTag );
+# ifdef ENABLE_CUDA
+  temp.set_device_as_active  ( CPU_INDEX );
+  press.set_device_as_active ( CPU_INDEX );
+# endif
+
   std::vector< CellFieldPtrT > canteraResults;
   for( size_t n=0; n < nSpec; ++n){
-    canteraResults.push_back( SpatialFieldStore::get<CellField>(temp) );
+    canteraResults.push_back( SO::SpatialFieldStore::get<CellField>(temp) );
   }
 
-  CellField::const_iterator                          iTemp    = temp.begin();
-  const CellField::const_iterator                    iTempEnd = temp.end();
-  std::vector< std::vector<double> >::const_iterator iMass = massFracs.begin();
-  std::vector<double> rResult(nSpec,0.0);
+  std::vector< std::vector<double> >::const_iterator iMass;
+  CellField::const_iterator                          iTemp;
+  CellField::const_iterator                          iPress;
+  CellField::iterator                                iCant;
 
+  std::vector<double> rResult(nSpec,0.0);
   Timer cTimer;
   cTimer.start();
   for( size_t rep=0; rep < canteraReps; ++rep ){
-    iMass = massFracs.begin();
+    iPress = press.begin();
+    iMass  = massFracs.begin();
     size_t i = 0;
-    for( iTemp = temp.begin(); iTemp != iTempEnd; ++iTemp, ++iMass, ++i){
-      gasMix.setState_TPY( *iTemp, refPressure, &(*iMass)[0]);
+    for( iTemp = temp.begin(); iTemp != temp.end(); ++iTemp, ++iMass, ++i){
+      gasMix.setState_TPY( *iTemp, *iPress, &(*iMass)[0]);
       gasMix.getNetProductionRates(&rResult[0]);
       for( size_t n=0; n<nSpec; ++n){
-        (*canteraResults[n])[i] = rResult[n];
+        (*canteraResults[n])[i] = rResult[n] * molecularWeights[n];
       }
     }
   }
   cTimer.stop();
   if( timings ) std::cout << "Cantera reaction rate time " << cTimer.elapsed_time()/canteraReps << std::endl;
-
-  for( size_t n=0; n<nSpec; ++n){
-    *canteraResults[n] <<= *canteraResults[n] * molecularWeights[n]; // convert to mass basis for field comparison
-  }
 
   return canteraResults;
 }
@@ -127,117 +119,133 @@ bool driver( const bool timings,
 {
   TestHelper status( !timings );
   Cantera_CXX::IdealGasMix* const gasMix = CanteraObjects::get_gasmix();
-
   const int nSpec=gasMix->nSpecies();
-  const double refPressure=gasMix->pressure();
 
-  typedef Expr::PlaceHolder <CellField> Temp;
-  typedef Expr::PlaceHolder <CellField> Pressure;
-  typedef Expr::PlaceHolder <CellField> MassFracs;
-  typedef MixtureMolWeight  <CellField> MixtureMolWeight;
-  typedef ReactionRates     <CellField> ReactionRates;
-
+  const Expr::Tag xTag  ( "XCoord",      Expr::STATE_NONE );
   const Expr::Tag tTag  ( "Temperature", Expr::STATE_NONE);
   const Expr::Tag pTag  ( "Pressure",    Expr::STATE_NONE);
   const Expr::Tag mmwTag( "mmw",         Expr::STATE_NONE);
-
   Expr::TagList yiTags;
+  Expr::TagList rTags;
   for( size_t n=0; n<nSpec; ++n ){
     yiTags.push_back( Expr::Tag( "yi_" + boost::lexical_cast<std::string>(n), Expr::STATE_NONE ) );
+    rTags.push_back(  Expr::Tag( "ri" + boost::lexical_cast<std::string>(n), Expr::STATE_NONE ) );
   }
-  Expr::TagList rTags;
-  for( size_t n=0; n<nSpec; ++n )
-    rTags.push_back( Expr::Tag( "ri" + boost::lexical_cast<std::string>(n), Expr::STATE_NONE ) );
 
-  Expr::ExpressionFactory exprFactory;
+  // we use an initialization tree to avoid recalculations when timing the execution
+  Expr::ExpressionFactory initFactory;
+  std::set<Expr::ExpressionID> initIDs;
+  Expr::ExpressionID tID; // temperature
+  Expr::ExpressionID pID; // pressure
+  Expr::ExpressionID mID; // mixture molecular weight
+  Expr::ExpressionID yID; // mass fractions
+  {
+    typedef Expr::PlaceHolder     <CellField>::Builder XCoord;
+    typedef       LinearMassFracs <CellField>::Builder MassFracs;
+    typedef Expr::ConstantExpr    <CellField>::Builder Pressure;
+    typedef       MixtureMolWeight<CellField>::Builder MixMolWeight;
+    typedef Expr::LinearFunction  <CellField>::Builder Temperature;
 
-  BOOST_FOREACH( Expr::Tag yiTag, yiTags){
-    exprFactory.register_expression( new MassFracs::Builder( yiTag ) );
+    initFactory.register_expression(       new XCoord       ( xTag )                     );
+    yID = initFactory.register_expression( new MassFracs    ( yiTags, xTag )             );
+    pID = initFactory.register_expression( new Pressure     ( pTag, gasMix->pressure() ) );
+    mID = initFactory.register_expression( new MixMolWeight ( mmwTag, yiTags )           );
+    tID = initFactory.register_expression( new Temperature  ( tTag ,xTag, 1000, 500 )    );
+    initIDs.insert( tID );
+    initIDs.insert( pID );
+    initIDs.insert( mID );
+    initIDs.insert( yID );
   }
-  exprFactory.register_expression( new Temp             ::Builder( tTag  ) );
-  exprFactory.register_expression( new Pressure         ::Builder( pTag  ) );
-  exprFactory.register_expression( new MixtureMolWeight ::Builder( mmwTag, yiTags ));
 
-  Expr::ExpressionID rRate_id = exprFactory.register_expression( new ReactionRates::Builder(rTags, tTag, pTag, yiTags, mmwTag) );
+  Expr::ExpressionFactory execFactory;
+  Expr::ExpressionID execID;
+  {
+    typedef Expr::PlaceHolder   <CellField>::Builder MassFracs;
+    typedef Expr::PlaceHolder   <CellField>::Builder Temperature;
+    typedef Expr::PlaceHolder   <CellField>::Builder Pressure;
+    typedef Expr::PlaceHolder   <CellField>::Builder MixMolWeight;
+    typedef       ReactionRates <CellField>::Builder ReactionRates;
 
-  std::vector<So::IntVec> ptvec;
+    execFactory.register_expression( new MassFracs   ( yiTags ) );
+    execFactory.register_expression( new Temperature ( tTag   ) );
+    execFactory.register_expression( new Pressure    ( pTag   ) );
+    execFactory.register_expression( new Pressure    ( mmwTag ) );
+    execID = execFactory.register_expression( new ReactionRates(rTags, tTag, pTag, yiTags, mmwTag) );
+  }
+
+  Expr::ExpressionTree initTree( initIDs, initFactory, 0 );
+  Expr::ExpressionTree execTree( execID , execFactory, 0 );
+  {
+    std::ofstream fout( "ReactionRate_init.dot" );
+    initTree.write_tree(fout);
+  }
+  {
+    std::ofstream fout( "ReactionRate.dot" );
+    execTree.write_tree(fout);
+  }
+
+  Expr::FieldManagerList fml;
+  initTree.register_fields( fml );
+  initTree.bind_fields( fml );
+  initTree.lock_fields( fml );
+
+  execTree.register_fields( fml );
+  execTree.bind_fields( fml );
+  execTree.lock_fields( fml );
+
+  std::vector<SO::IntVec> sizeVec;
   if( timings ){
-    ptvec.push_back( So::IntVec(126,126,126) );
-    ptvec.push_back( So::IntVec( 62, 62, 62) );
-    ptvec.push_back( So::IntVec( 30, 30, 30) );
-    ptvec.push_back( So::IntVec( 14, 14, 14) );
-    ptvec.push_back( So::IntVec(  6,  6,  6) );
+    sizeVec.push_back( SO::IntVec(126,126,126) );
+    sizeVec.push_back( SO::IntVec( 62, 62, 62) );
+    sizeVec.push_back( SO::IntVec( 30, 30, 30) );
+    sizeVec.push_back( SO::IntVec( 14, 14, 14) );
+    sizeVec.push_back( SO::IntVec(  6,  6,  6) );
   }
   else{
-    ptvec.push_back( So::IntVec(20,1,1) );
+    sizeVec.push_back( SO::IntVec( 20,  1,  1) );
   }
 
-  for( std::vector<So::IntVec>::iterator iPts = ptvec.begin(); iPts!= ptvec.end(); ++iPts){
+  for( std::vector<SO::IntVec>::iterator iSize = sizeVec.begin(); iSize!= sizeVec.end(); ++iSize){
 
-    Expr::ExpressionTree tree( rRate_id, exprFactory, 0 );
-    {
-      std::ofstream fout( "ReactionRate.dot" );
-      tree.write_tree(fout);
-    }
+    SO::IntVec gridSize = *iSize;
+    fml.allocate_fields( Expr::FieldAllocInfo( gridSize, 0, 0, false, false, false ) );
+    SO::Grid grid( gridSize, SO::DoubleVec(1,1,1) );
 
-    So::IntVec nPts = *iPts;
-    const So::BoundaryCellInfo cellBCInfo = So::BoundaryCellInfo::build<CellField>(false,false,false);
-    const So::GhostData cellGhosts(1);
-    const So::MemoryWindow vwindow( So::get_window_with_ghost(nPts,cellGhosts,cellBCInfo) );
-    CellField xcoord( vwindow, cellBCInfo, cellGhosts, NULL );
-
-    std::vector<double> length(3,1.0);
-    So::Grid grid( nPts, length );
-    grid.set_coord<SpatialOps::XDIR>( xcoord );
+    CellField& xcoord = fml.field_ref< CellField >( xTag );
+    grid.set_coord<SO::XDIR>( xcoord );
+    const int nPoints = xcoord.window_with_ghost().glob_npts();
 #   ifdef ENABLE_CUDA
-    xcoord.add_device( GPU_INDEX );
+    xcoord.set_device_as_active( GPU_INDEX );
 #   endif
 
-    Expr::FieldManagerList fml;
-    tree.register_fields( fml );
-    fml.allocate_fields( Expr::FieldAllocInfo( nPts, 0, 0, false, false, false ) );
-    tree.bind_fields( fml );
+    if( timings ) std::cout << std::endl << "Reaction rates test - " << nPoints << std::endl;
 
-    using namespace SpatialOps;
-    Expr::FieldMgrSelector<CellField>::type& cellFM = fml.field_manager<CellField>();
-
-    CellField& temp = cellFM.field_ref(tTag);
-    temp <<= 500.0 + 1000 * xcoord;
-
-    CellField& p = cellFM.field_ref(pTag);
-    p <<= refPressure;
-
-    const std::vector< std::vector<double> > massFracs = calculate_mass_fracs( nSpec, xcoord, yiTags, fml );
-
-    tree.lock_fields(fml);
-
-    if( timings ) std::cout << std::endl << "Reaction rates test - " << vwindow.glob_npts() << std::endl;
-
+    initTree.execute_tree();
     Timer rxnTimer;
     rxnTimer.start();
     for( size_t rep = 0; rep < pokittReps; ++rep ){
-      tree.execute_tree();
+      execTree.execute_tree();
     }
     rxnTimer.stop();
     if( timings ) std::cout << "PoKiTT  reaction rate time " << rxnTimer.elapsed_time()/pokittReps << std::endl;
 
-#   ifdef ENABLE_CUDA
-    BOOST_FOREACH( Expr::Tag rTag, rTags){
-      CellField& r = fml.field_manager<CellField>().field_ref(rTag);
-      r.add_device(CPU_INDEX);
-    }
-    temp.set_device_as_active( CPU_INDEX );
-#   endif
-
     const std::vector< CellFieldPtrT > canteraResults = get_cantera_results( timings,
                                                                              canteraReps,
                                                                              *gasMix,
-                                                                             massFracs,
-                                                                             temp );
+                                                                             fml,
+                                                                             tTag,
+                                                                             yiTags,
+                                                                             pTag );
+#   ifdef ENABLE_CUDA
+    BOOST_FOREACH( Expr::Tag rTag, rTags){
+      CellField& r = fml.field_ref< CellField >( rTag );
+      r.add_device(CPU_INDEX);
+    }
+#   endif
 
     std::vector< CellFieldPtrT >::const_iterator iCantera = canteraResults.begin();
     BOOST_FOREACH( const Expr::Tag& rTag, rTags ){
-      CellField& r = cellFM.field_ref(rTag);
+      CellField& r = fml.field_ref< CellField >( rTag );
       status( field_equal( r, **iCantera, 1e-8 ) || field_equal_abs( r, **iCantera, 1e-10 ), rTag.name() );
       ++iCantera;
     }
