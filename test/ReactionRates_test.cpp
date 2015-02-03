@@ -250,6 +250,7 @@ bool driver( const bool timings,
       ++iCantera;
     }
 
+    fml.deallocate_fields();
   } // number of points
 
   return status.ok();
