@@ -37,16 +37,17 @@ class DiffusionCoeff
   DECLARE_FIELDS( FieldT, temperature_, p_, mmw_ )
   DECLARE_VECTOR_OF_FIELDS( FieldT, massFracs_ )
 
-  int nSpec_; //number of species to iterate over
-  int modelType_; // type of model used by Cantera to estimate pure viscosity
-  std::vector<double> molecularWeights_; // molecular weights
-  std::vector<double> molecularWeightsInv_; // inverse of molecular weights (diving by MW is expensive)
-  std::vector< std::vector<double> > binaryDCoefs_; // coefficients used by Cantera to calculate binary diffusino coefficients
+  int nSpec_;                                       ///< number of species to iterate over
+  int modelType_;                                   ///< type of model used by Cantera to estimate pure viscosity
+  std::vector<double> molecularWeights_;            ///< molecular weights
+  std::vector<double> molecularWeightsInv_;         ///< inverse of molecular weights (diving by MW is expensive)
+  std::vector< std::vector<double> > binaryDCoefs_; ///< coefficients used by Cantera to calculate binary diffusion coefficients
+
   /* Cantera uses a polynomial in temperature to evaluate the binary diffusion coefficient of each pair [i][j] = [j][i]
    * indicies_[i][j] stores the index of the set of polynomial coefficients for the pair [i][j]
    * This is to simplify bookkeeping and does not affect the evaluation itself
    */
-  std::vector< std::vector< int > > indices_; // keeps track of which polynomial coefficients correspond to which binary pair of species
+  std::vector< std::vector<int> > indices_; ///< keeps track of which polynomial coefficients correspond to which binary pair of species
 
   DiffusionCoeff( const Expr::Tag& temperatureTag,
                   const Expr::Tag& pTag,
@@ -75,10 +76,8 @@ public:
     Expr::ExpressionBase* build() const;
 
   private:
-    const Expr::Tag temperatureTag_;
-    const Expr::Tag pTag_;
+    const Expr::Tag temperatureTag_, pTag_, mmwTag_;
     const Expr::TagList massFracTags_;
-    const Expr::Tag mmwTag_;
   };
 
   ~DiffusionCoeff(){}
@@ -119,11 +118,12 @@ class DiffusionCoeffMol
   DECLARE_FIELDS( FieldT, temperature_, p_, mmw_ )
   DECLARE_VECTOR_OF_FIELDS( FieldT, massFracs_ )
 
-  int nSpec_; //number of species to iterate over
-  int modelType_; // type of model used by Cantera to estimate pure viscosity
-  std::vector<double> molecularWeights_; // molecular weights
-  std::vector<double> molecularWeightsInv_; // inverse of molecular weights (diving by MW is expensive)
-  std::vector< std::vector<double> > binaryDCoefs_; // coefficients used by Cantera to calculate binary diffusino coefficients
+  int nSpec_;                                       ///< number of species to iterate over
+  int modelType_;                                   ///< type of model used by Cantera to estimate pure viscosity
+  std::vector<double> molecularWeights_;            ///< molecular weights
+  std::vector<double> molecularWeightsInv_;         ///< inverse of molecular weights (diving by MW is expensive)
+  std::vector< std::vector<double> > binaryDCoefs_; ///< coefficients used by Cantera to calculate binary diffusino coefficients
+
   /* Cantera uses a polynomial in temperature to evaluate the binary diffusion coefficient of each pair [i][j] = [j][i]
    * indicies_[i][j] stores the index of the set of polynomial coefficients for the pair [i][j]
    * This is to simplify bookkeeping and does not affect the evaluation itself
@@ -157,10 +157,8 @@ public:
     Expr::ExpressionBase* build() const;
 
   private:
-    const Expr::Tag temperatureTag_;
-    const Expr::Tag pTag_;
+    const Expr::Tag temperatureTag_, pTag_, mmwTag_;
     const Expr::TagList massFracTags_;
-    const Expr::Tag mmwTag_;
   };
 
   ~DiffusionCoeffMol(){}
@@ -286,9 +284,9 @@ Builder::Builder( const Expr::TagList& resultTags,
                   const int nghost )
 : ExpressionBuilder( resultTags, nghost ),
   temperatureTag_( temperatureTag ),
-  pTag_( pTag ),
-  massFracTags_( massFracTags ),
-  mmwTag_( mmwTag )
+  pTag_          ( pTag           ),
+  mmwTag_        ( mmwTag         ),
+  massFracTags_  ( massFracTags   )
 {}
 
 //--------------------------------------------------------------------
@@ -415,9 +413,9 @@ Builder::Builder( const Expr::TagList& resultTags,
                   const int nghost )
 : ExpressionBuilder( resultTags, nghost ),
   temperatureTag_( temperatureTag ),
-  pTag_( pTag ),
-  massFracTags_( massFracTags ),
-  mmwTag_( mmwTag )
+  pTag_          ( pTag           ),
+  mmwTag_        ( mmwTag         ),
+  massFracTags_  ( massFracTags   )
 {}
 
 //--------------------------------------------------------------------
