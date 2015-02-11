@@ -158,7 +158,8 @@ get_cantera_results( const bool timings,
       iMass  = massFracs.begin();
       size_t i = 0;
       for( iTemp = temp.begin(); iTemp != temp.end(); ++iTemp, ++iPress, ++iMass, ++i){
-        canteraThermo.setState_TPY( *iTemp, *iPress, &(*iMass)[0]);
+        canteraThermo.setMassFractions_NoNorm( &(*iMass)[0] );
+        canteraThermo.setState_TP( *iTemp, *iPress );
         switch(transportQuantity ){
         case DIFF_MASS:
           mixTrans.getMixDiffCoeffsMass(&d_result[0]); break;
@@ -179,7 +180,8 @@ get_cantera_results( const bool timings,
       iMass  = massFracs.begin();
       CellField::iterator iCantEnd = canteraResults[0]->end();
       for(CellField::iterator iCant = canteraResults[0]->begin(); iCant!=iCantEnd; ++iPress, ++iTemp, ++iMass, ++iCant){
-        canteraThermo.setState_TPY( *iTemp, *iPress, &(*iMass)[0]);
+        canteraThermo.setMassFractions_NoNorm( &(*iMass)[0] );
+        canteraThermo.setState_TP( *iTemp, *iPress );
         switch( transportQuantity ){
         case TCOND:
           *iCant = mixTrans.thermalConductivity(); break;

@@ -122,7 +122,7 @@ get_cantera_result( const bool timings,
     iTemp   = temp.begin();
     iMass   = massFracs.begin();
     for( iCant = canteraResult->begin(); iCant != canteraResult->end(); ++iVolume, ++iPress, ++iEnergy, ++iTemp, ++iMass, ++iCant){
-      gasMix.setState_TPY( *iTemp, *iPress, &(*iMass)[0]);
+      gasMix.setMassFractions_NoNorm( &(*iMass)[0] );
       switch( energyType ){
       case H:  gasMix.setState_HP( *iEnergy, *iPress  ); break;
       case E0: gasMix.setState_UV( *iEnergy, *iVolume ); break;

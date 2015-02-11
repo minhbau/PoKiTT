@@ -100,7 +100,8 @@ get_cantera_results( const bool timings,
     iMass  = massFracs.begin();
     size_t i = 0;
     for( iTemp = temp.begin(); iTemp != temp.end(); ++iTemp, ++iMass, ++i){
-      gasMix.setState_TPY( *iTemp, *iPress, &(*iMass)[0]);
+      gasMix.setMassFractions_NoNorm( &(*iMass)[0] );
+      gasMix.setState_TP( *iTemp, *iPress );
       gasMix.getNetProductionRates(&rResult[0]);
       for( size_t n=0; n<nSpec; ++n){
         (*canteraResults[n])[i] = rResult[n] * molecularWeights[n];

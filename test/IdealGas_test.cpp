@@ -113,17 +113,18 @@ get_cantera_result( const bool timings,
     iMass = massFracs.begin();
     iRef  = refQuantity.begin();
     for(iCant = canteraResult->begin(); iCant!=canteraResult->end(); ++iTemp, ++iRef, ++iMass, ++iCant){
+      gasMix.setMassFractions_NoNorm( &(*iMass)[0] );
       switch( gasQuantity ){
       case P:
-        gasMix.setState_TRY( *iTemp, *iRef, &(*iMass)[0]);
+        gasMix.setState_TR( *iTemp, *iRef );
         *iCant=gasMix.pressure();
         break;
       case RHO:
-        gasMix.setState_TPY( *iTemp, *iRef, &(*iMass)[0]);
+        gasMix.setState_TP( *iTemp, *iRef );
         *iCant=gasMix.density();
         break;
       case NU:
-        gasMix.setState_TPY( *iTemp, *iRef, &(*iMass)[0]);
+        gasMix.setState_TP( *iTemp, *iRef );
         *iCant=1/gasMix.density();
         break;
       }

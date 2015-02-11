@@ -187,7 +187,8 @@ get_cantera_results( const bool mix,
       iTemp = temp.begin();
       iMass = massFracs.begin();
       for( iCant = canteraResults[0]->begin(); iCant!=iCantEnd; ++iTemp, ++iMass, ++iCant ){
-        gasMix.setState_TPY( *iTemp, press, &(*iMass)[0]);
+        gasMix.setMassFractions_NoNorm( &(*iMass)[0] );
+        gasMix.setState_TP( *iTemp, press );
         switch(thermoQuantity){
         case CP  : *iCant=gasMix.cp_mass();        break;
         case CV  : *iCant=gasMix.cv_mass();        break;
@@ -207,7 +208,8 @@ get_cantera_results( const bool mix,
       size_t i = 0;
       iMass = massFracs.begin();
       for( iTemp = temp.begin(); iTemp != iTempEnd; ++iTemp, ++iMass, ++i){
-        gasMix.setState_TPY( *iTemp, press, &(*iMass)[0]);
+        gasMix.setMassFractions_NoNorm( &(*iMass)[0] );
+        gasMix.setState_TP( *iTemp, press );
         switch( thermoQuantity ){
         case CP  : gasMix.getPartialMolarCp(&thermoResult[0]);          break;
         case CV  : gasMix.getPartialMolarCp(&thermoResult[0]);          break;
