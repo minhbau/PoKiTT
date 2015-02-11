@@ -8,6 +8,10 @@ project( PoKiTT CXX C )
 option( BUILD_UPSTREAM_LIBS "Auto-build ExprLib and SpatialOps (not recommended when linking to downstream apps)" OFF )
 option( ENABLE_TESTS "Enable tests" ON )
 
+#still a messy work in progress but it should compile and run
+option( ENABLE_EXAMPLES "Enable reaction-diffusion example" OFF )
+mark_as_advanced( ENABLE_EXAMPLES )
+
 set( Cantera_DIR "" CACHE PATH "Location where cantera was installed" )
 
 
@@ -163,6 +167,10 @@ if( ENABLE_TESTS )
   enable_testing()
   add_subdirectory( test )
 endif( ENABLE_TESTS )
+
+if( ENABLE_EXAMPLES )
+  add_subdirectory( examples/ReactionDiffusion )
+endif( ENABLE_EXAMPLES )
 
 
 #-------------------------------------------------------------------------------
