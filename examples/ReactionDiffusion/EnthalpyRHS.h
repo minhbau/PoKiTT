@@ -22,16 +22,16 @@
  * IN THE SOFTWARE.
  */
 
-#ifndef SpeciesRHS_Expr_h
-#define SpeciesRHS_Expr_h
+#ifndef EnthalpyRHS_Expr_h
+#define EnthalpyRHS_Expr_h
 
 #include <expression/Expression.h>
 
 /**
- *  \class SpeciesRHS
+ *  \class EnthalpyRHS
  */
 template< typename FieldT >
-class SpeciesRHS
+class EnthalpyRHS
  : public Expr::Expression< FieldT >
 {
   typedef typename SpatialOps::FaceTypes<FieldT> FaceTypes;
@@ -52,10 +52,10 @@ class SpeciesRHS
   DECLARE_FIELD( YFluxT, yFlux_ )
   DECLARE_FIELD( ZFluxT, zFlux_ )
 
-  DECLARE_FIELD( FieldT, source_ )
+  DECLARE_FIELD( FieldT, rho_ )
   
-  SpeciesRHS( const Expr::Tag& sourceTag,
-              const Expr::TagList& fluxTags );
+  EnthalpyRHS( const Expr::Tag& rhoTag,
+               const Expr::TagList& fluxTags );
 
 public:
 
@@ -63,22 +63,22 @@ public:
   {
   public:
     /**
-     *  @brief Build a SpeciesRHS expression
+     *  @brief Build a EnthalpyRHS expression
      *  @param resultTag the tag for the value that this expression computes
      */
     Builder( const Expr::Tag& resultTag,
-             const Expr::Tag& sourceTag,
+             const Expr::Tag& rhoTag,
              const Expr::TagList& fluxTags,
              const int nghost = DEFAULT_NUMBER_OF_GHOSTS );
 
     Expr::ExpressionBase* build() const;
 
   private:
-    const Expr::Tag sourceTag_;
+    const Expr::Tag rhoTag_;
     const Expr::TagList fluxTags_;
   };
 
-  ~SpeciesRHS();
+  ~EnthalpyRHS();
   void bind_operators( const SpatialOps::OperatorDatabase& opDB );
   void evaluate();
 };
@@ -94,30 +94,30 @@ public:
 
 
 template< typename FieldT >
-SpeciesRHS<FieldT>::
-SpeciesRHS( const Expr::Tag& sourceTag,
-            const Expr::TagList& fluxTags )
+EnthalpyRHS<FieldT>::
+EnthalpyRHS( const Expr::Tag& rhoTag,
+             const Expr::TagList& fluxTags )
   : Expr::Expression<FieldT>()
 {
   xFlux_ = this->template create_field_request<XFluxT>( fluxTags[0] );
   yFlux_ = this->template create_field_request<YFluxT>( fluxTags[1] );
   zFlux_ = this->template create_field_request<ZFluxT>( fluxTags[2] );
 
-  source_ = this->template create_field_request<FieldT>( sourceTag );
+  rho_ = this->template create_field_request<FieldT>( rhoTag );
 }
 
 //--------------------------------------------------------------------
 
 template< typename FieldT >
-SpeciesRHS<FieldT>::
-~SpeciesRHS()
+EnthalpyRHS<FieldT>::
+~EnthalpyRHS()
 {}
 
 //--------------------------------------------------------------------
 
 template< typename FieldT >
 void
-SpeciesRHS<FieldT>::
+EnthalpyRHS<FieldT>::
 bind_operators( const SpatialOps::OperatorDatabase& opDB )
 {
   divXOp_ = opDB.retrieve_operator<DivX>();
@@ -129,7 +129,7 @@ bind_operators( const SpatialOps::OperatorDatabase& opDB )
 
 template< typename FieldT >
 void
-SpeciesRHS<FieldT>::
+EnthalpyRHS<FieldT>::
 evaluate()
 {
   FieldT& RHS = this->value();
@@ -138,22 +138,22 @@ evaluate()
   const YFluxT& yFlux = yFlux_->field_ref();
   const ZFluxT& zFlux = zFlux_->field_ref();
 
-  const FieldT& source = source_->field_ref();
+  const FieldT& rho = rho_->field_ref();
 
-  RHS <<= source;
-  RHS <<= RHS - (*divXOp_)( xFlux ) - (*divYOp_)( yFlux ) - (*divZOp_)( zFlux );
+  RHS <<= ( - (*divXOp_)( xFlux ) - (*divYOp_)( yFlux ) - (*divZOp_)( zFlux ) ) / rho;
+//  RHS <<= 0.0;
 }
 
 //--------------------------------------------------------------------
 
 template< typename FieldT >
-SpeciesRHS<FieldT>::
+EnthalpyRHS<FieldT>::
 Builder::Builder( const Expr::Tag& resultTag,
-                  const Expr::Tag& sourceTag,
+                  const Expr::Tag& rhoTag,
                   const Expr::TagList& fluxTags,
                   const int nghost )
   : ExpressionBuilder( resultTag, nghost ),
-    sourceTag_( sourceTag ),
+    rhoTag_( rhoTag ),
     fluxTags_( fluxTags )
 {}
 
@@ -161,11 +161,11 @@ Builder::Builder( const Expr::Tag& resultTag,
 
 template< typename FieldT >
 Expr::ExpressionBase*
-SpeciesRHS<FieldT>::
+EnthalpyRHS<FieldT>::
 Builder::build() const
 {
-  return new SpeciesRHS<FieldT>( sourceTag_, fluxTags_ );
+  return new EnthalpyRHS<FieldT>( rhoTag_, fluxTags_ );
 }
 
 
-#endif // SpeciesRHS_Expr_h
+#endif // EnthalpyRHS_Expr_h
