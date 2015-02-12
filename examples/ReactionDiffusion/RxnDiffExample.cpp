@@ -159,8 +159,8 @@ bool driver( const bool timings,
   }
 
   const double rho0 = 0.3;
-  const double t0 = 800;
-  const double length = 1e-3;
+  const double t0 = 400;
+  const double length = 5e-2;
 
   Expr::ExpressionFactory initFactory;
   std::set<Expr::ExpressionID> initIDs;
@@ -174,13 +174,13 @@ bool driver( const bool timings,
     typedef MassFractions       <CellField>::Builder MassFracs;
 
     initFactory.register_expression( new XCoord( xTag )    );
-    initFactory.register_expression( new Temperature( tTag, xTag, 0.0, t0 )    );
+    initFactory.register_expression( new Temperature( tTag, xTag, 1000/length, t0 )    );
     initFactory.register_expression( new Density( rhoTag, rho0 )    );
     initFactory.register_expression( new rhoYi ( rhoYiTags[0], rhoTag, 0.01, 0.0  ) );
     initFactory.register_expression( new rhoYi ( rhoYiTags[3], rhoTag, 0.20, 0.0  ) );
     for( size_t n = 0; n < (nSpec-1); ++n ){
       if( n != 0 && n != 3 )
-        initFactory.register_expression( new rhoYi ( rhoYiTags[n], rhoTag, 1e-8, 0.0  ) );
+        initFactory.register_expression( new rhoYi ( rhoYiTags[n], rhoTag, 1e-12, 0.0  ) );
     }
     initFactory.register_expression( new MassFracs( yiTags, rhoTag, rhoYiTags) );
     hID = initFactory.register_expression( new Enthalpy ( hTag , tTag, yiTags )    );
@@ -273,7 +273,7 @@ bool driver( const bool timings,
       if( n != 0 && n != 3 )
         setup_bcs( execFactory, grid, ghosts, rhoYiTags[n], 0, SO::NEUMANN );
     }
-    setup_bcs( execFactory, grid, ghosts, tTag, t0+500, SO::DIRICHLET );
+    setup_bcs( execFactory, grid, ghosts, hTag, 0, SO::NEUMANN );
 
     timeIntegrator.finalize( fml, patch.operator_database(), patch.field_info() );
     {
@@ -299,7 +299,7 @@ bool driver( const bool timings,
           int n=0;
           std::cout<<"n = " << n << "\n";
           SO::interior_print_field( fml.field_ref< CellField >( rhoYiTags[n] ), std::cout );
-          n=3;
+          n=4;
           std::cout<<"n = " << n << "\n";
           SO::interior_print_field( fml.field_ref< CellField >( rhoYiTags[n] ), std::cout );
           n=5;
