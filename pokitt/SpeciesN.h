@@ -27,6 +27,8 @@
 
 #include <expression/Expression.h>
 
+namespace pokitt{
+
 /**
  *  \class SpeciesN
  *  \brief Sets the requested species to enforce the constraint that \f$\sum y_i=1\f$.
@@ -86,7 +88,7 @@ public:
     {}
 
     Expr::ExpressionBase* build() const{
-      return new SpeciesN<FieldT>( speciesTags_ );
+      return new SpeciesN<FieldT>( speciesTags_, specNum_ );
     }
   };
 
@@ -96,11 +98,11 @@ public:
 
     specN <<= 1.0;
 
-    for( size_t i=0; i<species_->size(); ++i ){
+    for( size_t i=0; i<species_.size(); ++i ){
       if( i != specNum_ ) specN <<= specN - species_[i]->field_ref();
     }
 
-    if( max( specN ) > 1.0 || min( specN ) < 0.0 ){
+    if( nebo_max( specN ) > 1.0 || nebo_min( specN ) < 0.0 ){
       std::ostringstream msg;
       msg << __FILE__ << " : " << __LINE__ << "\nSpecies fractions are out of bounds!\n";
       throw std::runtime_error( msg.str() );
@@ -108,5 +110,7 @@ public:
   }
 
 };
+
+} // namespace pokitt
 
 #endif // SpeciesN_Expr_h
