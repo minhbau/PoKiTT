@@ -388,7 +388,7 @@ evaluate()
 #   ifdef ENABLE_CUDA
     res.set_device_as_active(CPU_INDEX);
 #   endif
-    const double err = nebo_max( abs(res) );
+    const double err = nebo_max_interior( abs(res) );
 #   ifdef ENABLE_CUDA
     res.set_device_as_active(GPU_INDEX);
 #   endif
@@ -642,7 +642,7 @@ evaluate()
 #     ifdef ENABLE_CUDA
       res.set_device_as_active(CPU_INDEX);
 #     endif
-      const double err = nebo_max( abs(res) );
+      const double err = nebo_max_interior( abs(res) );
 #     ifdef ENABLE_CUDA
       res.set_device_as_active(GPU_INDEX);
 #     endif
@@ -651,11 +651,11 @@ evaluate()
 
       // error trapping
 #     ifndef ENABLE_CUDA
-      if( nebo_min(dE0dT) <= 0 )
+      if( nebo_min_interior(dE0dT) <= 0 )
         throw( err );
-      if( nebo_min(temp) <= 0 )
+      if( nebo_min_interior(temp) <= 0 )
         throw( err );
-      if( nebo_max(temp) > exceptionTemp )
+      if( nebo_max_interior(temp) > exceptionTemp )
         throw( err );
       if( !isConverged && iterations == maxIts )
         throw( err );
@@ -673,19 +673,19 @@ evaluate()
     }
     else{
       msg << "Bad field(s) detected:" << std::endl;
-      if( nebo_min(dE0dT) < 0 ){
+      if( nebo_min_interior(dE0dT) < 0 ){
         msg << "Cv is negative" << std::endl;
       }
-      if( nebo_min(dE0dT) == 0 ){
+      if( nebo_min_interior(dE0dT) == 0 ){
         msg << "Cv is zero" << std::endl;
       }
-      if( nebo_min(temp) < 0 ){
+      if( nebo_min_interior(temp) < 0 ){
         msg << "Temperature is negative" << std::endl;
       }
-      if( nebo_min(temp) == 0 ){
+      if( nebo_min_interior(temp) == 0 ){
         msg << "Temperature is zero" << std::endl;
       }
-      if( nebo_max(temp) > exceptionTemp ){
+      if( nebo_max_interior(temp) > exceptionTemp ){
         msg << "Temperature is above " << exceptionTemp << std::endl;
       }
       msg << std::endl;

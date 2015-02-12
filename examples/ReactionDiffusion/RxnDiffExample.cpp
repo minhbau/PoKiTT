@@ -8,6 +8,7 @@
 #include <iostream>
 
 #include <expression/ExprLib.h>
+#include <expression/BoundaryConditionExpression.h>
 
 #include <spatialops/structured/Grid.h>
 #include <spatialops/OperatorDatabase.h>
@@ -38,14 +39,83 @@ namespace Cantera_CXX{ class IdealGasMix; }
 
 namespace SO = SpatialOps;
 typedef SO::SVolField  CellField;
-
 typedef SO::FaceTypes<CellField> FaceTypes;
 typedef FaceTypes::XFace XFluxT;
 typedef FaceTypes::YFace YFluxT;
+using SO::IntVec;
+using Expr::Tag;
+using Expr::TagList;
 
 namespace po = boost::program_options;
 
 using namespace pokitt;
+
+void
+initialize_mask_points( const SO::Grid& grid,
+                        std::vector<IntVec>& leftSet,
+                        std::vector<IntVec>& rightSet,
+                        std::vector<IntVec>& topSet,
+                        std::vector<IntVec>& bottomSet )
+{
+  for( int i=0; i < grid.extent(1); ++i ){
+    leftSet .push_back( IntVec(0, i, 0) );
+    rightSet.push_back( IntVec(grid.extent(0), i, 0) );
+  }
+
+  for(int i = 0; i < grid.extent(0); i++){
+    topSet   .push_back( IntVec(i, 0, 0) );
+    bottomSet.push_back( IntVec(i, grid.extent(1), 0) );
+  }
+}
+
+//==============================================================================
+
+void setup_bcs( Expr::ExpressionFactory& execFactory,
+                const SO::Grid& grid,
+                const SO::GhostData ghosts,
+                const Tag& fieldTag,
+                const double value,
+                const SO::BCType type)
+{
+  std::vector<IntVec> xminusPts, xplusPts, yminusPts, yplusPts;
+  initialize_mask_points( grid, xminusPts, xplusPts, yminusPts, yplusPts );
+
+  const SO::BoundaryCellInfo xInfo = SO::BoundaryCellInfo::build<XFluxT>(true,true,true);
+  const SO::BoundaryCellInfo yInfo = SO::BoundaryCellInfo::build<YFluxT>(true,true,true);
+  const SO::MemoryWindow xwindow( SO::get_window_with_ghost( grid.extent(), ghosts, xInfo ) );
+  const SO::MemoryWindow ywindow( SO::get_window_with_ghost( grid.extent(), ghosts, yInfo ) );
+
+  typedef Expr::ConstantBCOpExpression<CellField,SO::XDIR>::Builder XBC;
+  typedef Expr::ConstantBCOpExpression<CellField,SO::YDIR>::Builder YBC;
+
+  XBC::MaskPtr xminus( new XBC::MaskType( xwindow, xInfo, ghosts, xminusPts ) );
+  XBC::MaskPtr xplus ( new XBC::MaskType( xwindow, xInfo, ghosts, xplusPts  ) );
+  YBC::MaskPtr yminus( new YBC::MaskType( ywindow, yInfo, ghosts, yminusPts ) );
+  YBC::MaskPtr yplus ( new YBC::MaskType( ywindow, yInfo, ghosts, yplusPts  ) );
+
+# ifdef ENABLE_CUDA
+  // Masks are created on CPU so we need to explicitly transfer them to GPU
+  xminus->add_consumer( GPU_INDEX );
+  xplus ->add_consumer( GPU_INDEX );
+  yminus->add_consumer( GPU_INDEX );
+  yplus ->add_consumer( GPU_INDEX );
+# endif
+
+  Tag xmbcTag( fieldTag.name() + "xmbc", Expr::STATE_NONE );
+  Tag xpbcTag( fieldTag.name() + "xpbc", Expr::STATE_NONE );
+  Tag ymbcTag( fieldTag.name() + "ymbc", Expr::STATE_NONE );
+  Tag ypbcTag( fieldTag.name() + "ypbc", Expr::STATE_NONE );
+
+  execFactory.register_expression( new XBC( xmbcTag, xminus, type, SO::MINUS_SIDE,  value ) );
+  execFactory.register_expression( new XBC( xpbcTag, xplus , type, SO::PLUS_SIDE,  value ) );
+  execFactory.register_expression( new YBC( ymbcTag, yminus, type, SO::MINUS_SIDE,  value ) );
+  execFactory.register_expression( new YBC( ypbcTag, yplus , type, SO::PLUS_SIDE,  value ) );
+
+  execFactory.attach_modifier_expression( xmbcTag, fieldTag );
+  execFactory.attach_modifier_expression( xpbcTag, fieldTag );
+  execFactory.attach_modifier_expression( ymbcTag, fieldTag );
+  execFactory.attach_modifier_expression( ypbcTag, fieldTag );
+}
 
 bool driver( const bool timings,
              const size_t nSteps,
@@ -55,8 +125,7 @@ bool driver( const bool timings,
   Cantera_CXX::IdealGasMix* const gasMix = CanteraObjects::get_gasmix();
   const int nSpec=gasMix->nSpecies();
 
-  using Expr::Tag;
-  using Expr::TagList;
+
   const Tag xTag  ( "XCoord",               Expr::STATE_NONE );
   const Tag tTag  ( "Temp",                 Expr::STATE_NONE );
   const Tag pTag  ( "Pressure",             Expr::STATE_NONE);
@@ -89,26 +158,29 @@ bool driver( const bool timings,
     }
   }
 
-  const double rho0 = 1;
-  const double t0 = 1200;
+  const double rho0 = 0.3;
+  const double t0 = 800;
+  const double length = 1e-3;
 
   Expr::ExpressionFactory initFactory;
   std::set<Expr::ExpressionID> initIDs;
   Expr::ExpressionID hID; // temperature
   {
+    typedef Expr::PlaceHolder   <CellField>::Builder XCoord;
     typedef Expr::ConstantExpr  <CellField>::Builder Density;
     typedef Expr::LinearFunction<CellField>::Builder rhoYi;
-    typedef Expr::ConstantExpr  <CellField>::Builder Temperature;
+    typedef Expr::LinearFunction<CellField>::Builder Temperature;
     typedef Enthalpy            <CellField>::Builder Enthalpy;
     typedef MassFractions       <CellField>::Builder MassFracs;
 
-    initFactory.register_expression( new Temperature( tTag, t0 )    );
+    initFactory.register_expression( new XCoord( xTag )    );
+    initFactory.register_expression( new Temperature( tTag, xTag, 0.0, t0 )    );
     initFactory.register_expression( new Density( rhoTag, rho0 )    );
     initFactory.register_expression( new rhoYi ( rhoYiTags[0], rhoTag, 0.01, 0.0  ) );
     initFactory.register_expression( new rhoYi ( rhoYiTags[3], rhoTag, 0.20, 0.0  ) );
     for( size_t n = 0; n < (nSpec-1); ++n ){
       if( n != 0 && n != 3 )
-        initFactory.register_expression( new rhoYi ( rhoYiTags[n], rhoTag, 1e-12, 0.0  ) );
+        initFactory.register_expression( new rhoYi ( rhoYiTags[n], rhoTag, 1e-8, 0.0  ) );
     }
     initFactory.register_expression( new MassFracs( yiTags, rhoTag, rhoYiTags) );
     hID = initFactory.register_expression( new Enthalpy ( hTag , tTag, yiTags )    );
@@ -160,7 +232,6 @@ bool driver( const bool timings,
     }
   }
 
-  using SO::IntVec;
   std::vector< IntVec > sizeVec;
   if( timings ){
     sizeVec.push_back( IntVec(126,126, 1 ) );
@@ -170,7 +241,7 @@ bool driver( const bool timings,
     sizeVec.push_back( IntVec(  6,  6, 1 ) );
   }
   else{
-    sizeVec.push_back( IntVec( 2,  2,  1) );
+    sizeVec.push_back( IntVec( 10,  5,  1) );
   }
 
   for( std::vector< IntVec >::iterator iSize = sizeVec.begin(); iSize!= sizeVec.end(); ++iSize){
@@ -192,9 +263,17 @@ bool driver( const bool timings,
     }
     timeIntegrator.add_equation<CellField>( hTag.name(), hRHSTag, ghosts );
 
-    SO::Grid grid( gridSize, SO::DoubleVec(1,1,1) );
+    SO::Grid grid( gridSize, SO::DoubleVec( length, length, 1 ) );
     SO::OperatorDatabase& opDB = patch.operator_database();
     SO::build_stencils( grid, opDB );
+
+    setup_bcs( execFactory, grid, ghosts, rhoYiTags[0], 0, SO::NEUMANN );
+    setup_bcs( execFactory, grid, ghosts, rhoYiTags[3], 0, SO::NEUMANN );
+    for( size_t n = 0; n < (nSpec-1); ++n ){
+      if( n != 0 && n != 3 )
+        setup_bcs( execFactory, grid, ghosts, rhoYiTags[n], 0, SO::NEUMANN );
+    }
+    setup_bcs( execFactory, grid, ghosts, tTag, t0+500, SO::DIRICHLET );
 
     timeIntegrator.finalize( fml, patch.operator_database(), patch.field_info() );
     {
@@ -203,36 +282,41 @@ bool driver( const bool timings,
     }
     timeIntegrator.get_tree()->lock_fields(fml);
 
+    CellField& xcoord = fml.field_ref< CellField >( xTag );
+    grid.set_coord<SO::XDIR>( xcoord );
+#   ifdef ENABLE_CUDA
+    xcoord.set_device_as_active( GPU_INDEX );
+#   endif
+
     initTree.execute_tree();
     CellField& t = fml.field_ref< CellField >( tTag );
     CellField& h = fml.field_ref< CellField >( hTag );
     Timer timer;
     timer.start();
     for( size_t s = 0; s < nSteps; ++s ){
-//      std::cout<<"s\n";
-      if( s%1000 == 0 ){
+      if( s%5000 == 0 ){
         {
           int n=0;
           std::cout<<"n = " << n << "\n";
-          SO::print_field( fml.field_ref< CellField >( rhoYiTags[n] ), std::cout );
+          SO::interior_print_field( fml.field_ref< CellField >( rhoYiTags[n] ), std::cout );
           n=3;
           std::cout<<"n = " << n << "\n";
-          SO::print_field( fml.field_ref< CellField >( rhoYiTags[n] ), std::cout );
+          SO::interior_print_field( fml.field_ref< CellField >( rhoYiTags[n] ), std::cout );
           n=5;
           std::cout<<"n = " << n << "\n";
-          SO::print_field( fml.field_ref< CellField >( rhoYiTags[n] ), std::cout );
+          SO::interior_print_field( fml.field_ref< CellField >( rhoYiTags[n] ), std::cout );
         }
         std::cout<<"h\n";
-        SO::print_field( h, std::cout );
+        SO::interior_print_field( h, std::cout );
         std::cout<<"t\n";
-        SO::print_field( t, std::cout );
+        SO::interior_print_field( t, std::cout );
       }
       timeIntegrator.step( dt );
     }
     timer.stop();
 
     const double tMean = SO::nebo_sum_interior( t ) / ( gridSize[0] * gridSize[1] * gridSize[2] );
-    status( tMean >= (t0 - 100) && tMean < 5000 );
+    status( tMean >= 300 && tMean < 5000 );
 
     fml.deallocate_fields();
   } // number of points
@@ -248,7 +332,7 @@ int main( int iarg, char* carg[] )
   std::string inpGroup;
   bool timings = false;
   size_t nSteps = 1000;
-  double dt = 1e-12;
+  double dt = 1e-11;
 
   // parse the command line options input describing the problem
   try {
