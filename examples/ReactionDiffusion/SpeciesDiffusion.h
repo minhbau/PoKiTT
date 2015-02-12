@@ -33,9 +33,10 @@
  *  \tparam ScalarT the type of the scalar field (diffusivity, mole fraction)
  *  \tparam FluxT the type of the flux field.
  */
-template< typename ScalarT, typename FluxT >
+template< typename FluxT >
 class SpeciesDiffFlux : public Expr::Expression< FluxT >
 {
+  typedef typename SpatialOps::VolType<FluxT>::VolField ScalarT;
   typedef typename SpatialOps::OperatorTypeBuilder<SpatialOps::Gradient,   ScalarT,FluxT>::type GradT;
   typedef typename SpatialOps::OperatorTypeBuilder<SpatialOps::Interpolant,ScalarT,FluxT>::type InterpT;
 
@@ -103,8 +104,8 @@ public:
 
 
 //--------------------------------------------------------------------
-template<typename ScalarT,typename FluxT>
-SpeciesDiffFlux<ScalarT,FluxT>::
+template<typename FluxT>
+SpeciesDiffFlux<FluxT>::
 SpeciesDiffFlux( const Expr::TagList& yiTags,
                  const Expr::Tag& densTag,
                  const Expr::Tag& mmwTag,
@@ -118,17 +119,17 @@ SpeciesDiffFlux( const Expr::TagList& yiTags,
   this->template create_field_vector_request<ScalarT>( diffCoeffTags, diffCoeffs_ );
 }
 //--------------------------------------------------------------------
-template<typename ScalarT,typename FluxT>
+template<typename FluxT>
 void
-SpeciesDiffFlux<ScalarT,FluxT>::bind_operators( const SpatialOps::OperatorDatabase& opDB )
+SpeciesDiffFlux<FluxT>::bind_operators( const SpatialOps::OperatorDatabase& opDB )
 {
   gradOp_   = opDB.retrieve_operator<GradT  >();
   interpOp_ = opDB.retrieve_operator<InterpT>();
 }
 //--------------------------------------------------------------------
-template<typename ScalarT,typename FluxT>
+template<typename FluxT>
 void
-SpeciesDiffFlux<ScalarT,FluxT>::evaluate()
+SpeciesDiffFlux<FluxT>::evaluate()
 {
   using namespace SpatialOps;
   SpecFluxT& fluxes = this->get_value_vec();
@@ -167,8 +168,8 @@ SpeciesDiffFlux<ScalarT,FluxT>::evaluate()
 
 
 //--------------------------------------------------------------------
-template<typename ScalarT,typename FluxT>
-SpeciesDiffFlux<ScalarT,FluxT>::Builder::
+template<typename FluxT>
+SpeciesDiffFlux<FluxT>::Builder::
 Builder( const Expr::TagList& result,
          const Expr::TagList& massFracs,
          const Expr::Tag& densTag,
@@ -182,11 +183,11 @@ Builder( const Expr::TagList& result,
   diffCoeffTags_(diffCoeffTags)
 {}
 //--------------------------------------------------------------------
-template<typename ScalarT,typename FluxT>
+template<typename FluxT>
 Expr::ExpressionBase*
-SpeciesDiffFlux<ScalarT,FluxT>::Builder::build() const
+SpeciesDiffFlux<FluxT>::Builder::build() const
 {
-  return new SpeciesDiffFlux<ScalarT,FluxT>( yiTags_, densTag_, mmwTag_, diffCoeffTags_ );
+  return new SpeciesDiffFlux<FluxT>( yiTags_, densTag_, mmwTag_, diffCoeffTags_ );
 }
 
 #endif

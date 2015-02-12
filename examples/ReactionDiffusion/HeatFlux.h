@@ -4,9 +4,10 @@
 
 #include <expression/ExprLib.h>
 
-template< typename ScalarT, typename FluxT >
+template< typename FluxT >
 class HeatFlux : public Expr::Expression< FluxT >
 {
+  typedef typename SpatialOps::VolType<FluxT>::VolField ScalarT;
   typedef typename SpatialOps::OperatorTypeBuilder<SpatialOps::Gradient,   ScalarT,FluxT>::type GradT;
   typedef typename SpatialOps::OperatorTypeBuilder<SpatialOps::Interpolant,ScalarT,FluxT>::type InterpT;
 
@@ -69,8 +70,8 @@ public:
 
 
 //--------------------------------------------------------------------
-template<typename ScalarT,typename FluxT>
-HeatFlux<ScalarT,FluxT>::
+template<typename FluxT>
+HeatFlux<FluxT>::
 HeatFlux( const Expr::Tag& tTag,
           const Expr::Tag& tCondTag,
           const Expr::TagList& hTags,
@@ -84,17 +85,17 @@ HeatFlux( const Expr::Tag& tTag,
   this->template create_field_vector_request<FluxT>(   massFluxTags, j_ );
 }
 //--------------------------------------------------------------------
-template<typename ScalarT,typename FluxT>
+template<typename FluxT>
 void
-HeatFlux<ScalarT,FluxT>::bind_operators( const SpatialOps::OperatorDatabase& opDB )
+HeatFlux<FluxT>::bind_operators( const SpatialOps::OperatorDatabase& opDB )
 {
   gradOp_   = opDB.retrieve_operator<GradT  >();
   interpOp_ = opDB.retrieve_operator<InterpT>();
 }
 //--------------------------------------------------------------------
-template<typename ScalarT,typename FluxT>
+template<typename FluxT>
 void
-HeatFlux<ScalarT,FluxT>::evaluate()
+HeatFlux<FluxT>::evaluate()
 {
   using namespace SpatialOps;
   FluxT& flux = this->value();
@@ -117,8 +118,8 @@ HeatFlux<ScalarT,FluxT>::evaluate()
 
 
 //--------------------------------------------------------------------
-template<typename ScalarT,typename FluxT>
-HeatFlux<ScalarT,FluxT>::Builder::
+template<typename FluxT>
+HeatFlux<FluxT>::Builder::
 Builder( const Expr::Tag& heatFlux,
          const Expr::Tag& tTag,
          const Expr::Tag& tCondTag,
@@ -132,11 +133,11 @@ Builder( const Expr::Tag& heatFlux,
   massFluxTags_(massFluxTags)
 {}
 //--------------------------------------------------------------------
-template<typename ScalarT,typename FluxT>
+template<typename FluxT>
 Expr::ExpressionBase*
-HeatFlux<ScalarT,FluxT>::Builder::build() const
+HeatFlux<FluxT>::Builder::build() const
 {
-  return new HeatFlux<ScalarT,FluxT>( tTag_, tCondTag_, hTags_, massFluxTags_ );
+  return new HeatFlux<FluxT>( tTag_, tCondTag_, hTags_, massFluxTags_ );
 }
 
 #endif

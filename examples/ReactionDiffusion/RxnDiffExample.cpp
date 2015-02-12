@@ -38,15 +38,10 @@ namespace Cantera_CXX{ class IdealGasMix; }
 
 namespace SO = SpatialOps;
 typedef SO::SVolField  CellField;
-typedef SO::SpatFldPtr<CellField> CellFieldPtrT;
-typedef SO::BasicOpTypes<CellField>::GradX GradXOp;
-typedef SO::BasicOpTypes<CellField>::GradY GradYOp;
-typedef SO::BasicOpTypes<CellField>::GradZ GradZOp;
 
 typedef SO::FaceTypes<CellField> FaceTypes;
 typedef FaceTypes::XFace XFluxT;
 typedef FaceTypes::YFace YFluxT;
-typedef FaceTypes::ZFace ZFluxT;
 
 namespace po = boost::program_options;
 
@@ -60,38 +55,38 @@ bool driver( const bool timings,
   Cantera_CXX::IdealGasMix* const gasMix = CanteraObjects::get_gasmix();
   const int nSpec=gasMix->nSpecies();
 
-  const Expr::Tag xTag  ( "XCoord",               Expr::STATE_NONE );
-  const Expr::Tag tTag  ( "Temp",                 Expr::STATE_NONE );
-  const Expr::Tag pTag  ( "Pressure",             Expr::STATE_NONE);
-  const Expr::Tag rhoTag( "Density",              Expr::STATE_NONE);
-  const Expr::Tag mmwTag( "mix mol weight",       Expr::STATE_NONE);
-  const Expr::Tag hTag  ( "enthalpy",             Expr::STATE_N);
-  const Expr::Tag lamTag( "thermal conductivity", Expr::STATE_NONE);
-  const Expr::Tag qXTag ( "Heat Flux X",          Expr::STATE_NONE);
-  const Expr::Tag qYTag ( "Heat Flux Y",          Expr::STATE_NONE);
-  const Expr::Tag qZTag ( "Heat Flux Z",          Expr::STATE_NONE);
-  const Expr::Tag hRHSTag( "enthalpy RHS",        Expr::STATE_N);
-  Expr::TagList hiTags;
-  Expr::TagList jXTags;
-  Expr::TagList jYTags;
-  Expr::TagList jZTags;
-  Expr::TagList dTags;
-  Expr::TagList yiTags;
-  Expr::TagList rhoYiTags;
-  Expr::TagList specRHSTags;
-  Expr::TagList rTags;
+  using Expr::Tag;
+  using Expr::TagList;
+  const Tag xTag  ( "XCoord",               Expr::STATE_NONE );
+  const Tag tTag  ( "Temp",                 Expr::STATE_NONE );
+  const Tag pTag  ( "Pressure",             Expr::STATE_NONE);
+  const Tag rhoTag( "Density",              Expr::STATE_NONE);
+  const Tag mmwTag( "mix mol weight",       Expr::STATE_NONE);
+  const Tag hTag  ( "enthalpy",             Expr::STATE_N);
+  const Tag lamTag( "thermal conductivity", Expr::STATE_NONE);
+  const Tag qXTag ( "Heat Flux X",          Expr::STATE_NONE);
+  const Tag qYTag ( "Heat Flux Y",          Expr::STATE_NONE);
+  const Tag hRHSTag( "enthalpy RHS",        Expr::STATE_N);
+  TagList hiTags;
+  TagList jXTags;
+  TagList jYTags;
+  TagList dTags;
+  TagList yiTags;
+  TagList rhoYiTags;
+  TagList specRHSTags;
+  TagList rTags;
   for( size_t n=0; n<nSpec; ++n ){
-    yiTags.push_back( Expr::Tag( "yi_" + boost::lexical_cast<std::string>(n), Expr::STATE_NONE ) );
-    hiTags.push_back( Expr::Tag( "hi_" + boost::lexical_cast<std::string>(n), Expr::STATE_NONE ) );
-    rTags.push_back(  Expr::Tag( "ri_" + boost::lexical_cast<std::string>(n), Expr::STATE_NONE ) );
-    dTags.push_back(  Expr::Tag( "di_" + boost::lexical_cast<std::string>(n), Expr::STATE_NONE ) );
-    jXTags.push_back(  Expr::Tag( "Jxi_" + boost::lexical_cast<std::string>(n), Expr::STATE_NONE ) );
-    jYTags.push_back(  Expr::Tag( "Jyi_" + boost::lexical_cast<std::string>(n), Expr::STATE_NONE ) );
-    jZTags.push_back(  Expr::Tag( "Jzi_" + boost::lexical_cast<std::string>(n), Expr::STATE_NONE ) );
-  }
-  for( size_t n=0; n<nSpec-1; ++n ){
-    specRHSTags.push_back( Expr::Tag( "specRHS_" + boost::lexical_cast<std::string>(n), Expr::STATE_N ) );
-    rhoYiTags.push_back( Expr::Tag( "rhoYi_" + boost::lexical_cast<std::string>(n), Expr::STATE_N ) );
+    std::string spec = boost::lexical_cast<std::string>(n);
+    yiTags.push_back( Tag( "yi_" + spec, Expr::STATE_NONE ) );
+    hiTags.push_back( Tag( "hi_" + spec, Expr::STATE_NONE ) );
+    rTags.push_back(  Tag( "ri_" + spec, Expr::STATE_NONE ) );
+    dTags.push_back(  Tag( "di_" + spec, Expr::STATE_NONE ) );
+    jXTags.push_back(  Tag( "Jxi_" + spec, Expr::STATE_NONE ) );
+    jYTags.push_back(  Tag( "Jyi_" + spec, Expr::STATE_NONE ) );
+    if( n != (nSpec-1) ){
+      specRHSTags.push_back( Tag( "specRHS_" + spec, Expr::STATE_N ) );
+      rhoYiTags.push_back( Tag( "rhoYi_" + spec, Expr::STATE_N ) );
+    }
   }
 
   const double rho0 = 1;
@@ -134,12 +129,10 @@ bool driver( const bool timings,
     typedef ReactionRates       <CellField>::Builder ReactionRates;
     typedef DiffusionCoeff      <CellField>::Builder DiffusionCoeffs;
 
-    typedef SpeciesDiffFlux <CellField, XFluxT>::Builder MassFluxX;
-    typedef SpeciesDiffFlux <CellField, YFluxT>::Builder MassFluxY;
-    typedef SpeciesDiffFlux <CellField, ZFluxT>::Builder MassFluxZ;
-    typedef HeatFlux        <CellField, XFluxT>::Builder HeatFluxX;
-    typedef HeatFlux        <CellField, YFluxT>::Builder HeatFluxY;
-    typedef HeatFlux        <CellField, ZFluxT>::Builder HeatFluxZ;
+    typedef SpeciesDiffFlux <XFluxT>::Builder MassFluxX;
+    typedef SpeciesDiffFlux <YFluxT>::Builder MassFluxY;
+    typedef HeatFlux        <XFluxT>::Builder HeatFluxX;
+    typedef HeatFlux        <YFluxT>::Builder HeatFluxY;
 
     typedef EnthalpyRHS <CellField>::Builder EnthalpyRHS;
     typedef SpeciesRHS  <CellField>::Builder SpeciesRHS;
@@ -158,32 +151,31 @@ bool driver( const bool timings,
 
     execFactory.register_expression( new MassFluxX( jXTags, yiTags,rhoTag, mmwTag, dTags ) );
     execFactory.register_expression( new MassFluxY( jYTags, yiTags,rhoTag, mmwTag, dTags ) );
-    execFactory.register_expression( new MassFluxZ( jZTags, yiTags,rhoTag, mmwTag, dTags ) );
     execFactory.register_expression( new HeatFluxX( qXTag, tTag, lamTag, hiTags, jXTags ) );
     execFactory.register_expression( new HeatFluxY( qYTag, tTag, lamTag, hiTags, jYTags ) );
-    execFactory.register_expression( new HeatFluxZ( qZTag, tTag, lamTag, hiTags, jZTags ) );
 
-    execFactory.register_expression( new EnthalpyRHS ( hRHSTag, rhoTag, tag_list( qXTag, qYTag, qZTag ) ) );
+    execFactory.register_expression( new EnthalpyRHS ( hRHSTag, rhoTag, tag_list( qXTag, qYTag ) ) );
     for( size_t n = 0; n < (nSpec-1); ++n ){
-      execFactory.register_expression( new SpeciesRHS ( specRHSTags[n], rTags[n], tag_list( jXTags[n], jYTags[n], jZTags[n]) ) );
+      execFactory.register_expression( new SpeciesRHS ( specRHSTags[n], rTags[n], tag_list( jXTags[n], jYTags[n] ) ) );
     }
   }
 
-  std::vector<SO::IntVec> sizeVec;
+  using SO::IntVec;
+  std::vector< IntVec > sizeVec;
   if( timings ){
-    sizeVec.push_back( SO::IntVec(126,126,126) );
-    sizeVec.push_back( SO::IntVec( 62, 62, 62) );
-    sizeVec.push_back( SO::IntVec( 30, 30, 30) );
-    sizeVec.push_back( SO::IntVec( 14, 14, 14) );
-    sizeVec.push_back( SO::IntVec(  6,  6,  6) );
+    sizeVec.push_back( IntVec(126,126, 1 ) );
+    sizeVec.push_back( IntVec( 62, 62, 1 ) );
+    sizeVec.push_back( IntVec( 30, 30, 1 ) );
+    sizeVec.push_back( IntVec( 14, 14, 1 ) );
+    sizeVec.push_back( IntVec(  6,  6, 1 ) );
   }
   else{
-    sizeVec.push_back( SO::IntVec( 2,  2,  2) );
+    sizeVec.push_back( IntVec( 2,  2,  1) );
   }
 
-  for( std::vector<SO::IntVec>::iterator iSize = sizeVec.begin(); iSize!= sizeVec.end(); ++iSize){
+  for( std::vector< IntVec >::iterator iSize = sizeVec.begin(); iSize!= sizeVec.end(); ++iSize){
 
-    SO::IntVec gridSize = *iSize;
+    IntVec gridSize = *iSize;
     Expr::ExprPatch patch( gridSize[0], gridSize[1], gridSize[2] );
 
     Expr::FieldManagerList& fml = patch.field_manager_list();
@@ -194,14 +186,15 @@ bool driver( const bool timings,
     fml.allocate_fields( patch.field_info() );
     Expr::TimeStepper timeIntegrator( execFactory, Expr::FORWARD_EULER, patch.id() );
 
+    SO::GhostData ghosts( IntVec( 1, 1, 0), IntVec( 1, 1, 0 ) ); // 1 on +-x and +- y and 0 on z
     for( size_t n = 0; n < (nSpec-1); ++n ){
-      timeIntegrator.add_equation<CellField>( (rhoYiTags[n].name()), specRHSTags[n], SpatialOps::GhostData(1) );
+      timeIntegrator.add_equation<CellField>( (rhoYiTags[n].name()), specRHSTags[n], ghosts );
     }
-    timeIntegrator.add_equation<CellField>( hTag.name(), hRHSTag, SpatialOps::GhostData(1) );
+    timeIntegrator.add_equation<CellField>( hTag.name(), hRHSTag, ghosts );
 
     SO::Grid grid( gridSize, SO::DoubleVec(1,1,1) );
-    SpatialOps::OperatorDatabase& opDB = patch.operator_database();
-    SpatialOps::build_stencils( grid, opDB );
+    SO::OperatorDatabase& opDB = patch.operator_database();
+    SO::build_stencils( grid, opDB );
 
     timeIntegrator.finalize( fml, patch.operator_database(), patch.field_info() );
     {

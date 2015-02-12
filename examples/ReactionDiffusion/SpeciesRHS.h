@@ -37,20 +37,16 @@ class SpeciesRHS
   typedef typename SpatialOps::FaceTypes<FieldT> FaceTypes;
   typedef typename FaceTypes::XFace XFluxT; ///< The type of field for the x-face variables.
   typedef typename FaceTypes::YFace YFluxT; ///< The type of field for the y-face variables.
-  typedef typename FaceTypes::ZFace ZFluxT; ///< The type of field for the z-face variables.
 
   typedef typename SpatialOps::BasicOpTypes<FieldT> OpTypes;
   typedef typename OpTypes::DivX    DivX; ///< Divergence operator (surface integral) in the x-direction
   typedef typename OpTypes::DivY    DivY; ///< Divergence operator (surface integral) in the y-direction
-  typedef typename OpTypes::DivZ    DivZ; ///< Divergence operator (surface integral) in the z-direction
 
   const DivX* divXOp_;
   const DivY* divYOp_;
-  const DivZ* divZOp_;
 
   DECLARE_FIELD( XFluxT, xFlux_ )
   DECLARE_FIELD( YFluxT, yFlux_ )
-  DECLARE_FIELD( ZFluxT, zFlux_ )
 
   DECLARE_FIELD( FieldT, source_ )
   
@@ -101,7 +97,6 @@ SpeciesRHS( const Expr::Tag& sourceTag,
 {
   xFlux_ = this->template create_field_request<XFluxT>( fluxTags[0] );
   yFlux_ = this->template create_field_request<YFluxT>( fluxTags[1] );
-  zFlux_ = this->template create_field_request<ZFluxT>( fluxTags[2] );
 
   source_ = this->template create_field_request<FieldT>( sourceTag );
 }
@@ -122,7 +117,6 @@ bind_operators( const SpatialOps::OperatorDatabase& opDB )
 {
   divXOp_ = opDB.retrieve_operator<DivX>();
   divYOp_ = opDB.retrieve_operator<DivY>();
-  divZOp_ = opDB.retrieve_operator<DivZ>();
 }
 
 //--------------------------------------------------------------------
@@ -136,12 +130,11 @@ evaluate()
 
   const XFluxT& xFlux = xFlux_->field_ref();
   const YFluxT& yFlux = yFlux_->field_ref();
-  const ZFluxT& zFlux = zFlux_->field_ref();
 
   const FieldT& source = source_->field_ref();
 
   RHS <<= source;
-  RHS <<= RHS - (*divXOp_)( xFlux ) - (*divYOp_)( yFlux ) - (*divZOp_)( zFlux );
+  RHS <<= RHS - (*divXOp_)( xFlux ) - (*divYOp_)( yFlux );
 }
 
 //--------------------------------------------------------------------
