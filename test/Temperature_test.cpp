@@ -243,11 +243,13 @@ bool driver( const bool timings,
 
   std::vector<SO::IntVec> sizeVec;
   if( timings ){
-    sizeVec.push_back( SO::IntVec(126,126,126) );
-    sizeVec.push_back( SO::IntVec( 62, 62, 62) );
-    sizeVec.push_back( SO::IntVec( 30, 30, 30) );
-    sizeVec.push_back( SO::IntVec( 14, 14, 14) );
-    sizeVec.push_back( SO::IntVec(  6,  6,  6) );
+    sizeVec.push_back( SO::IntVec(2046, 1022, 1) );
+    sizeVec.push_back( SO::IntVec(1022, 1022, 1) );
+    sizeVec.push_back( SO::IntVec(510,  510,  1) );
+    sizeVec.push_back( SO::IntVec(254,  254,  1) );
+    sizeVec.push_back( SO::IntVec(126,  126,  1) );
+    sizeVec.push_back( SO::IntVec(62,   62,   1) );
+    sizeVec.push_back( SO::IntVec(30,   30,   1) );
   }
   else{
     sizeVec.push_back( SO::IntVec( 20,  1,  1) );

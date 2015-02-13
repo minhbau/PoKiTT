@@ -27,6 +27,8 @@
 
 #include <expression/Expression.h>
 
+namespace pokitt{
+
 /**
  *  \class SpeciesN
  *  \brief Sets the requested species to enforce the constraint that \f$\sum y_i=1\f$.
@@ -35,17 +37,13 @@
  *  a sum to unity, then an exception will be thrown.
  */
 template< typename FieldT >
-class SpeciesN
- : public Expr::Expression<FieldT>
+class SpeciesN : public Expr::Expression<FieldT>
 {
-  const size_t specNum_;
   DECLARE_VECTOR_OF_FIELDS( FieldT, species_ )
 
-  SpeciesN( const Expr::TagList& speciesTags,
-            const size_t specNum )
-    : Expr::Expression<FieldT>(),
-      specNum_( specNum )
+  SpeciesN( const Expr::TagList& speciesTags ) : Expr::Expression<FieldT>()
   {
+    this->set_gpu_runnable(true);
     this->template create_field_vector_request<FieldT>( speciesTags, species_ );
   }
 
@@ -53,8 +51,7 @@ public:
 
   class Builder : public Expr::ExpressionBuilder
   {
-    const Expr::TagList speciesTags_;
-    size_t specNum_;
+    Expr::TagList speciesTags_;
   public:
     /**
      *  @brief Build a SpeciesN expression
@@ -64,11 +61,10 @@ public:
     Builder( const Expr::Tag& specNTag,
              const Expr::TagList& speciesTags,
              const int nghost = DEFAULT_NUMBER_OF_GHOSTS )
-      : ExpressionBuilder( specNTag, nghost ),
-        speciesTags_( speciesTags )
+      : ExpressionBuilder( specNTag, nghost )
     {
       for( size_t i=0; i<speciesTags.size(); ++i ){
-        if( speciesTags[i] == specNTag ) specNum_ = i;
+        if( speciesTags[i] != specNTag ) speciesTags_.push_back( speciesTags[i] );
       }
     }
 
@@ -81,9 +77,10 @@ public:
              const size_t specNum,
              const int nghost = DEFAULT_NUMBER_OF_GHOSTS )
       : ExpressionBuilder( speciesTags[specNum], nghost ),
-        speciesTags_( speciesTags ),
-        specNum_( specNum )
-    {}
+        speciesTags_( speciesTags )
+    {
+      speciesTags_.erase( speciesTags_.begin() + specNum );
+    }
 
     Expr::ExpressionBase* build() const{
       return new SpeciesN<FieldT>( speciesTags_ );
@@ -96,11 +93,11 @@ public:
 
     specN <<= 1.0;
 
-    for( size_t i=0; i<species_->size(); ++i ){
-      if( i != specNum_ ) specN <<= specN - species_[i]->field_ref();
+    for( size_t i=0; i<species_.size(); ++i ){
+      specN <<= specN - species_[i]->field_ref();
     }
 
-    if( max( specN ) > 1.0 || min( specN ) < 0.0 ){
+    if( nebo_max( specN ) > 1.0 || nebo_min( specN ) < 0.0 ){
       std::ostringstream msg;
       msg << __FILE__ << " : " << __LINE__ << "\nSpecies fractions are out of bounds!\n";
       throw std::runtime_error( msg.str() );
@@ -108,5 +105,7 @@ public:
   }
 
 };
+
+} // namespace pokitt
 
 #endif // SpeciesN_Expr_h
