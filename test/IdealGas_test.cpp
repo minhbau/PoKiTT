@@ -233,7 +233,7 @@ bool driver( const bool timings,
 
   std::vector<SO::IntVec> sizeVec;
   if( timings ){
-    sizeVec.push_back( SO::IntVec(2046, 2046, 1) );
+    sizeVec.push_back( SO::IntVec(2046, 1022, 1) );
     sizeVec.push_back( SO::IntVec(1022, 1022, 1) );
     sizeVec.push_back( SO::IntVec(510,  510,  1) );
     sizeVec.push_back( SO::IntVec(254,  254,  1) );
