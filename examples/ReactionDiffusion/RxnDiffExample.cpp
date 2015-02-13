@@ -17,6 +17,8 @@
 
 #include <pokitt/CanteraObjects.h>
 #include "test/TestHelper.h"
+#include "EnthalpyTransport.h"
+#include "SpeciesTransport.h"
 #include "SpeciesRHS.h"
 #include "EnthalpyRHS.h"
 #include "HeatFlux.h"
@@ -125,112 +127,75 @@ bool driver( const bool timings,
   Cantera_CXX::IdealGasMix* const gasMix = CanteraObjects::get_gasmix();
   const int nSpec=gasMix->nSpecies();
 
+  const double rho0 = 0.3;
+  const double length = 1e-3;
+  const double tMax = 1700;
+  const double tDev = 0.2*length;
+  const double tMean = length/2;
+  const double tBase = 400;
+  std::vector<double> yi(nSpec, 0.0);
+  yi[0]=0.01;
+  yi[3]=0.20;
 
-  const Tag xTag  ( "XCoord",               Expr::STATE_NONE );
-  const Tag tTag  ( "Temp",                 Expr::STATE_NONE );
-  const Tag pTag  ( "Pressure",             Expr::STATE_NONE);
-  const Tag rhoTag( "Density",              Expr::STATE_NONE);
-  const Tag mmwTag( "mix mol weight",       Expr::STATE_NONE);
-  const Tag hTag  ( "enthalpy",             Expr::STATE_N);
-  const Tag lamTag( "thermal conductivity", Expr::STATE_NONE);
-  const Tag qXTag ( "Heat Flux X",          Expr::STATE_NONE);
-  const Tag qYTag ( "Heat Flux Y",          Expr::STATE_NONE);
-  const Tag hRHSTag( "enthalpy RHS",        Expr::STATE_N);
-  TagList hiTags;
-  TagList jXTags;
-  TagList jYTags;
-  TagList dTags;
-  TagList yiTags;
-  TagList rhoYiTags;
-  TagList specRHSTags;
-  TagList rTags;
+  const Tag xTag  ( "XCoord",         Expr::STATE_NONE );
+  const Tag yTag  ( "YCoord",         Expr::STATE_NONE );
+  const Tag tTag  ( "Temp",           Expr::STATE_NONE );
+  const Tag pTag  ( "Pressure",       Expr::STATE_NONE );
+  const Tag rhoTag( "Density",        Expr::STATE_NONE );
+  const Tag mmwTag( "mix mol weight", Expr::STATE_NONE );
+  const Tag hTag  ( "enthalpy",       Expr::STATE_N    );
+  TagList jXTags, jYTags, dTags, yiTags, rhoYiTags, rTags;
   for( size_t n=0; n<nSpec; ++n ){
     std::string spec = boost::lexical_cast<std::string>(n);
-    yiTags.push_back( Tag( "yi_" + spec, Expr::STATE_NONE ) );
-    hiTags.push_back( Tag( "hi_" + spec, Expr::STATE_NONE ) );
-    rTags.push_back(  Tag( "ri_" + spec, Expr::STATE_NONE ) );
-    dTags.push_back(  Tag( "di_" + spec, Expr::STATE_NONE ) );
-    jXTags.push_back(  Tag( "Jxi_" + spec, Expr::STATE_NONE ) );
-    jYTags.push_back(  Tag( "Jyi_" + spec, Expr::STATE_NONE ) );
+    yiTags.push_back( Tag( "yi_"  + spec, Expr::STATE_NONE ) );
+    rTags.push_back(  Tag( "ri_"  + spec, Expr::STATE_NONE ) );
+    dTags.push_back(  Tag( "di_"  + spec, Expr::STATE_NONE ) );
+    jXTags.push_back( Tag( "Jxi_" + spec, Expr::STATE_NONE ) );
+    jYTags.push_back( Tag( "Jyi_" + spec, Expr::STATE_NONE ) );
     if( n != (nSpec-1) ){
-      specRHSTags.push_back( Tag( "specRHS_" + spec, Expr::STATE_N ) );
       rhoYiTags.push_back( Tag( "rhoYi_" + spec, Expr::STATE_N ) );
     }
   }
 
-  const double rho0 = 0.3;
-  const double t0 = 400;
-  const double length = 5e-2;
-
   Expr::ExpressionFactory initFactory;
-  std::set<Expr::ExpressionID> initIDs;
-  Expr::ExpressionID hID; // temperature
-  {
-    typedef Expr::PlaceHolder   <CellField>::Builder XCoord;
-    typedef Expr::ConstantExpr  <CellField>::Builder Density;
-    typedef Expr::LinearFunction<CellField>::Builder rhoYi;
-    typedef Expr::LinearFunction<CellField>::Builder Temperature;
-    typedef Enthalpy            <CellField>::Builder Enthalpy;
-    typedef MassFractions       <CellField>::Builder MassFracs;
-
-    initFactory.register_expression( new XCoord( xTag )    );
-    initFactory.register_expression( new Temperature( tTag, xTag, 1000/length, t0 )    );
-    initFactory.register_expression( new Density( rhoTag, rho0 )    );
-    initFactory.register_expression( new rhoYi ( rhoYiTags[0], rhoTag, 0.01, 0.0  ) );
-    initFactory.register_expression( new rhoYi ( rhoYiTags[3], rhoTag, 0.20, 0.0  ) );
-    for( size_t n = 0; n < (nSpec-1); ++n ){
-      if( n != 0 && n != 3 )
-        initFactory.register_expression( new rhoYi ( rhoYiTags[n], rhoTag, 1e-12, 0.0  ) );
-    }
-    initFactory.register_expression( new MassFracs( yiTags, rhoTag, rhoYiTags) );
-    hID = initFactory.register_expression( new Enthalpy ( hTag , tTag, yiTags )    );
-    initIDs.insert( hID );
-  }
-  Expr::ExpressionTree initTree( initIDs, initFactory, 0 );
-
   Expr::ExpressionFactory execFactory;
   {
     typedef Expr::PlaceHolder<CellField>::Builder Density;
+    typedef MassFractions    <CellField>::Builder MassFracs;
+    typedef MixtureMolWeight <CellField>::Builder MixMolWeight;
+    typedef Temperature      <CellField>::Builder Temperature;
+    typedef Pressure         <CellField>::Builder Pressure;
+    typedef ReactionRates    <CellField>::Builder ReactionRates;
+    typedef DiffusionCoeff   <CellField>::Builder DiffusionCoeffs;
+    typedef SpeciesDiffFlux     <XFluxT>::Builder MassFluxX;
+    typedef SpeciesDiffFlux     <YFluxT>::Builder MassFluxY;
 
-    typedef MassFractions       <CellField>::Builder MassFracs;
-    typedef MixtureMolWeight    <CellField>::Builder MixMolWeight;
-    typedef Temperature         <CellField>::Builder Temperature;
-    typedef Pressure            <CellField>::Builder Pressure;
-    typedef SpeciesEnthalpy     <CellField>::Builder SpecEnthalpy;
-    typedef ThermalConductivity <CellField>::Builder ThermCond;
-    typedef ReactionRates       <CellField>::Builder ReactionRates;
-    typedef DiffusionCoeff      <CellField>::Builder DiffusionCoeffs;
-
-    typedef SpeciesDiffFlux <XFluxT>::Builder MassFluxX;
-    typedef SpeciesDiffFlux <YFluxT>::Builder MassFluxY;
-    typedef HeatFlux        <XFluxT>::Builder HeatFluxX;
-    typedef HeatFlux        <YFluxT>::Builder HeatFluxY;
-
-    typedef EnthalpyRHS <CellField>::Builder EnthalpyRHS;
-    typedef SpeciesRHS  <CellField>::Builder SpeciesRHS;
-
-    execFactory.register_expression( new Density( rhoTag ) );
-    execFactory.register_expression( new MassFracs( yiTags, rhoTag, rhoYiTags) );
-    execFactory.register_expression( new MixMolWeight ( mmwTag, yiTags )           );
-    execFactory.register_expression( new Temperature ( tTag, yiTags, hTag ) );
-    execFactory.register_expression( new Pressure ( pTag, tTag, rhoTag, mmwTag) );
-    for( size_t n = 0; n < nSpec; ++n ){
-      execFactory.register_expression( new SpecEnthalpy ( hiTags[n], tTag, n ) );
-    }
-    execFactory.register_expression( new ThermCond ( lamTag, tTag, yiTags, mmwTag ) );
-    execFactory.register_expression( new ReactionRates(rTags, tTag, pTag, yiTags, mmwTag) );
-    execFactory.register_expression( new DiffusionCoeffs(dTags, tTag, pTag, yiTags, mmwTag) );
-
-    execFactory.register_expression( new MassFluxX( jXTags, yiTags,rhoTag, mmwTag, dTags ) );
-    execFactory.register_expression( new MassFluxY( jYTags, yiTags,rhoTag, mmwTag, dTags ) );
-    execFactory.register_expression( new HeatFluxX( qXTag, tTag, lamTag, hiTags, jXTags ) );
-    execFactory.register_expression( new HeatFluxY( qYTag, tTag, lamTag, hiTags, jYTags ) );
-
-    execFactory.register_expression( new EnthalpyRHS ( hRHSTag, rhoTag, tag_list( qXTag, qYTag ) ) );
-    for( size_t n = 0; n < (nSpec-1); ++n ){
-      execFactory.register_expression( new SpeciesRHS ( specRHSTags[n], rTags[n], tag_list( jXTags[n], jYTags[n] ) ) );
-    }
+    execFactory.register_expression( new Density         ( rhoTag                                ) );
+    execFactory.register_expression( new MassFracs       ( yiTags, rhoTag, rhoYiTags             ) );
+    execFactory.register_expression( new MixMolWeight    ( mmwTag, yiTags                        ) );
+    execFactory.register_expression( new Temperature     ( tTag,   yiTags, hTag                  ) );
+    execFactory.register_expression( new Pressure        ( pTag,   tTag,   rhoTag, mmwTag        ) );
+    execFactory.register_expression( new ReactionRates   ( rTags,  tTag,   pTag,   yiTags, mmwTag) );
+    execFactory.register_expression( new DiffusionCoeffs ( dTags,  tTag,   pTag,   yiTags, mmwTag) );
+    execFactory.register_expression( new MassFluxX       ( jXTags, yiTags, rhoTag, mmwTag, dTags ) );
+    execFactory.register_expression( new MassFluxY       ( jYTags, yiTags, rhoTag, mmwTag, dTags ) );
   }
+
+  typedef EnthalpyTransport<CellField> EnthalpyTransport;
+  typedef SpeciesTransport <CellField> SpeciesTransport;
+
+  std::set<Expr::ExpressionID> initIDs;
+  EnthalpyTransport* hTrans = new EnthalpyTransport( execFactory, hTag, tTag, rhoTag, yiTags, mmwTag, jXTags, jYTags );
+  initIDs.insert( hTrans->initial_condition( initFactory, yiTags, rhoYiTags, rhoTag, hTag, xTag, yTag, tTag, rho0, tMax, tDev, tMean, tBase ) );
+
+  std::list<SpeciesTransport*> specEqns;
+  for( size_t n=0; n<(nSpec-1); ++n ){
+    SpeciesTransport* specTrans = new SpeciesTransport( execFactory, rhoYiTags[n], rTags[n], jXTags[n], jYTags[n] );
+    initIDs.insert( specTrans->initial_condition( initFactory, rhoTag, rhoYiTags[n], yi[n] ) );
+    specEqns.push_back( specTrans );
+  }
+
+  Expr::ExpressionTree initTree( initIDs, initFactory, 0 );
 
   std::vector< IntVec > sizeVec;
   if( timings ){
@@ -241,7 +206,7 @@ bool driver( const bool timings,
     sizeVec.push_back( IntVec(  6,  6, 1 ) );
   }
   else{
-    sizeVec.push_back( IntVec( 10,  5,  1) );
+    sizeVec.push_back( IntVec( 6,  6,  1) );
   }
 
   for( std::vector< IntVec >::iterator iSize = sizeVec.begin(); iSize!= sizeVec.end(); ++iSize){
@@ -256,24 +221,21 @@ bool driver( const bool timings,
 
     fml.allocate_fields( patch.field_info() );
     Expr::TimeStepper timeIntegrator( execFactory, Expr::FORWARD_EULER, patch.id() );
-
     SO::GhostData ghosts( IntVec( 1, 1, 0), IntVec( 1, 1, 0 ) ); // 1 on +-x and +- y and 0 on z
-    for( size_t n = 0; n < (nSpec-1); ++n ){
-      timeIntegrator.add_equation<CellField>( (rhoYiTags[n].name()), specRHSTags[n], ghosts );
-    }
-    timeIntegrator.add_equation<CellField>( hTag.name(), hRHSTag, ghosts );
 
     SO::Grid grid( gridSize, SO::DoubleVec( length, length, 1 ) );
     SO::OperatorDatabase& opDB = patch.operator_database();
     SO::build_stencils( grid, opDB );
 
-    setup_bcs( execFactory, grid, ghosts, rhoYiTags[0], 0, SO::NEUMANN );
-    setup_bcs( execFactory, grid, ghosts, rhoYiTags[3], 0, SO::NEUMANN );
-    for( size_t n = 0; n < (nSpec-1); ++n ){
-      if( n != 0 && n != 3 )
-        setup_bcs( execFactory, grid, ghosts, rhoYiTags[n], 0, SO::NEUMANN );
+    for( std::list<SpeciesTransport*>::iterator iEqn=specEqns.begin(); iEqn!=specEqns.end(); ++iEqn ){
+      timeIntegrator.add_equation<CellField>( (*iEqn)->solution_variable_name(), (*iEqn)->get_rhs_tag(), ghosts );
     }
-    setup_bcs( execFactory, grid, ghosts, hTag, 0, SO::NEUMANN );
+    timeIntegrator.add_equation<CellField>( hTrans->solution_variable_name(), hTrans->get_rhs_tag(), ghosts );
+
+    for( size_t n = 0; n < (nSpec-1); ++n ){
+      setup_bcs( execFactory, grid, ghosts, rhoYiTags[n], 0, SO::NEUMANN );
+    }
+    setup_bcs( execFactory, grid, ghosts, tTag, 0, SO::NEUMANN );
 
     timeIntegrator.finalize( fml, patch.operator_database(), patch.field_info() );
     {
@@ -283,40 +245,26 @@ bool driver( const bool timings,
     timeIntegrator.get_tree()->lock_fields(fml);
 
     CellField& xcoord = fml.field_ref< CellField >( xTag );
+    CellField& ycoord = fml.field_ref< CellField >( yTag );
     grid.set_coord<SO::XDIR>( xcoord );
+    grid.set_coord<SO::YDIR>( ycoord );
 #   ifdef ENABLE_CUDA
     xcoord.set_device_as_active( GPU_INDEX );
+    ycoord.set_device_as_active( GPU_INDEX );
 #   endif
 
     initTree.execute_tree();
-    CellField& t = fml.field_ref< CellField >( tTag );
-    CellField& h = fml.field_ref< CellField >( hTag );
+
     Timer timer;
     timer.start();
     for( size_t s = 0; s < nSteps; ++s ){
-      if( s%5000 == 0 ){
-        {
-          int n=0;
-          std::cout<<"n = " << n << "\n";
-          SO::interior_print_field( fml.field_ref< CellField >( rhoYiTags[n] ), std::cout );
-          n=4;
-          std::cout<<"n = " << n << "\n";
-          SO::interior_print_field( fml.field_ref< CellField >( rhoYiTags[n] ), std::cout );
-          n=5;
-          std::cout<<"n = " << n << "\n";
-          SO::interior_print_field( fml.field_ref< CellField >( rhoYiTags[n] ), std::cout );
-        }
-        std::cout<<"h\n";
-        SO::interior_print_field( h, std::cout );
-        std::cout<<"t\n";
-        SO::interior_print_field( t, std::cout );
-      }
       timeIntegrator.step( dt );
     }
     timer.stop();
 
+    CellField& t = fml.field_ref< CellField >( tTag );
     const double tMean = SO::nebo_sum_interior( t ) / ( gridSize[0] * gridSize[1] * gridSize[2] );
-    status( tMean >= 300 && tMean < 5000 );
+    status( tMean >= 200 && tMean <= 3500 ); // bounds on NASA polynomials
 
     fml.deallocate_fields();
   } // number of points
