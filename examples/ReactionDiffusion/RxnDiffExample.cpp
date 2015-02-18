@@ -19,19 +19,6 @@
 #include "test/TestHelper.h"
 #include "EnthalpyTransport.h"
 #include "SpeciesTransport.h"
-#include "SpeciesRHS.h"
-#include "EnthalpyRHS.h"
-#include "HeatFlux.h"
-#include "MassFractions.h"
-#include "SpeciesDiffusion.h"
-#include <pokitt/thermo/Temperature.h>
-#include <pokitt/thermo/Pressure.h>
-#include <pokitt/thermo/Density.h>
-#include <pokitt/MixtureMolWeight.h>
-#include <pokitt/kinetics/ReactionRates.h>
-#include <pokitt/thermo/Enthalpy.h>
-#include <pokitt/transport/DiffusionCoeffMix.h>
-#include <pokitt/transport/ThermalCondMix.h>
 
 #include <boost/lexical_cast.hpp>
 #include <boost/foreach.hpp>
@@ -136,65 +123,44 @@ bool driver( const bool timings,
   std::vector<double> yi(nSpec, 0.0);
   yi[0]=0.01;
   yi[3]=0.20;
+  std::cout<<"here00\n";
+  const Tag xTag    ( "XCoord",         Expr::STATE_NONE );
+  const Tag yTag    ( "YCoord",         Expr::STATE_NONE );
+  const Tag rhoTag  ( "Density",        Expr::STATE_NONE );
+  const Tag mmwTag  ( "mix MW ",        Expr::STATE_NONE );
 
-  const Tag xTag  ( "XCoord",         Expr::STATE_NONE );
-  const Tag yTag  ( "YCoord",         Expr::STATE_NONE );
-  const Tag tTag  ( "Temp",           Expr::STATE_NONE );
-  const Tag pTag  ( "Pressure",       Expr::STATE_NONE );
-  const Tag rhoTag( "Density",        Expr::STATE_NONE );
-  const Tag mmwTag( "mix mol weight", Expr::STATE_NONE );
-  const Tag hTag  ( "enthalpy",       Expr::STATE_N    );
-  TagList jXTags, jYTags, dTags, yiTags, rhoYiTags, rTags;
+  const Tag tTag    ( "Temp",           Expr::STATE_NONE );
+  const Tag hTag    ( "enthalpy",       Expr::STATE_N    );
+
+  const Tag jTag    ( "J",              Expr::STATE_NONE );
+  const Tag rhoYiTag( "rhoYi",          Expr::STATE_N    );
+  TagList yiTags;
   for( size_t n=0; n<nSpec; ++n ){
     std::string spec = boost::lexical_cast<std::string>(n);
-    yiTags.push_back( Tag( "yi_"  + spec, Expr::STATE_NONE ) );
-    rTags.push_back(  Tag( "ri_"  + spec, Expr::STATE_NONE ) );
-    dTags.push_back(  Tag( "di_"  + spec, Expr::STATE_NONE ) );
-    jXTags.push_back( Tag( "Jxi_" + spec, Expr::STATE_NONE ) );
-    jYTags.push_back( Tag( "Jyi_" + spec, Expr::STATE_NONE ) );
-    if( n != (nSpec-1) ){
-      rhoYiTags.push_back( Tag( "rhoYi_" + spec, Expr::STATE_N ) );
-    }
+    yiTags.push_back( Tag("yi"+spec,    Expr::STATE_NONE ) );
   }
-
+  std::cout<<"here01\n";
   Expr::ExpressionFactory initFactory;
   Expr::ExpressionFactory execFactory;
-  {
-    typedef Expr::PlaceHolder<CellField>::Builder Density;
-    typedef MassFractions    <CellField>::Builder MassFracs;
-    typedef MixtureMolWeight <CellField>::Builder MixMolWeight;
-    typedef Temperature      <CellField>::Builder Temperature;
-    typedef Pressure         <CellField>::Builder Pressure;
-    typedef ReactionRates    <CellField>::Builder ReactionRates;
-    typedef DiffusionCoeff   <CellField>::Builder DiffusionCoeffs;
-    typedef SpeciesDiffFlux     <XFluxT>::Builder MassFluxX;
-    typedef SpeciesDiffFlux     <YFluxT>::Builder MassFluxY;
-
-    execFactory.register_expression( new Density         ( rhoTag                                ) );
-    execFactory.register_expression( new MassFracs       ( yiTags, rhoTag, rhoYiTags             ) );
-    execFactory.register_expression( new MixMolWeight    ( mmwTag, yiTags                        ) );
-    execFactory.register_expression( new Temperature     ( tTag,   yiTags, hTag                  ) );
-    execFactory.register_expression( new Pressure        ( pTag,   tTag,   rhoTag, mmwTag        ) );
-    execFactory.register_expression( new ReactionRates   ( rTags,  tTag,   pTag,   yiTags, mmwTag) );
-    execFactory.register_expression( new DiffusionCoeffs ( dTags,  tTag,   pTag,   yiTags, mmwTag) );
-    execFactory.register_expression( new MassFluxX       ( jXTags, yiTags, rhoTag, mmwTag, dTags ) );
-    execFactory.register_expression( new MassFluxY       ( jYTags, yiTags, rhoTag, mmwTag, dTags ) );
-  }
 
   typedef EnthalpyTransport<CellField> EnthalpyTransport;
   typedef SpeciesTransport <CellField> SpeciesTransport;
-
+  std::cout<<"here02\n";
   std::set<Expr::ExpressionID> initIDs;
-  EnthalpyTransport* hTrans = new EnthalpyTransport( execFactory, hTag, tTag, rhoTag, yiTags, mmwTag, jXTags, jYTags );
-  initIDs.insert( hTrans->initial_condition( initFactory, yiTags, rhoYiTags, rhoTag, hTag, xTag, yTag, tTag, rho0, tMax, tDev, tMean, tBase ) );
-
+  std::cout<<"here03\n";
   std::list<SpeciesTransport*> specEqns;
   for( size_t n=0; n<(nSpec-1); ++n ){
-    SpeciesTransport* specTrans = new SpeciesTransport( execFactory, rhoYiTags[n], rTags[n], jXTags[n], jYTags[n] );
-    initIDs.insert( specTrans->initial_condition( initFactory, rhoTag, rhoYiTags[n], yi[n] ) );
+    std::string spec = boost::lexical_cast<std::string>(n);
+    SpeciesTransport* specTrans = new SpeciesTransport( execFactory, rhoYiTag, jTag, spec );
+    initIDs.insert( specTrans->initial_condition( initFactory, yiTags[n], yi[n], rho0 ) );
     specEqns.push_back( specTrans );
   }
-
+  specEqns.front()->register_one_time_expressions(execFactory, rhoTag, yiTags, mmwTag, tTag );
+  std::cout<<"here04\n";
+  EnthalpyTransport* hTrans = new EnthalpyTransport( execFactory, hTag, tTag, rhoTag, yiTags, jTag, mmwTag );
+  std::cout<<"here041\n";
+  initIDs.insert( hTrans->initial_condition( initFactory, xTag, yTag, tMax, tDev, tMean, tBase ) );
+std::cout<<"here05\n";
   Expr::ExpressionTree initTree( initIDs, initFactory, 0 );
 
   std::vector< IntVec > sizeVec;
@@ -208,17 +174,17 @@ bool driver( const bool timings,
   else{
     sizeVec.push_back( IntVec( 6,  6,  1) );
   }
-
+  std::cout<<"here1\n";
   for( std::vector< IntVec >::iterator iSize = sizeVec.begin(); iSize!= sizeVec.end(); ++iSize){
 
     IntVec gridSize = *iSize;
     Expr::ExprPatch patch( gridSize[0], gridSize[1], gridSize[2] );
-
+    std::cout<<"here2\n";
     Expr::FieldManagerList& fml = patch.field_manager_list();
     initTree.register_fields( fml );
     initTree.bind_fields( fml );
     initTree.lock_fields( fml );
-
+    std::cout<<"here3\n";
     fml.allocate_fields( patch.field_info() );
     Expr::TimeStepper timeIntegrator( execFactory, Expr::FORWARD_EULER, patch.id() );
     SO::GhostData ghosts( IntVec( 1, 1, 0), IntVec( 1, 1, 0 ) ); // 1 on +-x and +- y and 0 on z
@@ -226,17 +192,14 @@ bool driver( const bool timings,
     SO::Grid grid( gridSize, SO::DoubleVec( length, length, 1 ) );
     SO::OperatorDatabase& opDB = patch.operator_database();
     SO::build_stencils( grid, opDB );
-
+    std::cout<<"here4\n";
     for( std::list<SpeciesTransport*>::iterator iEqn=specEqns.begin(); iEqn!=specEqns.end(); ++iEqn ){
       timeIntegrator.add_equation<CellField>( (*iEqn)->solution_variable_name(), (*iEqn)->get_rhs_tag(), ghosts );
+      (*iEqn)->setup_boundary_conditions( grid, execFactory );
     }
     timeIntegrator.add_equation<CellField>( hTrans->solution_variable_name(), hTrans->get_rhs_tag(), ghosts );
-
-    for( size_t n = 0; n < (nSpec-1); ++n ){
-      setup_bcs( execFactory, grid, ghosts, rhoYiTags[n], 0, SO::NEUMANN );
-    }
-    setup_bcs( execFactory, grid, ghosts, tTag, 0, SO::NEUMANN );
-
+    hTrans->setup_boundary_conditions( grid, execFactory );
+    std::cout<<"here5\n";
     timeIntegrator.finalize( fml, patch.operator_database(), patch.field_info() );
     {
       std::ofstream out( "rxn_example.dot" );
