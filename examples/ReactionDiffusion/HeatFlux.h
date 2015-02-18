@@ -104,7 +104,6 @@ HeatFlux<FluxT>::evaluate()
   const ScalarT& tCond = tCond_->field_ref();
 
   flux <<= - (*interpOp_) ( tCond ) * (*gradOp_) ( t );
-  flux <<= 0.0;
 
   for( size_t i=0; i<h_.size(); ++i ){
     const ScalarT& h = h_[i]->field_ref();
