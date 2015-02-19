@@ -133,8 +133,8 @@ evaluate()
 
   const FieldT& source = source_->field_ref();
 
-  RHS <<= source;
-  RHS <<= RHS - (*divXOp_)( xFlux ) - (*divYOp_)( yFlux );
+  RHS <<= - (*divXOp_)( xFlux ) - (*divYOp_)( yFlux );
+  RHS <<= RHS + source;
 }
 
 //--------------------------------------------------------------------

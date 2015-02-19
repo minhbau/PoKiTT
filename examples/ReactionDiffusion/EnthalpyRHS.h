@@ -134,7 +134,6 @@ evaluate()
   const FieldT& rho = rho_->field_ref();
 
   RHS <<= ( - (*divXOp_)( xFlux ) - (*divYOp_)( yFlux ) ) / rho;
-//  RHS <<= 0.0;
 }
 
 //--------------------------------------------------------------------

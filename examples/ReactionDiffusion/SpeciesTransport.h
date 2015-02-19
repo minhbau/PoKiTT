@@ -36,19 +36,21 @@ public:
   void setup_boundary_conditions(const SO::Grid& grid, Expr::ExpressionFactory& execFactory );
 
   void register_one_time_expressions(Expr::ExpressionFactory& execFactory,
-                                      const Tag& rhoTag,
-                                      const TagList& yiTags,
-                                      const Tag& mmwTag,
-                                      const Tag& tTag );
+                                     const int nSpec,
+                                     const Tag& rhoTag,
+                                     const Tag& yiTag,
+                                     const Tag& mmwTag,
+                                     const Tag& tTag );
 
   Expr::ExpressionID initial_condition( Expr::ExpressionFactory& initFactory,
+                                        const Tag& rhoTag,
                                         const Tag& yiTag,
                                         const double yi,
                                         const double rho0);
 
 private:
 
-  void setup_boundary_conditions( Expr::ExpressionFactory& );
+  void setup_boundary_conditions( Expr::ExpressionFactory& ){}
 
 };
 
@@ -128,9 +130,9 @@ setup_boundary_conditions( const SO::Grid& grid, Expr::ExpressionFactory& execFa
   Tag ymbcTag( this->solution_variable_name() + "ymbc", Expr::STATE_NONE );
   Tag ypbcTag( this->solution_variable_name() + "ypbc", Expr::STATE_NONE );
 
-  execFactory.register_expression( new XBC( xmbcTag, xminus, SO::NEUMANN, SO::MINUS_SIDE,  0.0 ) );
+  execFactory.register_expression( new XBC( xmbcTag, xminus, SO::NEUMANN, SO::MINUS_SIDE, 0.0 ) );
   execFactory.register_expression( new XBC( xpbcTag, xplus , SO::NEUMANN, SO::PLUS_SIDE,  0.0 ) );
-  execFactory.register_expression( new YBC( ymbcTag, yminus, SO::NEUMANN, SO::MINUS_SIDE,  0.0 ) );
+  execFactory.register_expression( new YBC( ymbcTag, yminus, SO::NEUMANN, SO::MINUS_SIDE, 0.0 ) );
   execFactory.register_expression( new YBC( ypbcTag, yplus , SO::NEUMANN, SO::PLUS_SIDE,  0.0 ) );
 
   execFactory.attach_modifier_expression( xmbcTag, Tag( this->solution_variable_name(), Expr::STATE_N ) );
@@ -139,29 +141,23 @@ setup_boundary_conditions( const SO::Grid& grid, Expr::ExpressionFactory& execFa
   execFactory.attach_modifier_expression( ypbcTag, Tag( this->solution_variable_name(), Expr::STATE_N ) );
 }
 
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-void
-SpeciesTransport<FieldT>::
-setup_boundary_conditions( Expr::ExpressionFactory& factory )
-{}
-
-//--------------------------------------------------------------------
-
 template< typename FieldT >
 Expr::ExpressionID
 SpeciesTransport<FieldT>::
 initial_condition( Expr::ExpressionFactory& initFactory,
+                   const Tag& rhoTag,
                    const Tag& yiTag,
                    const double yi,
                    const double rho0 )
 {
-  typedef typename Expr::LinearFunction <FieldT>::Builder rhoYi;
+  typedef typename Expr::LinearFunction <FieldT>::Builder RhoYi;
+  typedef typename Expr::ConstantExpr   <FieldT>::Builder Rho;
   typedef typename Expr::ConstantExpr   <FieldT>::Builder Yi;
 
+  if( !initFactory.have_entry(rhoTag) )
+    initFactory.register_expression( new Rho( rhoTag, rho0 ) );
   initFactory.register_expression( new Yi( yiTag, yi ) );
-  return initFactory.register_expression( new rhoYi ( Tag( this->solution_variable_name(), Expr::STATE_N), yiTag, rho0, 0.0  ) );
+  return initFactory.register_expression( new RhoYi ( Tag( this->solution_variable_name(), Expr::STATE_N), rhoTag, yi, 0.0  ) );
 }
 
 //--------------------------------------------------------------------
@@ -170,10 +166,11 @@ template< typename FieldT >
 void
 SpeciesTransport<FieldT>::
 register_one_time_expressions( Expr::ExpressionFactory& execFactory,
-                                      const Tag& rhoTag,
-                                      const TagList& yiTags,
-                                      const Tag& mmwTag,
-                                      const Tag& tTag )
+                               const int nSpec,
+                               const Tag& rhoTag,
+                               const Tag& yiTag,
+                               const Tag& mmwTag,
+                               const Tag& tTag )
 {
   if( execFactory.have_entry(rhoTag) )
     return;
@@ -192,14 +189,15 @@ register_one_time_expressions( Expr::ExpressionFactory& execFactory,
   typedef typename SpeciesDiffFlux  <YFluxT>::Builder MassFluxY;
 
   Tag pTag( "pressure", Expr::STATE_NONE );
-  TagList jxTags, jyTags, rhoYiTags, rTags, dTags;
-  for( size_t n=0; n<yiTags.size(); ++n ){
+  TagList jxTags, jyTags, rhoYiTags, rTags, dTags, yiTags;
+  for( size_t n=0; n<nSpec; ++n ){
     std::string spec = boost::lexical_cast<std::string>(n);
     jxTags.push_back( Tag(jTag_,"x" + spec ) );
     jyTags.push_back( Tag(jTag_,"y" + spec ) );
     rTags.push_back( Tag(rTag_, spec ) );
     dTags.push_back( Tag("D"+spec, Expr::STATE_NONE ) );
-    if( n != (yiTags.size() - 1) ){
+    yiTags.push_back( Tag( yiTag, spec ));
+    if( n != (nSpec - 1) ){
       rhoYiTags.push_back( Tag( rhoYi_, spec ) );
     }
   }
