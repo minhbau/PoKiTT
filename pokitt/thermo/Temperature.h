@@ -109,7 +109,7 @@ public:
              const Expr::TagList& massFracTags,
              const Expr::Tag& enthTag,
              const double tol = 1e-3,
-             const int nghos = DEFAULT_NUMBER_OF_GHOSTS );
+             const int nghost = DEFAULT_NUMBER_OF_GHOSTS );
 
     Expr::ExpressionBase* build() const;
 
