@@ -8,6 +8,8 @@
 
 #include <pokitt/CanteraObjects.h> // include Cantera wrapper
 
+#include <math.h> // isnan error checking
+
 namespace pokitt{
 
 /**
@@ -61,10 +63,12 @@ class Temperature
   std::vector<int> polyTypeVec_; // vector of polynomial types
   int nSpec_; // number of species to iterate over
   bool shomateFlag_; // flag if shomate polynomial is present
+  const double tol_; // tolerance for Newton's method
 
 
   Temperature( const Expr::TagList& massFracTags,
-               const Expr::Tag& enthTag );
+               const Expr::Tag& enthTag,
+               const double tol );
 public:
 
   class Builder : public Expr::ExpressionBuilder
@@ -75,10 +79,12 @@ public:
      *  @param resultTag the tag for the temperature of the mixture
      *  @param massFracTags tag for the mass fraction of each species, ordering is consistent with Cantera input file
      *  @param enthTag tag for the enthalpy of the mixture
+     *  @param tol     tolerance for the non-linear solve
      */
     Builder( const Expr::Tag& resultTag,
              const Expr::TagList& massFracTags,
              const Expr::Tag& enthTag,
+             const double tol = 1e-3,
              const int nghos = DEFAULT_NUMBER_OF_GHOSTS );
 
     Expr::ExpressionBase* build() const;
@@ -86,10 +92,12 @@ public:
   private:
     const Expr::Tag enthTag_;
     const Expr::TagList massFracTags_;
+    const double tol_;
   };
 
   ~Temperature(){}
   void evaluate();
+  void find_bad_points( std::ostringstream& msg, const FieldT& badField, const double badValue, const bool checkBelow );
 };
 
 /**
@@ -131,8 +139,6 @@ class TemperatureFromE0
   typedef std::vector<FieldT*> SpecT;
   typedef std::vector<double> PolyVals; // values used for polynomial
 
-  const double tol_; // tolerance for Newton's method
-
   DECLARE_FIELDS( FieldT, e0_, ke_ )
   DECLARE_VECTOR_OF_FIELDS( FieldT, massFracs_ )
 
@@ -143,11 +149,12 @@ class TemperatureFromE0
   std::vector<int> polyTypeVec_; // vector of polynomial types
   int nSpec_; // number of species to iterate over
   bool shomateFlag_; // flag if Shomate polynomial is present
+  const double tol_; // tolerance for Newton's method
 
   TemperatureFromE0( const Expr::TagList& massFracTags,
                      const Expr::Tag& e0Tag,
                      const Expr::Tag& keTag,
-                     const double tol);
+                     const double tol );
 public:
 
   class Builder : public Expr::ExpressionBuilder
@@ -159,25 +166,27 @@ public:
      *  @param massFracTags tag for the mass fraction of each species, ordering is consistent with Cantera input file
      *  @param e0Tag tag for the total energy of the mixture
      *  @param keTag tag for kinetic energy of the mixture
+     *  @param tol   tolerance for the non-linear solve
      */
     Builder( const Expr::Tag& resultTag,
              const Expr::TagList& massFracTags,
              const Expr::Tag& e0Tag,
              const Expr::Tag& keTag,
-             const double tol=1e-3,
+             const double tol = 1e-3,
              const int nghost = DEFAULT_NUMBER_OF_GHOSTS );
 
     Expr::ExpressionBase* build() const;
 
   private:
-    const double tol_;
     const Expr::Tag e0Tag_;
     const Expr::TagList massFracTags_;
     const Expr::Tag keTag_;
+    const double tol_;
   };
 
   ~TemperatureFromE0(){}
   void evaluate();
+  void find_bad_points( std::ostringstream& msg, const FieldT& badField, const double badValue, const bool checkBelow );
 };
 
 // ###################################################################
@@ -189,9 +198,11 @@ public:
 template< typename FieldT >
 Temperature<FieldT>::
 Temperature( const Expr::TagList& massFracTags,
-             const Expr::Tag& enthTag )
+             const Expr::Tag& enthTag,
+             const double tol )
   : Expr::Expression<FieldT>(),
-    shomateFlag_ ( false )
+    shomateFlag_ ( false ),
+    tol_( tol )
 {
   this->set_gpu_runnable( true );
 
@@ -295,6 +306,9 @@ evaluate()
   res.add_device(CPU_INDEX);
 # endif
   bool isConverged = false;
+  int iterations = 0;
+  const int maxIts = 20;
+  const double exceptionTemp = 3000; // maximum temperature before exception is thrown
   while( !isConverged ){
     delH <<= enth;
     dhdT <<= 0.0;
@@ -306,6 +320,42 @@ evaluate()
 #   ifndef ENABLE_CUDA
     const double maxTval = nebo_max(temp);
     const double minTval = nebo_min(temp);
+    if( maxTval >= exceptionTemp ){
+      std::ostringstream msg;
+        msg << std::endl
+            << "Error in pokitt::Temperature::evaluate()." << std::endl
+            << "Temperature is too high" << std::endl;
+        find_bad_points( msg, temp, exceptionTemp, false );
+        msg << "Total   iterations = " << iterations << std::endl
+            << "Maximum iterations = " << maxIts << std::endl
+            << "Set tolerance      = " << tol_ << std::endl
+            << __FILE__ << " : " << __LINE__ << std::endl;
+        throw std::runtime_error( msg.str() );
+    }
+    if( minTval <= 0.0 ){
+      std::ostringstream msg;
+        msg << std::endl
+            << "Error in pokitt::Temperature::evaluate()." << std::endl
+            << "Temperature is below 0" << std::endl;
+        find_bad_points( msg, temp, 0, true );
+        msg << "Total   iterations = " << iterations << std::endl
+            << "Maximum iterations = " << maxIts << std::endl
+            << "Set tolerance      = " << tol_ << std::endl
+            << __FILE__ << " : " << __LINE__ << std::endl;
+        throw std::runtime_error( msg.str() );
+    }
+    if( isnan( nebo_sum_interior( temp ) ) ){
+      std::ostringstream msg;
+        msg << std::endl
+            << "Error in pokitt::Temperature::evaluate()." << std::endl
+            << "Temperature is NaN" << std::endl;
+        find_bad_points( msg, temp, NAN, false );
+        msg << "Total   iterations = " << iterations << std::endl
+            << "Maximum iterations = " << maxIts << std::endl
+            << "Set tolerance      = " << tol_ << std::endl
+            << __FILE__ << " : " << __LINE__ << std::endl;
+        throw std::runtime_error( msg.str() );
+    }
 #   endif
     for( size_t n=0; n<nSpec_; ++n ){
       const FieldT& yi = massFracs_[n]->field_ref();
@@ -392,8 +442,81 @@ evaluate()
 #   ifdef ENABLE_CUDA
     res.set_device_as_active(GPU_INDEX);
 #   endif
-    isConverged = err < 1e-4; // Converged when the temperature has changed by less than 1e-4
+    isConverged = err < tol_; // Converged when the temperature has changed by less than specified tolerance
+    ++iterations;
+
+    if( !isConverged && iterations == maxIts ){
+      std::ostringstream msg;
+        msg << std::endl
+            << "Error in pokitt::Temperature::evaluate()." << std::endl
+            << "Iteration count exceeded" << std::endl
+            << "Total   iterations = " << iterations << std::endl
+            << "Maximum iterations = " << maxIts << std::endl
+            << "Set tolerance              = " << tol_ << std::endl
+            << "Largest pointwise residual = " << err << std::endl
+            << __FILE__ << " : " << __LINE__ << std::endl;
+        throw std::runtime_error( msg.str() );
+    }
   }
+}
+
+//--------------------------------------------------------------------
+
+
+template< typename FieldT >
+void
+Temperature<FieldT>::
+find_bad_points( std::ostringstream& msg, const FieldT& badField, const double badValue, const bool checkBelow )
+{
+  bool checkNaN = false;
+  if( isnan( badValue ) ) checkNaN = true;
+  typename FieldT::const_iterator iField = badField.interior_begin();
+  const SpatialOps::MemoryWindow mw = badField.window_without_ghost();
+  int badPoints = 0;
+  double worstValue = 0;
+  int xWorst, yWorst, zWorst;
+
+  for( int z = 1; z <= mw.extent(2); ++z ){
+    for( int y = 1; y <= mw.extent(1); ++y ){
+      for( int x = 1; x <= mw.extent(0); ++x, ++iField ){
+        if( checkNaN ){
+          if( isnan( *iField ) ){
+            ++badPoints;
+            if( badPoints < 6 )
+              msg << "Value = " << *iField << " at [x,y,z] = [" << x << "," <<  y << "," << z << "]" << std::endl;
+            worstValue = *iField;
+            xWorst = x; yWorst = y; zWorst = z;
+          }
+        }
+        else if( checkBelow ){
+          if( *iField <= badValue  ){
+            ++badPoints;
+            if( badPoints < 6 )
+              msg << "Value = " << *iField << " at [x,y,z] = [" << x << "," <<  y << "," << z << "]" << std::endl;
+          }
+          if( *iField < worstValue ){
+            worstValue = *iField;
+            xWorst = x; yWorst = y; zWorst = z;
+          }
+
+        }
+        else{
+          if( *iField >= badValue ){
+            ++badPoints;
+            if( badPoints < 6 )
+              msg << "Value = " << *iField << " at [x,y,z] = [" << x << "," <<  y << "," << z << "]" << std::endl;
+          }
+          if( *iField > worstValue ){
+            worstValue = *iField;
+            xWorst = x; yWorst = y; zWorst = z;
+          }
+        }
+      }
+    }
+  }
+  msg << std::endl
+      << "Worst value = " << worstValue << " at [x,y,z] = [" << xWorst << "," <<  yWorst << "," << zWorst << "]" << std::endl
+      << "A total of " << badPoints << " bad point(s) detected." << std::endl;
 }
 
 
@@ -404,10 +527,12 @@ Temperature<FieldT>::
 Builder::Builder( const Expr::Tag& resultTag,
                   const Expr::TagList& massFracTags,
                   const Expr::Tag& enthTag,
+                  const double tol,
                   const int nghost )
 : ExpressionBuilder( resultTag, nghost ),
   massFracTags_( massFracTags ),
-  enthTag_( enthTag )
+  enthTag_( enthTag ),
+  tol_( tol )
 {}
 
 //--------------------------------------------------------------------
@@ -417,7 +542,7 @@ Expr::ExpressionBase*
 Temperature<FieldT>::
 Builder::build() const
 {
-  return new Temperature<FieldT>( massFracTags_, enthTag_ );
+  return new Temperature<FieldT>( massFracTags_, enthTag_, tol_ );
 }
 
 //--------------------------------------------------------------------
@@ -546,7 +671,6 @@ evaluate()
   int iterations = 0;
   const int maxIts = 20;
   const double exceptionTemp = 3000; // maximum temperature before exception is thrown
-  try{
     while( !isConverged ){
       delE0 <<= e0 - ke;
       dE0dT <<= 0.0;
@@ -556,8 +680,44 @@ evaluate()
         *recipRecipT <<= *recipT * *recipT;
       }
 #     ifndef ENABLE_CUDA
-      const double maxTval = nebo_max(temp);
-      const double minTval = nebo_min(temp);
+      const double maxTval = nebo_max_interior(temp);
+      const double minTval = nebo_min_interior(temp);
+      if( maxTval >= exceptionTemp ){
+        std::ostringstream msg;
+          msg << std::endl
+              << "Error in pokitt::TemperatureFromE0::evaluate()." << std::endl
+              << "Temperature is too high" << std::endl;
+          find_bad_points( msg, temp, exceptionTemp, false );
+          msg << "Total   iterations = " << iterations << std::endl
+              << "Maximum iterations = " << maxIts << std::endl
+              << "Set tolerance      = " << tol_ << std::endl
+              << __FILE__ << " : " << __LINE__ << std::endl;
+          throw std::runtime_error( msg.str() );
+      }
+      if( minTval <= 0.0 ){
+        std::ostringstream msg;
+          msg << std::endl
+              << "Error in pokitt::TemperatureFromE0::evaluate()." << std::endl
+              << "Temperature is below 0" << std::endl;
+          find_bad_points( msg, temp, 0, true );
+          msg << "Total   iterations = " << iterations << std::endl
+              << "Maximum iterations = " << maxIts << std::endl
+              << "Set tolerance      = " << tol_ << std::endl
+              << __FILE__ << " : " << __LINE__ << std::endl;
+          throw std::runtime_error( msg.str() );
+      }
+      if( isnan( nebo_sum_interior( temp ) ) ){
+        std::ostringstream msg;
+          msg << std::endl
+              << "Error in pokitt::TemperatureFromE0::evaluate()." << std::endl
+              << "Temperature is NaN" << std::endl;
+          find_bad_points( msg, temp, NAN, false );
+          msg << "Total   iterations = " << iterations << std::endl
+              << "Maximum iterations = " << maxIts << std::endl
+              << "Set tolerance      = " << tol_ << std::endl
+              << __FILE__ << " : " << __LINE__ << std::endl;
+          throw std::runtime_error( msg.str() );
+      }
 #     endif
       for( size_t n=0; n<nSpec_; ++n){
         const FieldT& yi = massFracs_[n]->field_ref();
@@ -649,57 +809,79 @@ evaluate()
       isConverged = ( err < tol_ ); // Converged when the temperature has changed by less than set tolerance
       ++iterations;
 
-      // error trapping
-#     ifndef ENABLE_CUDA
-      if( nebo_min_interior(dE0dT) <= 0 )
-        throw( err );
-      if( nebo_min_interior(temp) <= 0 )
-        throw( err );
-      if( nebo_max_interior(temp) > exceptionTemp )
-        throw( err );
-      if( !isConverged && iterations == maxIts )
-        throw( err );
-#     endif
-
+      if( !isConverged && iterations == maxIts ){
+        std::ostringstream msg;
+          msg << std::endl
+              << "Error in pokitt::TemperatureFromE0::evaluate()." << std::endl
+              << "Iteration count exceeded" << std::endl
+              << "Total   iterations = " << iterations << std::endl
+              << "Maximum iterations = " << maxIts << std::endl
+              << "Set tolerance              = " << tol_ << std::endl
+              << "Largest pointwise residual = " << err << std::endl
+              << __FILE__ << " : " << __LINE__ << std::endl;
+          throw std::runtime_error( msg.str() );
+      }
     }
-  }
-  catch( const double err ){
-    std::ostringstream msg;
-    msg << std::endl
-        << "Error in pokitt::TemperatureFromE0::evaluate()." << std::endl;
-
-    if( iterations == maxIts ){
-      msg << "Maximum iteration count exceeded " << std::endl;
-    }
-    else{
-      msg << "Bad field(s) detected:" << std::endl;
-      if( nebo_min_interior(dE0dT) < 0 ){
-        msg << "Cv is negative" << std::endl;
-      }
-      if( nebo_min_interior(dE0dT) == 0 ){
-        msg << "Cv is zero" << std::endl;
-      }
-      if( nebo_min_interior(temp) < 0 ){
-        msg << "Temperature is negative" << std::endl;
-      }
-      if( nebo_min_interior(temp) == 0 ){
-        msg << "Temperature is zero" << std::endl;
-      }
-      if( nebo_max_interior(temp) > exceptionTemp ){
-        msg << "Temperature is above " << exceptionTemp << std::endl;
-      }
-      msg << std::endl;
-    }
-
-    msg << "Total   iterations = " << iterations << std::endl
-        << "Maximum iterations = " << maxIts << std::endl
-        << "Set tolerance              = " << tol_ << std::endl
-        << "Largest pointwise residual = " << err << std::endl
-        << __FILE__ << " : " << __LINE__ << std::endl;
-    throw std::runtime_error( msg.str() );
-  }
 }
 
+//--------------------------------------------------------------------
+
+
+template< typename FieldT >
+void
+TemperatureFromE0<FieldT>::
+find_bad_points( std::ostringstream& msg, const FieldT& badField, const double badValue, const bool checkBelow )
+{
+  bool checkNaN = false;
+  if( isnan( badValue ) ) checkNaN = true;
+  typename FieldT::const_iterator iField = badField.interior_begin();
+  const SpatialOps::MemoryWindow mw = badField.window_without_ghost();
+  int badPoints = 0;
+  double worstValue = 0;
+  int xWorst, yWorst, zWorst;
+
+  for( int z = 1; z <= mw.extent(2); ++z ){
+    for( int y = 1; y <= mw.extent(1); ++y ){
+      for( int x = 1; x <= mw.extent(0); ++x, ++iField ){
+        if( checkNaN ){
+          if( isnan( *iField ) ){
+            ++badPoints;
+            if( badPoints < 6 )
+              msg << "Value = " << *iField << " at [x,y,z] = [" << x << "," <<  y << "," << z << "]" << std::endl;
+            worstValue = *iField;
+            xWorst = x; yWorst = y; zWorst = z;
+          }
+        }
+        else if( checkBelow ){
+          if( *iField <= badValue  ){
+            ++badPoints;
+            if( badPoints < 6 )
+              msg << "Value = " << *iField << " at [x,y,z] = [" << x << "," <<  y << "," << z << "]" << std::endl;
+          }
+          if( *iField < worstValue ){
+            worstValue = *iField;
+            xWorst = x; yWorst = y; zWorst = z;
+          }
+
+        }
+        else{
+          if( *iField >= badValue ){
+            ++badPoints;
+            if( badPoints < 6 )
+              msg << "Value = " << *iField << " at [x,y,z] = [" << x << "," <<  y << "," << z << "]" << std::endl;
+          }
+          if( *iField > worstValue ){
+            worstValue = *iField;
+            xWorst = x; yWorst = y; zWorst = z;
+          }
+        }
+      }
+    }
+  }
+  msg << std::endl
+      << "Worst value = " << worstValue << " at [x,y,z] = [" << xWorst << "," <<  yWorst << "," << zWorst << "]" << std::endl
+      << "A total of " << badPoints << " bad point(s) detected." << std::endl;
+}
 
 //--------------------------------------------------------------------
 
