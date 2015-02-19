@@ -342,8 +342,8 @@ evaluate()
       *recipRecipT <<= *recipT * *recipT;
     }
 #   ifndef ENABLE_CUDA
-    const double maxTval = nebo_max_interior(temp);
-    const double minTval = nebo_min_interior(temp);
+    const double maxTval = nebo_max(temp);
+    const double minTval = nebo_min(temp);
     if( maxTval >= exceptionTemp ){
       std::ostringstream msg;
         msg << std::endl
@@ -462,7 +462,7 @@ evaluate()
 #   ifdef ENABLE_CUDA
     res.set_device_as_active(CPU_INDEX);
 #   endif
-    const double err = nebo_max_interior( abs(res) );
+    const double err = nebo_max( abs(res) );
 #   ifdef ENABLE_CUDA
     res.set_device_as_active(GPU_INDEX);
 #   endif
@@ -494,8 +494,8 @@ find_bad_points( std::ostringstream& msg, const FieldT& badField, const double b
 {
   bool checkNaN = false;
   if( isnan( badValue ) ) checkNaN = true;
-  typename FieldT::const_iterator iField = badField.interior_begin();
-  const SpatialOps::MemoryWindow mw = badField.window_without_ghost();
+  typename FieldT::const_iterator iField = badField.begin();
+  const SpatialOps::MemoryWindow mw = badField.window_with_ghost();
   int badPoints = 0;
   double worstValue = 0;
   int xWorst, yWorst, zWorst;
@@ -704,8 +704,8 @@ evaluate()
         *recipRecipT <<= *recipT * *recipT;
       }
 #     ifndef ENABLE_CUDA
-      const double maxTval = nebo_max_interior(temp);
-      const double minTval = nebo_min_interior(temp);
+      const double maxTval = nebo_max(temp);
+      const double minTval = nebo_min(temp);
       if( maxTval >= exceptionTemp ){
         std::ostringstream msg;
           msg << std::endl
@@ -730,7 +730,7 @@ evaluate()
               << __FILE__ << " : " << __LINE__ << std::endl;
           throw std::runtime_error( msg.str() );
       }
-      if( isnan( nebo_sum_interior( temp ) ) ){
+      if( isnan( nebo_sum( temp ) ) ){
         std::ostringstream msg;
           msg << std::endl
               << "Error in pokitt::TemperatureFromE0::evaluate()." << std::endl
@@ -826,7 +826,7 @@ evaluate()
 #     ifdef ENABLE_CUDA
       res.set_device_as_active(CPU_INDEX);
 #     endif
-      const double err = nebo_max_interior( abs(res) );
+      const double err = nebo_max( abs(res) );
 #     ifdef ENABLE_CUDA
       res.set_device_as_active(GPU_INDEX);
 #     endif
@@ -858,8 +858,8 @@ find_bad_points( std::ostringstream& msg, const FieldT& badField, const double b
 {
   bool checkNaN = false;
   if( isnan( badValue ) ) checkNaN = true;
-  typename FieldT::const_iterator iField = badField.interior_begin();
-  const SpatialOps::MemoryWindow mw = badField.window_without_ghost();
+  typename FieldT::const_iterator iField = badField.begin();
+  const SpatialOps::MemoryWindow mw = badField.window_with_ghost();
   int badPoints = 0;
   double worstValue = 0;
   int xWorst, yWorst, zWorst;
