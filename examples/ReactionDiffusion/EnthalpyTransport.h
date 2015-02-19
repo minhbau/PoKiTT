@@ -216,16 +216,13 @@ initial_condition( Expr::ExpressionFactory& initFactory,
   typedef typename Expr::PlaceHolder       <FieldT>::Builder XCoord;
   typedef typename Expr::PlaceHolder       <FieldT>::Builder YCoord;
   typedef typename Enthalpy                <FieldT>::Builder Enthalpy;
-  typedef typename Temperature             <FieldT>::Builder Temperature;
 
-  Tag t0Tag( "T0", Expr::STATE_NONE );
   initFactory.register_expression(        new XCoord( xTag ) );
   initFactory.register_expression(        new YCoord( yTag ) );
   initFactory.register_expression(        new SpecN(  yiTags_, yiTags_.size()-1 ) );
 
-  initFactory.register_expression(        new Temperature0( t0Tag, xTag, yTag, tMax-tBase, tDev, tDev, tMean/5, tMean, tBase )    );
-  initFactory.register_expression(        new Enthalpy    ( Tag( this->solution_variable_name(), Expr::STATE_N) , t0Tag, yiTags_ ) );
-  return initFactory.register_expression( new Temperature ( tTag_, yiTags_, Tag( this->solution_variable_name(), Expr::STATE_N) ) );
+  initFactory.register_expression(        new Temperature0( tTag_, xTag, yTag, tMax-tBase, tDev, tDev, tMean/5, tMean, tBase )    );
+  return initFactory.register_expression(        new Enthalpy    ( Tag( this->solution_variable_name(), Expr::STATE_N) , tTag_, yiTags_ ) );
 }
 
 //--------------------------------------------------------------------

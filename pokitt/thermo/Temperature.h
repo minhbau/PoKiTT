@@ -342,8 +342,8 @@ evaluate()
       *recipRecipT <<= *recipT * *recipT;
     }
 #   ifndef ENABLE_CUDA
-    const double maxTval = nebo_max(temp);
-    const double minTval = nebo_min(temp);
+    const double maxTval = nebo_max_interior(temp);
+    const double minTval = nebo_min_interior(temp);
     if( maxTval >= exceptionTemp ){
       std::ostringstream msg;
         msg << std::endl
