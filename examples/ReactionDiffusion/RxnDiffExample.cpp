@@ -206,18 +206,18 @@ int main( int iarg, char* carg[] )
   size_t nSteps = 5000;
   double dt = 1e-10;
 
+  po::options_description desc("Supported Options");
+  desc.add_options()
+               ( "help", "print help message" )
+               ( "xml-input-file", po::value<std::string>(&inputFileName)->default_value("h2o2.xml"), "Cantera xml input file name" )
+               ( "phase", po::value<std::string>(&inpGroup), "name of phase in Cantera xml input file" )
+               ( "timings", "Generate comparison timings between Cantera and PoKiTT across several problem sizes" )
+               ( "print-fields", "Print field values for Temperature, mass of H2, and mass of OH every 2000 time steps")
+               ( "nsteps", po::value<size_t>(&nSteps)->default_value(5000), "How many time steps to take" )
+               ( "dt",     po::value<double>(&dt)->default_value(1e-10),    "Size of time steps (s) to take"  );
+
   // parse the command line options input describing the problem
   try {
-    po::options_description desc("Supported Options");
-    desc.add_options()
-           ( "help", "print help message" )
-           ( "xml-input-file", po::value<std::string>(&inputFileName), "Cantera xml input file name" )
-           ( "phase", po::value<std::string>(&inpGroup), "name of phase in Cantera xml input file" )
-           ( "timings", "Generate comparison timings between Cantera and PoKiTT across several problem sizes" )
-           ( "print-fields", "Print field values for Temperature, mass of H2, and mass of OH every 2000 time steps")
-           ( "nsteps", po::value<size_t>(&nSteps), "How many time steps to take" )
-           ( "dt",     po::value<double>(&dt),     "Size of time steps to take"  );
-
     po::variables_map args;
     po::store( po::parse_command_line(iarg,carg,desc), args );
     po::notify(args);
@@ -233,7 +233,8 @@ int main( int iarg, char* carg[] )
   }
 
   catch( std::exception& err ){
-    std::cout << "Error parsing input arguments\n" << err.what() << std::endl;
+    std::cout << "Error parsing input arguments\n" << err.what() << std::endl
+        << std::endl << "Usage:\n" << desc << std::endl;
     return -2;
   }
 
