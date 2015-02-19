@@ -125,10 +125,10 @@ setup_boundary_conditions( const SO::Grid& grid, Expr::ExpressionFactory& execFa
   yplus ->add_consumer( GPU_INDEX );
 # endif
 
-  Tag xmbcTag( this->solution_variable_name() + "xmbc", Expr::STATE_NONE );
-  Tag xpbcTag( this->solution_variable_name() + "xpbc", Expr::STATE_NONE );
-  Tag ymbcTag( this->solution_variable_name() + "ymbc", Expr::STATE_NONE );
-  Tag ypbcTag( this->solution_variable_name() + "ypbc", Expr::STATE_NONE );
+  Tag xmbcTag( this->solution_variable_name() + "_xmbc", Expr::STATE_NONE );
+  Tag xpbcTag( this->solution_variable_name() + "_xpbc", Expr::STATE_NONE );
+  Tag ymbcTag( this->solution_variable_name() + "_ymbc", Expr::STATE_NONE );
+  Tag ypbcTag( this->solution_variable_name() + "_ypbc", Expr::STATE_NONE );
 
   execFactory.register_expression( new XBC( xmbcTag, xminus, SO::NEUMANN, SO::MINUS_SIDE, 0.0 ) );
   execFactory.register_expression( new XBC( xpbcTag, xplus , SO::NEUMANN, SO::PLUS_SIDE,  0.0 ) );

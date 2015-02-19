@@ -75,30 +75,36 @@ bool driver( const bool timings,
   const Tag rhoYiTag( "rhoYi",    Expr::STATE_N    );
   const Tag hTag    ( "enthalpy", Expr::STATE_N    );
 
-  typedef EnthalpyTransport<CellField> EnthalpyTransport;
-  typedef SpeciesTransport <CellField> SpeciesTransport;
-
-  Expr::ExpressionFactory initFactory;
-  Expr::ExpressionFactory execFactory;
-
-  std::set<Expr::ExpressionID> initIDs;
-  EnthalpyTransport* hTrans = new EnthalpyTransport( execFactory, nSpec, hTag, tTag, rhoTag, yiTag, jTag, mmwTag );
-  initIDs.insert( hTrans->initial_condition( initFactory, xTag, yTag, tMax, tDev, tMean, tBase ) );
-
-  std::list<SpeciesTransport*> specEqns;
-  for( size_t n=0; n<(nSpec-1); ++n ){
-    std::string spec = boost::lexical_cast<std::string>(n);
-    SpeciesTransport* specTrans = new SpeciesTransport( execFactory, rhoYiTag, jTag, spec );
-    initIDs.insert( specTrans->initial_condition( initFactory, rhoTag, Tag(yiTag, spec), yi[n], rho0 ) );
-    specEqns.push_back( specTrans );
-  }
-  specEqns.front()->register_one_time_expressions(execFactory, nSpec, rhoTag, yiTag, mmwTag, tTag );
-
-  Expr::ExpressionTree initTree( initIDs, initFactory, 0 );
-
   std::vector< IntVec > sizeVec;
-  sizeVec.push_back( IntVec( 8,  8,  1) );
+  if( timings ){
+    sizeVec.push_back( IntVec(126,126, 1 ) );
+    sizeVec.push_back( IntVec( 62, 62, 1 ) );
+    sizeVec.push_back( IntVec( 30, 30, 1 ) );
+    sizeVec.push_back( IntVec( 14, 14, 1 ) );
+  }
+  sizeVec.push_back( IntVec( 6,  6,  1) );
   for( std::vector< IntVec >::iterator iSize = sizeVec.begin(); iSize!= sizeVec.end(); ++iSize){
+
+    typedef EnthalpyTransport<CellField> EnthalpyTransport;
+    typedef SpeciesTransport <CellField> SpeciesTransport;
+
+    Expr::ExpressionFactory initFactory;
+    Expr::ExpressionFactory execFactory;
+
+    std::set<Expr::ExpressionID> initIDs;
+    EnthalpyTransport* hTrans = new EnthalpyTransport( execFactory, nSpec, hTag, tTag, rhoTag, yiTag, jTag, mmwTag );
+    initIDs.insert( hTrans->initial_condition( initFactory, xTag, yTag, tMax, tDev, tMean, tBase ) );
+
+    std::list<SpeciesTransport*> specEqns;
+    for( size_t n=0; n<(nSpec-1); ++n ){
+      std::string spec = boost::lexical_cast<std::string>(n);
+      SpeciesTransport* specTrans = new SpeciesTransport( execFactory, rhoYiTag, jTag, spec );
+      initIDs.insert( specTrans->initial_condition( initFactory, rhoTag, Tag(yiTag, spec), yi[n], rho0 ) );
+      specEqns.push_back( specTrans );
+    }
+    specEqns.front()->register_one_time_expressions(execFactory, nSpec, rhoTag, yiTag, mmwTag, tTag );
+
+    Expr::ExpressionTree initTree( initIDs, initFactory, 0 );
 
     IntVec gridSize = *iSize;
     Expr::ExprPatch patch( gridSize[0], gridSize[1], gridSize[2] );
@@ -140,6 +146,7 @@ bool driver( const bool timings,
 
     initTree.execute_tree();
 
+    if( timings ) std::cout << "\nPoKiTT Reaction Diffusion size " << xcoord.window_with_ghost().glob_npts() << std::endl;
     Timer timer;
     timer.start();
     for( size_t s = 0; s < nSteps; ++s ){
@@ -152,6 +159,7 @@ bool driver( const bool timings,
       timeIntegrator.step( dt );
     }
     timer.stop();
+    if( timings ) std::cout << "PoKiTT Reaction Diffusion time " << timer.elapsed_time() << std::endl;
 
     CellField& t = fml.field_ref< CellField >( tTag );
     const double tMean = SO::nebo_sum_interior( t ) / ( gridSize[0] * gridSize[1] * gridSize[2] );
@@ -181,6 +189,7 @@ int main( int iarg, char* carg[] )
            ( "help", "print help message" )
            ( "xml-input-file", po::value<std::string>(&inputFileName), "Cantera xml input file name" )
            ( "phase", po::value<std::string>(&inpGroup), "name of phase in Cantera xml input file" )
+           ( "timings", "Generate comparison timings between Cantera and PoKiTT across several problem sizes" )
            ( "print-fields", "Print field values for Temperature, mass of H2, and mass of OH every 2000 time steps")
            ( "nsteps", po::value<size_t>(&nSteps), "How many time steps to take" )
            ( "dt",     po::value<double>(&dt),     "Size of time steps to take"  );
@@ -190,6 +199,8 @@ int main( int iarg, char* carg[] )
     po::notify(args);
 
     print = args.count("print-fields") > 0;
+    timings = args.count("timings") > 0;
+    if( timings ) print = false;
 
     if (args.count("help")) {
       std::cout << desc << "\n";

@@ -158,10 +158,10 @@ setup_boundary_conditions( const SO::Grid& grid, Expr::ExpressionFactory& execFa
 # endif
 
   Tag hTag( this->solution_variable_name(), Expr::STATE_N );
-  Tag xmbcTag( Tag( tTag_, "xmbc") );
-  Tag xpbcTag( Tag( hTag,  "xpbc") );
-  Tag ymbcTag( Tag( tTag_, "ymbc") );
-  Tag ypbcTag( Tag( hTag,  "ypbc") );
+  Tag xmbcTag( Tag( tTag_, "_xmbc") );
+  Tag xpbcTag( Tag( hTag,  "_xpbc") );
+  Tag ymbcTag( Tag( tTag_, "_ymbc") );
+  Tag ypbcTag( Tag( hTag,  "_ypbc") );
 
   execFactory.register_expression( new XBC( xmbcTag, xminus, SO::NEUMANN, SO::MINUS_SIDE,  0.0 ) );
   execFactory.register_expression( new XBC( xpbcTag, xplus , SO::NEUMANN, SO::PLUS_SIDE,  -1e9 ) );
