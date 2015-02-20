@@ -183,7 +183,6 @@ setup_boundary_conditions( const SO::Grid& grid, Expr::ExpressionFactory& execFa
   yplus ->add_consumer( GPU_INDEX );
 # endif
 
-  Tag hTag( this->solution_variable_name(), Expr::STATE_N );
   Tag xmbcTag( Tag( tTag_, "_xmbc") );
   Tag xpbcTag( Tag( tTag_, "_xpbc") );
   Tag ymbcTag( Tag( tTag_, "_ymbc") );
@@ -198,6 +197,22 @@ setup_boundary_conditions( const SO::Grid& grid, Expr::ExpressionFactory& execFa
   execFactory.attach_modifier_expression( xpbcTag, tTag_ );
   execFactory.attach_modifier_expression( ymbcTag, tTag_ );
   execFactory.attach_modifier_expression( ypbcTag, tTag_ );
+
+  Tag hTag( this->solution_variable_name(), Expr::STATE_N );
+  Tag hxmbcTag( Tag( hTag, "_xmbc") );
+  Tag hxpbcTag( Tag( hTag, "_xpbc") );
+  Tag hymbcTag( Tag( hTag, "_ymbc") );
+  Tag hypbcTag( Tag( hTag, "_ypbc") );
+
+  execFactory.register_expression( new XBC( hxmbcTag, xminus, SO::NEUMANN, SO::MINUS_SIDE,  0.0 ) );
+  execFactory.register_expression( new XBC( hxpbcTag, xplus , SO::NEUMANN, SO::PLUS_SIDE,   0.0 ) );
+  execFactory.register_expression( new YBC( hymbcTag, yminus, SO::NEUMANN, SO::MINUS_SIDE,  0.0 ) );
+  execFactory.register_expression( new YBC( hypbcTag, yplus , SO::NEUMANN, SO::PLUS_SIDE,   0.0 ) );
+
+  execFactory.attach_modifier_expression( hxmbcTag, hTag );
+  execFactory.attach_modifier_expression( hxpbcTag, hTag );
+  execFactory.attach_modifier_expression( hymbcTag, hTag );
+  execFactory.attach_modifier_expression( hypbcTag, hTag );
 }
 
 //--------------------------------------------------------------------
