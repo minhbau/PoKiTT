@@ -172,6 +172,7 @@ SpeciesDiffFlux<FluxT>::evaluate()
     const ScalarT& yi       = species_   [i]->field_ref();
     const ScalarT& diffCoef = diffCoeffs_[i]->field_ref();
     FluxT& flux = *fluxes[i];
+    flux <<= 0.0;
 
     // convert mass fraction gradients to mole fraction gradients
     // $ M_i $ cancel out when converting from molar flux to mass flux

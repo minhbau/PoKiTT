@@ -81,10 +81,10 @@ bool driver( const bool timings,
 
   const double rho0 = 0.3;
   const double length = 1e-3;
-  const double tMax = 1600;
+  const double tMax = 1700;
   const double tDev = 0.2*length;
   const double tMean = length/2;
-  const double tBase = 600;
+  const double tBase = 800;
   std::vector<double> yi(nSpec, 0.0);
   yi[0]=0.01;
   yi[3]=0.15;
@@ -173,7 +173,7 @@ bool driver( const bool timings,
     if( timings ) std::cout << "\nPoKiTT Reaction Diffusion size " << xcoord.window_with_ghost().glob_npts() << std::endl;
     Timer timer;
     timer.start();
-    for( size_t s = 0; s < nSteps; ++s ){
+    for( size_t s = 0; s <= nSteps; ++s ){
       if( s%5000 == 0 && print){
         timer.stop();
         std::cout<<"Fields at time "<< s*dt << "; step " << s << "; simulation run time " << timer.elapsed_time() << std::endl;

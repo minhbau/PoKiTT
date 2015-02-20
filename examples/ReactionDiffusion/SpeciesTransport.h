@@ -89,7 +89,7 @@ SpeciesTransport( Expr::ExpressionFactory& execFactory,
                    const Tag& jTag,
                    const std::string n)
                   : Expr::TransportEquation( rhoYi.name() + n,
-                    Tag( rhoYi, n +"RHS" ) ),
+                    Tag( rhoYi, n +"_RHS" ) ),
                     rTag_( Tag( "r", Expr::STATE_NONE)),
                     rhoYi_( rhoYi ),
                     jTag_( jTag )
@@ -216,11 +216,11 @@ register_one_time_expressions( Expr::ExpressionFactory& execFactory,
   TagList jxTags, jyTags, rhoYiTags, rTags, dTags, yiTags;
   for( size_t n=0; n<nSpec; ++n ){
     std::string spec = boost::lexical_cast<std::string>(n);
-    jxTags.push_back( Tag(jTag_,"x" + spec ) );
-    jyTags.push_back( Tag(jTag_,"y" + spec ) );
-    rTags.push_back( Tag(rTag_, spec ) );
-    dTags.push_back( Tag("D"+spec, Expr::STATE_NONE ) );
-    yiTags.push_back( Tag( yiTag, spec ));
+    jxTags.push_back( Tag( jTag_,"x" + spec ) );
+    jyTags.push_back( Tag( jTag_,"y" + spec ) );
+    rTags.push_back(  Tag( rTag_,      spec ) );
+    yiTags.push_back( Tag( yiTag,      spec ) );
+    dTags.push_back(  Tag( "D" + spec, Expr::STATE_NONE ) );
     if( n != (nSpec - 1) ){
       rhoYiTags.push_back( Tag( rhoYi_, spec ) );
     }

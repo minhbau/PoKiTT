@@ -9,8 +9,7 @@ option( BUILD_UPSTREAM_LIBS "Auto-build ExprLib and SpatialOps (not recommended 
 option( ENABLE_TESTS "Enable tests" ON )
 
 #still a messy work in progress but it should compile and run
-option( ENABLE_EXAMPLES "Enable reaction-diffusion example" OFF )
-mark_as_advanced( ENABLE_EXAMPLES )
+option( ENABLE_EXAMPLES "Enable reaction-diffusion example" ON )
 
 set( Cantera_DIR "" CACHE PATH "Location where cantera was installed" )
 

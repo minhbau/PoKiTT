@@ -48,6 +48,7 @@ class EnthalpyTransport : public Expr::TransportEquation
 
   TagList yiTags_;
   const Tag tTag_;
+  const Tag hTag_;
 
 public:
 
@@ -93,8 +94,9 @@ EnthalpyTransport( Expr::ExpressionFactory& execFactory,
                    const Tag& jTag,
                    const Tag& mmwTag)
                   : Expr::TransportEquation( hTag.name(),
-                    Expr::Tag( hTag.name()+"RHS", Expr::STATE_N ) ),
-                    tTag_( tTag )
+                    Expr::Tag( hTag, "_RHS" ) ),
+                    tTag_( tTag ),
+                    hTag_( hTag )
 {
   typedef typename SO::FaceTypes<FieldT> FaceTypes;
   typedef typename FaceTypes::XFace XFluxT;
@@ -121,12 +123,12 @@ EnthalpyTransport( Expr::ExpressionFactory& execFactory,
   typedef typename HeatFlux           <YFluxT>::Builder HeatFluxY;
   typedef typename EnthalpyRHS        <FieldT>::Builder EnthalpyRHS;
 
-  execFactory.register_expression( new Temperature    ( tTag_,     yiTags_, hTag                   ) );
+  execFactory.register_expression( new Temperature    ( tTag_,     yiTags_, hTag     ) );
   execFactory.register_expression( new ThermCond      ( lamTag,    tTag,    yiTags_, mmwTag        ) );
-  execFactory.register_expression( new HeatFluxX      ( qXTag,     tTag_,   lamTag, hiTags, jxTags ) );
-  execFactory.register_expression( new HeatFluxY      ( qYTag,     tTag_,   lamTag, hiTags, jyTags ) );
+  execFactory.register_expression( new HeatFluxX      ( qXTag,     tTag_,   lamTag,  hiTags, jxTags ) );
+  execFactory.register_expression( new HeatFluxY      ( qYTag,     tTag_,   lamTag,  hiTags, jyTags ) );
   for( size_t n = 0; n < hiTags.size(); ++n ){
-    execFactory.register_expression( new SpecEnthalpy ( hiTags[n], tTag_,    n                     ) );
+    execFactory.register_expression( new SpecEnthalpy ( hiTags[n], tTag_,   n        ) );
   }
   execFactory.register_expression( new EnthalpyRHS ( this->get_rhs_tag(), rhoTag, tag_list( qXTag, qYTag ) ) );
 }
@@ -183,19 +185,19 @@ setup_boundary_conditions( const SO::Grid& grid, Expr::ExpressionFactory& execFa
 
   Tag hTag( this->solution_variable_name(), Expr::STATE_N );
   Tag xmbcTag( Tag( tTag_, "_xmbc") );
-  Tag xpbcTag( Tag( hTag,  "_xpbc") );
+  Tag xpbcTag( Tag( tTag_, "_xpbc") );
   Tag ymbcTag( Tag( tTag_, "_ymbc") );
-  Tag ypbcTag( Tag( hTag,  "_ypbc") );
+  Tag ypbcTag( Tag( tTag_, "_ypbc") );
 
   execFactory.register_expression( new XBC( xmbcTag, xminus, SO::NEUMANN, SO::MINUS_SIDE,  0.0 ) );
-  execFactory.register_expression( new XBC( xpbcTag, xplus , SO::NEUMANN, SO::PLUS_SIDE,  -1e9 ) );
+  execFactory.register_expression( new XBC( xpbcTag, xplus , SO::NEUMANN, SO::PLUS_SIDE,  -2e6  ) );
   execFactory.register_expression( new YBC( ymbcTag, yminus, SO::NEUMANN, SO::MINUS_SIDE,  0.0 ) );
-  execFactory.register_expression( new YBC( ypbcTag, yplus , SO::NEUMANN, SO::PLUS_SIDE,  -1e9 ) );
+  execFactory.register_expression( new YBC( ypbcTag, yplus , SO::NEUMANN, SO::PLUS_SIDE,  -2e6  ) );
 
   execFactory.attach_modifier_expression( xmbcTag, tTag_ );
-  execFactory.attach_modifier_expression( xpbcTag, hTag );
+  execFactory.attach_modifier_expression( xpbcTag, tTag_ );
   execFactory.attach_modifier_expression( ymbcTag, tTag_ );
-  execFactory.attach_modifier_expression( ypbcTag, hTag );
+  execFactory.attach_modifier_expression( ypbcTag, tTag_ );
 }
 
 //--------------------------------------------------------------------
@@ -217,12 +219,11 @@ initial_condition( Expr::ExpressionFactory& initFactory,
   typedef typename Expr::PlaceHolder       <FieldT>::Builder YCoord;
   typedef typename Enthalpy                <FieldT>::Builder Enthalpy;
 
-  initFactory.register_expression(        new XCoord( xTag ) );
-  initFactory.register_expression(        new YCoord( yTag ) );
-  initFactory.register_expression(        new SpecN(  yiTags_, yiTags_.size()-1 ) );
-
-  initFactory.register_expression(        new Temperature0( tTag_, xTag, yTag, tMax-tBase, tDev, tDev, tMean/5, tMean, tBase )    );
-  return initFactory.register_expression(        new Enthalpy    ( Tag( this->solution_variable_name(), Expr::STATE_N) , tTag_, yiTags_ ) );
+  initFactory.register_expression(        new XCoord      ( xTag     ) );
+  initFactory.register_expression(        new YCoord      ( yTag     ) );
+  initFactory.register_expression(        new SpecN       ( yiTags_.back(), yiTags_ ) );
+  initFactory.register_expression(        new Temperature0( tTag_,   xTag,  yTag,   tMax-tBase, tDev, tDev, tMean/5, tMean, tBase ) );
+  return initFactory.register_expression( new Enthalpy    ( hTag_,   tTag_, yiTags_ ) );
 }
 
 //--------------------------------------------------------------------
