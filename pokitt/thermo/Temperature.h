@@ -332,7 +332,7 @@ evaluate()
   bool isConverged = false;
   int iterations = 0;
   const int maxIts = 20;
-  const double exceptionTemp = 3000; // maximum temperature before exception is thrown
+  const double exceptionTemp = 5000; // maximum temperature before exception is thrown
   while( !isConverged ){
     delH <<= enth;
     dhdT <<= 0.0;
@@ -694,7 +694,7 @@ evaluate()
   bool isConverged = false;
   int iterations = 0;
   const int maxIts = 20;
-  const double exceptionTemp = 3000; // maximum temperature before exception is thrown
+  const double exceptionTemp = 5000; // maximum temperature before exception is thrown
     while( !isConverged ){
       delE0 <<= e0 - ke;
       dE0dT <<= 0.0;
