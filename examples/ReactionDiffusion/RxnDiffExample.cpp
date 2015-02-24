@@ -101,10 +101,13 @@ bool driver( const bool timings,
 
   std::vector< IntVec > sizeVec;
   if( timings ){
+    sizeVec.push_back( IntVec(2046, 1022, 1) );
+    sizeVec.push_back( IntVec(1022, 1022, 1) );
+    sizeVec.push_back( IntVec(510,  510,  1) );
+    sizeVec.push_back( IntVec(254,  254,  1) );
     sizeVec.push_back( IntVec(126,126, 1 ) );
     sizeVec.push_back( IntVec( 62, 62, 1 ) );
     sizeVec.push_back( IntVec( 30, 30, 1 ) );
-    sizeVec.push_back( IntVec( 14, 14, 1 ) );
   }
   sizeVec.push_back( IntVec( 6,  6,  1) );
   for( std::vector< IntVec >::iterator iSize = sizeVec.begin(); iSize!= sizeVec.end(); ++iSize){
@@ -177,13 +180,14 @@ bool driver( const bool timings,
       if( s%5000 == 0 && print){
         timer.stop();
         std::cout<<"Fields at time "<< s*dt << "; step " << s << "; simulation run time " << timer.elapsed_time() << std::endl;
-        print_fields( fml, tag_list( tTag, hTag, Tag( rhoYiTag, "0"), Tag( rhoYiTag, "4") ) );
+        print_fields( fml, tag_list( tTag, hTag ) );
+        print_fields( fml, tag_list( Tag( hTag, "_RHS" ), Tag( rhoYiTag, "0_RHS" ), Tag( "r0", Expr::STATE_NONE), Tag( rhoYiTag, "0"), Tag( rhoYiTag, "4") ) );
         timer.start();
       }
       timeIntegrator.step( dt );
     }
     timer.stop();
-    if( timings ) std::cout << "PoKiTT Reaction Diffusion time " << timer.elapsed_time() << std::endl;
+    if( timings ) std::cout << "PoKiTT Reaction Diffusion time per step " << timer.elapsed_time() / (nSteps + 1) << std::endl;
 
     CellField& t = fml.field_ref< CellField >( tTag );
     const double tMean = SO::nebo_sum_interior( t ) / ( gridSize[0] * gridSize[1] * gridSize[2] );
@@ -224,7 +228,9 @@ int main( int iarg, char* carg[] )
 
     print = args.count("print-fields") > 0;
     timings = args.count("timings") > 0;
-    if( timings ) print = false;
+
+    if( timings && args["nsteps"].defaulted() )
+      nSteps = 5;
 
     if (args.count("help")) {
       std::cout << desc << "\n";
