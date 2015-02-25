@@ -3,7 +3,7 @@
  *
  * Copyright (c) 2015 The University of Utah
  *
-  * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
  * deal in the Software without restriction, including without limitation the
  * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
@@ -147,6 +147,9 @@ bool driver( const bool timings,
     hTrans->setup_boundary_conditions( grid, execFactory );
 
     Expr::FieldManagerList& fml = patch.field_manager_list();
+#   ifdef ENABLE_CUDA
+    initTree.set_device_index( GPU_INDEX, fml );
+#   endif
     fml.allocate_fields( patch.field_info() );
     SO::OperatorDatabase& opDB = patch.operator_database();
     SO::build_stencils( grid, opDB );
@@ -166,10 +169,6 @@ bool driver( const bool timings,
     CellField& ycoord = fml.field_ref< CellField >( yTag );
     grid.set_coord<SO::XDIR>( xcoord );
     grid.set_coord<SO::YDIR>( ycoord );
-#   ifdef ENABLE_CUDA
-    xcoord.set_device_as_active( GPU_INDEX );
-    ycoord.set_device_as_active( GPU_INDEX );
-#   endif
 
     initTree.execute_tree();
 
@@ -190,6 +189,9 @@ bool driver( const bool timings,
     if( timings ) std::cout << "PoKiTT Reaction Diffusion time per step " << timer.elapsed_time() / (nSteps + 1) << std::endl;
 
     CellField& t = fml.field_ref< CellField >( tTag );
+#   ifdef ENABLE_CUDA
+    t.set_device_as_active( CPU_INDEX );
+#   endif
     const double tMean = SO::nebo_sum_interior( t ) / ( gridSize[0] * gridSize[1] * gridSize[2] );
     status( tMean >= 200 && tMean <= 3500 ); // bounds on NASA polynomials
 
@@ -227,6 +229,11 @@ int main( int iarg, char* carg[] )
     po::notify(args);
 
     print = args.count("print-fields") > 0;
+#   ifdef ENABLE_CUDA
+    if( print )
+      throw std::runtime_error("print-fields is not (yet) supported with CUDA");
+#   endif
+
     timings = args.count("timings") > 0;
 
     if( timings && args["nsteps"].defaulted() )

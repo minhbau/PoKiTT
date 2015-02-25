@@ -91,17 +91,18 @@ public:
   {
     FieldT& specN = this->value();
 
-    specN <<= 1.0;
-
-    for( size_t i=0; i<species_.size(); ++i ){
+    specN <<= 1.0 - species_[0]->field_ref();
+    for( size_t i=1; i<species_.size(); ++i ){
       specN <<= specN - species_[i]->field_ref();
     }
 
+#   ifndef ENABLE_CUDA
     if( nebo_max( specN ) > 1.0 || nebo_min( specN ) < 0.0 ){
       std::ostringstream msg;
       msg << __FILE__ << " : " << __LINE__ << "\nSpecies fractions are out of bounds!\n";
       throw std::runtime_error( msg.str() );
     }
+#   endif
   }
 
 };
