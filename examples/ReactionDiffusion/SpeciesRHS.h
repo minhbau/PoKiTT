@@ -95,6 +95,8 @@ SpeciesRHS( const Expr::Tag& sourceTag,
             const Expr::TagList& fluxTags )
   : Expr::Expression<FieldT>()
 {
+  this->set_gpu_runnable( true );
+
   xFlux_ = this->template create_field_request<XFluxT>( fluxTags[0] );
   yFlux_ = this->template create_field_request<YFluxT>( fluxTags[1] );
 

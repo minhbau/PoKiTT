@@ -136,6 +136,8 @@ SpeciesDiffFlux( const Expr::TagList& yiTags,
                  const Expr::TagList& diffCoeffTags )
   : Expr::Expression<FluxT>()
 {
+  this->set_gpu_runnable( true );
+
   density_ = this->template create_field_request<ScalarT>( densTag );
   mmw_     = this->template create_field_request<ScalarT>( mmwTag  );
 

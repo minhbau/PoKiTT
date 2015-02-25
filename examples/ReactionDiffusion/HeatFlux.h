@@ -102,6 +102,8 @@ HeatFlux( const Expr::Tag& tTag,
           const Expr::TagList& massFluxTags )
   : Expr::Expression<FluxT>()
 {
+  this->set_gpu_runnable( true );
+
   t_ = this->template create_field_request<ScalarT>( tTag );
   tCond_ = this->template create_field_request<ScalarT>( tCondTag  );
 
