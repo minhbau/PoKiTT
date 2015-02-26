@@ -94,7 +94,8 @@ public:
      *  @brief Build a HeatCapacity_Cp expression
      *  @param resultTag the mixture heat capacity
      *  @param tTag tag for temperature
-     *  @param massFracTag tag for mass fractions of each species, ordering is consistent with Cantera input
+     *  @param massFracTags species mass fraction, indexing is consistent with Cantera input
+     *  @param nghost number of ghost cells
      */
     Builder( const Expr::Tag& resultTag,
              const Expr::Tag& tTag,
@@ -163,6 +164,7 @@ public:
      *  @param resultTag tag for the pure species heat capacity
      *  @param tTag tag for temperature
      *  @param n species index
+     *  @param nghost number of ghost cells
      */
     Builder( const Expr::Tag& resultTag,
              const Expr::Tag& tTag,

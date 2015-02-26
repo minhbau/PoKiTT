@@ -57,6 +57,7 @@ public:
      *  @brief Build a SpeciesN expression
      *  @param specNTag the tag for species "N" - the one to compute here
      *  @param speciesTags the list of tags for all species
+     *  @param nghost number of ghost cells
      */
     Builder( const Expr::Tag& specNTag,
              const Expr::TagList& speciesTags,
@@ -72,6 +73,7 @@ public:
      *  @brief Build a SpeciesN expression
      *  @param speciesTags the list of tags for all species
      *  @param specNum the species index (0-based) for the species to absorb the constraint that \f$\sum y_i = 1\f$.
+     *  @param nghost number of ghost cells
      */
     Builder( const Expr::TagList& speciesTags,
              const size_t specNum,

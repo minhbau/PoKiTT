@@ -77,7 +77,7 @@ public:
      *  @brief Build a ThermalConductivity expression
      *  @param resultTag the tag for the mixture averaged thermal conductivity
      *  @param temperatureTag temperature
-     *  @param massFracTag tag for mass fraction of each species, ordering must be consistent with Cantera input
+     *  @param massFracTags mass fraction of each species, ordering must be consistent with Cantera input
      *  @param mmwTag tag for mixture molecular weight
      *  @param nghost the number of ghost cells to compute in
      */

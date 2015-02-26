@@ -138,6 +138,7 @@ public:
      *  @param pTag pressure
      *  @param massFracTags tag for the mass fraction of each species
      *  @param mmwTag tag for mixture molecular weight
+     *  @param nghost number of ghost cells
      */
     Builder( const Expr::TagList& resultTags,
              const Expr::Tag& tTag,

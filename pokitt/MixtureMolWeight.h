@@ -53,8 +53,7 @@ public:
     /**
      *  @brief Build a MixtureMolWeight expression
      *  @param resultTag the tag for mixture molecular weight
-     *  @param massFracTags tag for mass fractions of each species, ordering is consistent with specMW
-     *  @param specMW vector of species molecular weights
+     *  @param massFracTags species mass fraction, indexing is consistent with Cantera input
      */
     Builder( const Expr::Tag& resultTag,
              const Expr::TagList& massFracTags );

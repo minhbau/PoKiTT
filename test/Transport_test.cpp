@@ -171,47 +171,35 @@ get_cantera_results( const bool timings,
   std::vector< std::vector<double> >::const_iterator iMass;
   CellField::const_iterator                          iTemp;
   CellField::const_iterator                          iPress;
-  CellField::iterator                                iCant;
 
   Timer transportTimer;
-  if( transportQuantity == DIFF_MASS || transportQuantity == DIFF_MOL){
-    std::vector<double> d_result(nSpec,0.0);
-    transportTimer.start();
-    for( size_t rep=0; rep < canteraReps; ++rep ){
-      iPress = press.begin();
-      iMass  = massFracs.begin();
-      size_t i = 0;
-      for( iTemp = temp.begin(); iTemp != temp.end(); ++iTemp, ++iPress, ++iMass, ++i){
-        canteraThermo.setMassFractions_NoNorm( &(*iMass)[0] );
-        canteraThermo.setState_TP( *iTemp, *iPress );
-        switch(transportQuantity ){
-        case DIFF_MASS:
-          mixTrans.getMixDiffCoeffsMass(&d_result[0]); break;
-        case DIFF_MOL:
-          mixTrans.getMixDiffCoeffs    (&d_result[0]); break;
-        }
-        for( size_t n=0; n<nSpec; ++n){
+  std::vector<double> d_result(nSpec,0.0);
+  transportTimer.start();
+  for( size_t rep=0; rep < canteraReps; ++rep ){
+    iPress = press.begin();
+    iMass  = massFracs.begin();
+    size_t i = 0;
+    for( iTemp = temp.begin(); iTemp != temp.end(); ++iTemp, ++iPress, ++iMass, ++i){
+      canteraThermo.setMassFractions_NoNorm( &(*iMass)[0] );
+      canteraThermo.setState_TP( *iTemp, *iPress );
+      switch(transportQuantity ){
+      case TCOND:
+        (*canteraResults[0])[i] = mixTrans.thermalConductivity();
+        break;
+      case VISC:
+        (*canteraResults[0])[i] = mixTrans.viscosity();
+        break;
+      case DIFF_MASS:
+        mixTrans.getMixDiffCoeffsMass(&d_result[0]);
+        for( size_t n=0; n<nSpec; ++n)
           (*canteraResults[n])[i] = d_result[n];
-        }
-      }
-    }
-  }
-  else{
-    transportTimer.start();
-    for( size_t rep=0; rep < canteraReps; ++rep ){
-      iPress = press.begin();
-      iTemp  = temp.begin();
-      iMass  = massFracs.begin();
-      CellField::iterator iCantEnd = canteraResults[0]->end();
-      for(CellField::iterator iCant = canteraResults[0]->begin(); iCant!=iCantEnd; ++iPress, ++iTemp, ++iMass, ++iCant){
-        canteraThermo.setMassFractions_NoNorm( &(*iMass)[0] );
-        canteraThermo.setState_TP( *iTemp, *iPress );
-        switch( transportQuantity ){
-        case TCOND:
-          *iCant = mixTrans.thermalConductivity(); break;
-        case VISC:
-          *iCant = mixTrans.viscosity(); break;
-        }
+        break;
+      case DIFF_MOL:
+        mixTrans.getMixDiffCoeffs    (&d_result[0]);
+        for( size_t n=0; n<nSpec; ++n)
+          (*canteraResults[n])[i] = d_result[n];
+        break;
+
       }
     }
   }

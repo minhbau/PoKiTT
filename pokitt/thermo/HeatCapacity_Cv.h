@@ -95,7 +95,7 @@ public:
      *  @brief Build a HeatCapacity_Cv expression
      *  @param resultTag the mixture heat capacity
      *  @param tTag tag for temperature
-     *  @param massFracTag tag for mass fractions of each species, ordering is consistent with Cantera input
+     *  @param massFracTags mass fractions of each species, ordering is consistent with Cantera input
      */
     Builder( const Expr::Tag& resultTag,
              const Expr::Tag& tTag,

@@ -68,6 +68,7 @@ public:
      *  @param tTag tag for temperature
      *  @param pTag tag for pressure
      *  @param mmwTag tag for mixture molecular weight
+     *  @param nghost number of ghost cells
      */
     Builder( const Expr::Tag& resultTag,
              const Expr::Tag& tTag,
