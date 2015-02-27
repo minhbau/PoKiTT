@@ -42,10 +42,10 @@
 #include "test/TestHelper.h"
 #include "EnthalpyTransport.h"
 #include "SpeciesTransport.h"
-
 #include <boost/lexical_cast.hpp>
 #include <boost/foreach.hpp>
 #include <boost/program_options.hpp>
+#include "TagManager.h"
 
 namespace Cantera_CXX{ class IdealGasMix; }
 
@@ -89,27 +89,34 @@ bool driver( const bool timings,
   yi[0]=0.01;
   yi[3]=0.15;
 
-  const Tag xTag    ( "XCoord",   Expr::STATE_NONE );
-  const Tag yTag    ( "YCoord",   Expr::STATE_NONE );
-  const Tag rhoTag  ( "Density",  Expr::STATE_NONE );
-  const Tag mmwTag  ( "mix MW ",  Expr::STATE_NONE );
-  const Tag tTag    ( "Temp",     Expr::STATE_NONE );
-  const Tag jTag    ( "J",        Expr::STATE_NONE );
-  const Tag yiTag   ( "yi",       Expr::STATE_NONE );
-  const Tag rhoYiTag( "rhoYi",    Expr::STATE_N    );
-  const Tag hTag    ( "enthalpy", Expr::STATE_N    );
+  const TagManager tagMgr( nSpec,           // enum values:
+      Tag( "rhoYi",     Expr::STATE_N    ), // RHOYI
+      Tag( "enthalpy",  Expr::STATE_N    ), // H
+      Tag( "yi",        Expr::STATE_NONE ), // YI
+      Tag( "temp",      Expr::STATE_NONE ), // T
+      Tag( "pressure",  Expr::STATE_NONE ), // P
+      Tag( "density",   Expr::STATE_NONE ), // RHO
+      Tag( "mix MW ",   Expr::STATE_NONE ), // MMW
+      Tag( "r",         Expr::STATE_NONE ), // R
+      Tag( "lambda",    Expr::STATE_NONE ), // LAM
+      Tag( "D",         Expr::STATE_NONE ), // D
+      Tag( "J",         Expr::STATE_NONE ), // J
+      Tag( "heat flux", Expr::STATE_NONE ), // Q
+      Tag( "XCoord",    Expr::STATE_NONE ), // XCOORD
+      Tag( "YCoord",    Expr::STATE_NONE ) // YCOORD
+  );
 
   std::vector< IntVec > sizeVec;
   if( timings ){
-    sizeVec.push_back( IntVec(2046, 1022, 1) );
-    sizeVec.push_back( IntVec(1022, 1022, 1) );
-    sizeVec.push_back( IntVec(510,  510,  1) );
-    sizeVec.push_back( IntVec(254,  254,  1) );
-    sizeVec.push_back( IntVec(126,126, 1 ) );
-    sizeVec.push_back( IntVec( 62, 62, 1 ) );
-    sizeVec.push_back( IntVec( 30, 30, 1 ) );
+    sizeVec.push_back( IntVec(2046, 1022, 1 ) );
+    sizeVec.push_back( IntVec(1022, 1022, 1 ) );
+    sizeVec.push_back( IntVec(510,  510,  1 ) );
+    sizeVec.push_back( IntVec(254,  254,  1 ) );
+    sizeVec.push_back( IntVec(126,  126,  1 ) );
+    sizeVec.push_back( IntVec( 62,  62,   1 ) );
+    sizeVec.push_back( IntVec( 30,  30,   1 ) );
   }
-  sizeVec.push_back( IntVec( 6,  6,  1) );
+  sizeVec.push_back( IntVec( 6,  6,  1 ) );
   for( std::vector< IntVec >::iterator iSize = sizeVec.begin(); iSize!= sizeVec.end(); ++iSize){
 
     typedef EnthalpyTransport<CellField> EnthalpyTransport;
@@ -119,17 +126,16 @@ bool driver( const bool timings,
     Expr::ExpressionFactory execFactory;
 
     std::set<Expr::ExpressionID> initIDs;
-    EnthalpyTransport* hTrans = new EnthalpyTransport( execFactory, nSpec, hTag, tTag, rhoTag, yiTag, jTag, mmwTag );
-    initIDs.insert( hTrans->initial_condition( initFactory, xTag, yTag, tMax, tDev, tMean, tBase ) );
+    EnthalpyTransport* hTrans = new EnthalpyTransport( execFactory, tagMgr );
+    initIDs.insert( hTrans->initial_condition( initFactory, tMax, tBase, tMean, tDev) );
 
     std::list<SpeciesTransport*> specEqns;
     for( size_t n=0; n<(nSpec-1); ++n ){
-      std::string spec = boost::lexical_cast<std::string>(n);
-      SpeciesTransport* specTrans = new SpeciesTransport( execFactory, rhoYiTag, jTag, spec );
-      initIDs.insert( specTrans->initial_condition( initFactory, rhoTag, Tag(yiTag, spec), yi[n], rho0 ) );
+      SpeciesTransport* specTrans = new SpeciesTransport( execFactory, tagMgr, n );
+      initIDs.insert( specTrans->initial_condition( initFactory, yi[n], rho0 ) );
       specEqns.push_back( specTrans );
     }
-    specEqns.front()->register_one_time_expressions(execFactory, nSpec, rhoTag, yiTag, mmwTag, tTag );
+    specEqns.front()->register_one_time_expressions( execFactory );
 
     Expr::ExpressionTree initTree( initIDs, initFactory, 0 );
 
@@ -165,8 +171,8 @@ bool driver( const bool timings,
     initTree.bind_fields( fml );
     initTree.lock_fields( fml );
 
-    CellField& xcoord = fml.field_ref< CellField >( xTag );
-    CellField& ycoord = fml.field_ref< CellField >( yTag );
+    CellField& xcoord = fml.field_ref< CellField >( tagMgr[XCOORD] );
+    CellField& ycoord = fml.field_ref< CellField >( tagMgr[YCOORD] );
     grid.set_coord<SO::XDIR>( xcoord );
     grid.set_coord<SO::YDIR>( ycoord );
 
@@ -179,8 +185,7 @@ bool driver( const bool timings,
       if( s%5000 == 0 && print){
         timer.stop();
         std::cout<<"Fields at time "<< s*dt << "; step " << s << "; simulation run time " << timer.elapsed_time() << std::endl;
-        print_fields( fml, tag_list( tTag, hTag ) );
-        print_fields( fml, tag_list( Tag( hTag, "_RHS" ), Tag( rhoYiTag, "0_RHS" ), Tag( "r0", Expr::STATE_NONE), Tag( rhoYiTag, "0"), Tag( rhoYiTag, "4") ) );
+        print_fields( fml, tag_list( tagMgr[T], tagMgr.rN( 0 ), tagMgr.rhoYiN( 0 ) ) );
         timer.start();
       }
       timeIntegrator.step( dt );
@@ -188,7 +193,7 @@ bool driver( const bool timings,
     timer.stop();
     if( timings ) std::cout << "PoKiTT Reaction Diffusion time per step " << timer.elapsed_time() / (nSteps + 1) << std::endl;
 
-    CellField& t = fml.field_ref< CellField >( tTag );
+    CellField& t = fml.field_ref< CellField >( tagMgr[T] );
 #   ifdef ENABLE_CUDA
     t.set_device_as_active( CPU_INDEX );
 #   endif

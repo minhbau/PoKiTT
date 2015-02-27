@@ -31,6 +31,7 @@
 #include "SpeciesRHS.h"
 #include "MassFractions.h"
 #include "SpeciesDiffusion.h"
+#include "TagManager.h"
 #include <pokitt/thermo/Pressure.h>
 #include <pokitt/MixtureMolWeight.h>
 #include <pokitt/kinetics/ReactionRates.h>
@@ -44,31 +45,22 @@ template< typename FieldT >
 class SpeciesTransport : public Expr::TransportEquation
 {
 
-  const Tag rTag_;
-  const Tag rhoYi_;
-  const Tag jTag_;
+  const TagManager& tagM_;
+  const int n_;
 
 public:
 
   SpeciesTransport( Expr::ExpressionFactory& execFactory,
-                     const Tag& rhoYi,
-                     const Tag& jTag,
-                     const std::string n);
+                     const TagManager& tagM,
+                     const int n);
 
   ~SpeciesTransport();
 
   void setup_boundary_conditions(const SO::Grid& grid, Expr::ExpressionFactory& execFactory );
 
-  void register_one_time_expressions(Expr::ExpressionFactory& execFactory,
-                                     const int nSpec,
-                                     const Tag& rhoTag,
-                                     const Tag& yiTag,
-                                     const Tag& mmwTag,
-                                     const Tag& tTag );
+  void register_one_time_expressions(Expr::ExpressionFactory& execFactory );
 
   Expr::ExpressionID initial_condition( Expr::ExpressionFactory& initFactory,
-                                        const Tag& rhoTag,
-                                        const Tag& yiTag,
                                         const double yi,
                                         const double rho0);
 
@@ -85,18 +77,16 @@ private:
 template< typename FieldT >
 SpeciesTransport<FieldT>::
 SpeciesTransport( Expr::ExpressionFactory& execFactory,
-                   const Tag& rhoYi,
-                   const Tag& jTag,
-                   const std::string n)
-                  : Expr::TransportEquation( rhoYi.name() + n,
-                    Tag( rhoYi, n +"_RHS" ) ),
-                    rTag_( Tag( "r", Expr::STATE_NONE)),
-                    rhoYi_( rhoYi ),
-                    jTag_( jTag )
+                   const TagManager& tagM,
+                   const int n)
+                  : Expr::TransportEquation( tagM.rhoYiN(n).name(),
+                    Tag( tagM.rhoYiN(n), "_RHS" ) ),
+                    tagM_( tagM ),
+                    n_( n )
 {
   typedef typename SpeciesRHS <FieldT>::Builder SpeciesRHS;
 
-  execFactory.register_expression( new SpeciesRHS ( this->get_rhs_tag(), Tag( rTag_, n), tag_list( Tag( jTag,"x" +n), Tag( jTag,"y" +n) ) ) );
+  execFactory.register_expression( new SpeciesRHS ( this->get_rhs_tag(), tagM_.rN(n_), tag_list( tagM_.jxN(n_), tagM_.jyN(n_) ) ) );
 }
 
 //--------------------------------------------------------------------
@@ -169,8 +159,6 @@ template< typename FieldT >
 Expr::ExpressionID
 SpeciesTransport<FieldT>::
 initial_condition( Expr::ExpressionFactory& initFactory,
-                   const Tag& rhoTag,
-                   const Tag& yiTag,
                    const double yi,
                    const double rho0 )
 {
@@ -178,10 +166,10 @@ initial_condition( Expr::ExpressionFactory& initFactory,
   typedef typename Expr::ConstantExpr   <FieldT>::Builder Rho;
   typedef typename Expr::ConstantExpr   <FieldT>::Builder Yi;
 
-  if( !initFactory.have_entry(rhoTag) )
-    initFactory.register_expression( new Rho( rhoTag, rho0 ) );
-  initFactory.register_expression( new Yi( yiTag, yi ) );
-  return initFactory.register_expression( new RhoYi ( Tag( this->solution_variable_name(), Expr::STATE_N), rhoTag, yi, 0.0  ) );
+  if( !initFactory.have_entry(tagM_[RHO]) )
+    initFactory.register_expression( new Rho( tagM_[RHO],    rho0 ) );
+  initFactory.register_expression(   new Yi(  tagM_.yiN(n_), yi   ) );
+  return initFactory.register_expression( new RhoYi ( Tag( this->solution_variable_name(), Expr::STATE_N), tagM_[RHO], yi, 0.0  ) );
 }
 
 //--------------------------------------------------------------------
@@ -189,14 +177,9 @@ initial_condition( Expr::ExpressionFactory& initFactory,
 template< typename FieldT >
 void
 SpeciesTransport<FieldT>::
-register_one_time_expressions( Expr::ExpressionFactory& execFactory,
-                               const int nSpec,
-                               const Tag& rhoTag,
-                               const Tag& yiTag,
-                               const Tag& mmwTag,
-                               const Tag& tTag )
+register_one_time_expressions( Expr::ExpressionFactory& execFactory )
 {
-  if( execFactory.have_entry(rhoTag) )
+  if( execFactory.have_entry(tagM_[RHO]) )
     return;
 
   typedef typename SpatialOps::FaceTypes<FieldT> FaceTypes;
@@ -212,28 +195,14 @@ register_one_time_expressions( Expr::ExpressionFactory& execFactory,
   typedef typename SpeciesDiffFlux  <XFluxT>::Builder MassFluxX;
   typedef typename SpeciesDiffFlux  <YFluxT>::Builder MassFluxY;
 
-  Tag pTag( "pressure", Expr::STATE_NONE );
-  TagList jxTags, jyTags, rhoYiTags, rTags, dTags, yiTags;
-  for( size_t n=0; n<nSpec; ++n ){
-    std::string spec = boost::lexical_cast<std::string>(n);
-    jxTags.push_back( Tag( jTag_,"x" + spec ) );
-    jyTags.push_back( Tag( jTag_,"y" + spec ) );
-    rTags.push_back(  Tag( rTag_,      spec ) );
-    yiTags.push_back( Tag( yiTag,      spec ) );
-    dTags.push_back(  Tag( "D" + spec, Expr::STATE_NONE ) );
-    if( n != (nSpec - 1) ){
-      rhoYiTags.push_back( Tag( rhoYi_, spec ) );
-    }
-  }
-
-  execFactory.register_expression( new Density         ( rhoTag                                ) );
-  execFactory.register_expression( new MassFracs       ( yiTags, rhoTag, rhoYiTags             ) );
-  execFactory.register_expression( new MixMolWeight    ( mmwTag, yiTags                        ) );
-  execFactory.register_expression( new Pressure        ( pTag,   tTag,   rhoTag, mmwTag        ) );
-  execFactory.register_expression( new DiffusionCoeffs ( dTags,  tTag,   pTag,   yiTags, mmwTag) );
-  execFactory.register_expression( new ReactionRates   ( rTags,  tTag,   pTag,   yiTags, mmwTag) );
-  execFactory.register_expression( new MassFluxX       ( jxTags, yiTags, rhoTag, mmwTag, dTags ) );
-  execFactory.register_expression( new MassFluxY       ( jyTags, yiTags, rhoTag, mmwTag, dTags ) );
+  execFactory.register_expression( new Density         ( tagM_[RHO]   ) );
+  execFactory.register_expression( new MixMolWeight    ( tagM_[MMW],  tagM_.yiN()  ) );
+  execFactory.register_expression( new MassFracs       ( tagM_.yiN(), tagM_[RHO],  tagM_.rhoYiN()         ) );
+  execFactory.register_expression( new Pressure        ( tagM_[P],    tagM_[T],    tagM_[RHO], tagM_[MMW] ) );
+  execFactory.register_expression( new DiffusionCoeffs ( tagM_.dN(),  tagM_[T],    tagM_[P],   tagM_.yiN(), tagM_[MMW] ) );
+  execFactory.register_expression( new ReactionRates   ( tagM_.rN(),  tagM_[T],    tagM_[P],   tagM_.yiN(), tagM_[MMW] ) );
+  execFactory.register_expression( new MassFluxX       ( tagM_.jxN(), tagM_.yiN(), tagM_[RHO], tagM_[MMW],  tagM_.dN() ) );
+  execFactory.register_expression( new MassFluxY       ( tagM_.jyN(), tagM_.yiN(), tagM_[RHO], tagM_[MMW],  tagM_.dN() ) );
 }
 
 //--------------------------------------------------------------------
