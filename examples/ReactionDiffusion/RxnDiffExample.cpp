@@ -108,7 +108,6 @@ bool driver( const bool timings,
 
   std::vector< IntVec > sizeVec;
   if( timings ){
-    sizeVec.push_back( IntVec(2046, 1022, 1 ) );
     sizeVec.push_back( IntVec(1022, 1022, 1 ) );
     sizeVec.push_back( IntVec(510,  510,  1 ) );
     sizeVec.push_back( IntVec(254,  254,  1 ) );
