@@ -143,7 +143,9 @@ bool driver( const bool timings,
     SO::Grid grid( gridSize, SO::DoubleVec( length, length, 1 ) );
     SO::GhostData ghosts( IntVec( 1, 1, 0), IntVec( 1, 1, 0 ) ); // 1 on +-x and +- y and 0 on z
 
-    Expr::TimeStepper timeIntegrator( execFactory, Expr::FORWARD_EULER, patch.id() );
+    Expr::TimeStepper timeIntegrator( execFactory, Expr::FORWARD_EULER, "timestepper", patch.id() );
+    timeIntegrator.request_timings();
+
     for( std::list<SpeciesTransport*>::iterator iEqn=specEqns.begin(); iEqn!=specEqns.end(); ++iEqn ){
       timeIntegrator.add_equation<CellField>( (*iEqn)->solution_variable_name(), (*iEqn)->get_rhs_tag(), ghosts );
       (*iEqn)->setup_boundary_conditions( grid, execFactory );
