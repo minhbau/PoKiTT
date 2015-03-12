@@ -178,7 +178,7 @@ bool driver( const bool timings,
     initTree.execute_tree();
 
     if( timings ) std::cout << "\nPoKiTT Reaction Diffusion size " << xcoord.window_with_ghost().glob_npts() << std::endl;
-    Timer timer;
+    SpatialOps::Timer timer;
     timer.start();
     for( size_t s = 0; s <= nSteps; ++s ){
       if( s%5000 == 0 && print){
@@ -248,7 +248,6 @@ int main( int iarg, char* carg[] )
       return -1;
     }
   }
-
   catch( std::exception& err ){
     std::cout << "Error parsing input arguments\n" << err.what() << std::endl
         << std::endl << "Usage:\n" << desc << std::endl;

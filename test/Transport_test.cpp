@@ -172,7 +172,7 @@ get_cantera_results( const bool timings,
   CellField::const_iterator                          iTemp;
   CellField::const_iterator                          iPress;
 
-  Timer transportTimer;
+  SpatialOps::Timer transportTimer;
   std::vector<double> d_result(nSpec,0.0);
   transportTimer.start();
   for( size_t rep=0; rep < canteraReps; ++rep ){
@@ -346,7 +346,7 @@ bool driver( const bool timings,
     if( timings ) std::cout << std::endl << transport_name(transportQuantity) << " test - " << nPoints << std::endl;
 
     initTree.execute_tree();
-    Timer transportTimer;
+    SpatialOps::Timer transportTimer;
     transportTimer.start();
     for( size_t rep = 0; rep < pokittReps; ++rep ){
       execTree.execute_tree();

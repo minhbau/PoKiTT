@@ -117,7 +117,7 @@ get_cantera_results( const bool timings,
   CellField::iterator                                iCant;
 
   std::vector<double> rResult(nSpec,0.0);
-  Timer cTimer;
+  SpatialOps::Timer cTimer;
   cTimer.start();
   for( size_t rep=0; rep < canteraReps; ++rep ){
     iPress = press.begin();
@@ -248,7 +248,7 @@ bool driver( const bool timings,
     if( timings ) std::cout << std::endl << "Reaction rates test - " << nPoints << std::endl;
 
     initTree.execute_tree();
-    Timer rxnTimer;
+    SpatialOps::Timer rxnTimer;
     rxnTimer.start();
     for( size_t rep = 0; rep < pokittReps; ++rep ){
       execTree.execute_tree();

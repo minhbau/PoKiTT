@@ -130,7 +130,7 @@ get_cantera_result( const bool timings,
   CellField::const_iterator                          iTemp;
   CellField::const_iterator                          iRef;
   CellField::iterator                                iCant;
-  Timer gasTime;
+  SpatialOps::Timer gasTime;
   gasTime.start();
   for( size_t rep=0; rep < canteraReps; ++rep ){
     iTemp = temp.begin();
@@ -285,7 +285,7 @@ bool driver( const bool timings,
     if( timings ) std::cout << std::endl << property_name(gasQuantity) + " test - " << nPoints << std::endl;
 
     initTree.execute_tree();
-    Timer gasTimer;
+    SpatialOps::Timer gasTimer;
     gasTimer.start();
     for( size_t rep = 0; rep < pokittReps; ++rep ){
       execTree.execute_tree();

@@ -203,7 +203,7 @@ get_cantera_results( const bool mix,
   CellField::const_iterator                          iTemp;
   CellField::iterator                                iCant;
 
-  Timer thermoTimer;
+  SpatialOps::Timer thermoTimer;
   if( mix ){
     const CellField::iterator iCantEnd = canteraResults[0]->end();
     thermoTimer.start();
@@ -357,7 +357,7 @@ bool driver( const bool timings,
     if( timings ) std::cout << std::endl << thermo_name(thermoQuantity) << " test - " << nPoints << std::endl;
 
     initTree.execute_tree();
-    Timer thermoTimer;  thermoTimer.start();
+    SpatialOps::Timer thermoTimer;  thermoTimer.start();
     for( size_t rep = 0; rep < pokittReps; ++rep ){
       execTree.execute_tree();
     }

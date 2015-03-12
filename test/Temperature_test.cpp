@@ -137,7 +137,7 @@ get_cantera_result( const bool timings,
   CellField::const_iterator                          iVolume;
   CellField::const_iterator                          iPress;
   CellField::iterator                                iCant;
-  Timer tTime;
+  SpatialOps::Timer tTime;
   tTime.start();
   for( size_t rep=0; rep < canteraReps; ++rep ){
     iEnergy = energy.begin();
@@ -294,7 +294,7 @@ bool driver( const bool timings,
 
     if( timings ) std::cout << std::endl << "T from " << energy_name(energyType) << " test - " << nPoints << std::endl;
 
-    Timer tTimer;
+    SpatialOps::Timer tTimer;
     for( size_t rep = 0; rep < pokittReps; ++rep ){
       initTree.execute_tree(); // set initial guess
       tTimer.start();
