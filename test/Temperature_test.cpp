@@ -341,7 +341,7 @@ int main( int iarg, char* carg[] )
     po::options_description desc("Supported Options");
     desc.add_options()
            ( "help", "print help message" )
-           ( "xml-input-file", po::value<std::string>(&inputFileName), "Cantera xml input file name" )
+           ( "xml-input-file", po::value<std::string>(&inputFileName)->default_value("h2o2.xml"), "Cantera xml input file name" )
            ( "phase", po::value<std::string>(&inpGroup), "name of phase in Cantera xml input file" )
            ( "timings", "Generate comparison timings between Cantera and PoKiTT across several problem sizes" )
            ( "pokitt-reps", po::value<size_t>(&pokittReps), "Repeat the PoKiTT tests and report the average execution time")
@@ -351,13 +351,7 @@ int main( int iarg, char* carg[] )
     po::store( po::parse_command_line(iarg,carg,desc), args );
     po::notify(args);
 
-    timings = args.count("timings") > 0;
-
-    if (!args.count("xml-input-file")){
-      std::cout << "You must enter an xml input file for Cantera" << std::endl;
-      std::cout << desc << std::endl;
-      return 1;
-    }
+    timings = args.count("timings") || args.count("pokitt-reps") || args.count("cantera-reps");
 
     if (args.count("help")) {
       std::cout << desc << "\n";
