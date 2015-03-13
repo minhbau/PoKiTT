@@ -29,11 +29,13 @@
  *      Author: Nathan Yonkee
  */
 
+#include <numeric>
 #include <iostream>
 #include "TestHelper.h"
 #include "LinearMassFracs.h"
 #include <pokitt/MixtureMolWeight.h>
 #include <pokitt/kinetics/ReactionRates.h>
+#include <pokitt/thermo/Density.h>
 
 #include <expression/ExprLib.h>
 
@@ -46,6 +48,11 @@
 #include <boost/program_options.hpp>
 
 #include <cantera/IdealGasMix.h>
+
+#ifdef ENABLE_CUDA
+#include <cuda_profiler_api.h>
+#include <cuda_runtime_api.h>
+#endif
 
 namespace Cantera_CXX{ class IdealGasMix; }
 
@@ -117,7 +124,7 @@ get_cantera_results( const bool timings,
   CellField::iterator                                iCant;
 
   std::vector<double> rResult(nSpec,0.0);
-  SpatialOps::Timer cTimer;
+  SO::Timer cTimer;
   cTimer.start();
   for( size_t rep=0; rep < canteraReps; ++rep ){
     iPress = press.begin();
@@ -150,6 +157,7 @@ bool driver( const bool timings,
   const Expr::Tag tTag  ( "Temperature", Expr::STATE_NONE);
   const Expr::Tag pTag  ( "Pressure",    Expr::STATE_NONE);
   const Expr::Tag mmwTag( "mmw",         Expr::STATE_NONE);
+  const Expr::Tag rhoTag( "rho",         Expr::STATE_NONE);
   Expr::TagList yiTags;
   Expr::TagList rTags;
   for( size_t n=0; n<nSpec; ++n ){
@@ -170,12 +178,14 @@ bool driver( const bool timings,
     typedef Expr::ConstantExpr    <CellField>::Builder Pressure;
     typedef       MixtureMolWeight<CellField>::Builder MixMolWeight;
     typedef Expr::LinearFunction  <CellField>::Builder Temperature;
+    typedef       Density         <CellField>::Builder Density;
 
     initFactory.register_expression(       new XCoord       ( xTag )                     );
     yID = initFactory.register_expression( new MassFracs    ( yiTags, xTag )             );
-    pID = initFactory.register_expression( new Pressure     ( pTag, gasMix->pressure() ) );
+    initFactory.register_expression(       new Pressure     ( pTag, gasMix->pressure() ) );
     mID = initFactory.register_expression( new MixMolWeight ( mmwTag, yiTags )           );
-    tID = initFactory.register_expression( new Temperature  ( tTag ,xTag, 1000, 500 )    );
+    tID = initFactory.register_expression( new Temperature  ( tTag ,xTag, 2000, 500 )    );
+    pID = initFactory.register_expression( new Density      ( rhoTag, tTag, pTag, mmwTag ) );
     initIDs.insert( tID );
     initIDs.insert( pID );
     initIDs.insert( mID );
@@ -187,15 +197,15 @@ bool driver( const bool timings,
   {
     typedef Expr::PlaceHolder   <CellField>::Builder MassFracs;
     typedef Expr::PlaceHolder   <CellField>::Builder Temperature;
-    typedef Expr::PlaceHolder   <CellField>::Builder Pressure;
+    typedef Expr::PlaceHolder   <CellField>::Builder Density;
     typedef Expr::PlaceHolder   <CellField>::Builder MixMolWeight;
     typedef       ReactionRates <CellField>::Builder ReactionRates;
 
     execFactory.register_expression( new MassFracs   ( yiTags ) );
     execFactory.register_expression( new Temperature ( tTag   ) );
-    execFactory.register_expression( new Pressure    ( pTag   ) );
-    execFactory.register_expression( new Pressure    ( mmwTag ) );
-    execID = execFactory.register_expression( new ReactionRates(rTags, tTag, pTag, yiTags, mmwTag) );
+    execFactory.register_expression( new Density     ( rhoTag ) );
+    execFactory.register_expression( new MixMolWeight( mmwTag ) );
+    execID = execFactory.register_expression( new ReactionRates(rTags, tTag, rhoTag, yiTags, mmwTag) );
   }
 
   Expr::ExpressionTree initTree( initIDs, initFactory, 0 );
@@ -220,7 +230,7 @@ bool driver( const bool timings,
 
   std::vector<SO::IntVec> sizeVec;
   if( timings ){
-    sizeVec.push_back( SO::IntVec(2046, 1022, 1) );
+    sizeVec.push_back( SO::IntVec(1022, 1022, 1) );
     sizeVec.push_back( SO::IntVec(1022, 1022, 1) );
     sizeVec.push_back( SO::IntVec(510,  510,  1) );
     sizeVec.push_back( SO::IntVec(254,  254,  1) );
@@ -248,13 +258,28 @@ bool driver( const bool timings,
     if( timings ) std::cout << std::endl << "Reaction rates test - " << nPoints << std::endl;
 
     initTree.execute_tree();
-    SpatialOps::Timer rxnTimer;
-    rxnTimer.start();
+    SO::Timer rxnTimer;
+    std::vector< double > times;
+    double ti=0.0;
+    if( timings )
+      execTree.execute_tree(); // sets memory high-water mark
     for( size_t rep = 0; rep < pokittReps; ++rep ){
+      rxnTimer.start();
       execTree.execute_tree();
+      rxnTimer.stop();
+      if( timings ){
+        std::cout << "PoKiTT  reaction rate time " << rxnTimer.elapsed_time() - ti << std::endl;
+        times.push_back(rxnTimer.elapsed_time() - ti);
+        ti =rxnTimer.elapsed_time();
+
+      }
     }
-    rxnTimer.stop();
-    if( timings ) std::cout << "PoKiTT  reaction rate time " << rxnTimer.elapsed_time()/pokittReps << std::endl;
+
+    if( timings ){
+      std::sort( times.begin(), times.end() );
+      int chop = floor(pokittReps/4);
+      std::cout << "PoKiTT  reaction rate time " << std::accumulate((times.begin() + chop), (times.end()-chop), 0.0 )/(pokittReps-2*chop) << std::endl;
+    }
 
     const std::vector< CellFieldPtrT > canteraResults = get_cantera_results( timings,
                                                                              canteraReps,
@@ -298,7 +323,7 @@ int main( int iarg, char* carg[] )
     po::options_description desc("Supported Options");
     desc.add_options()
            ( "help", "print help message" )
-           ( "xml-input-file", po::value<std::string>(&inputFileName), "Cantera xml input file name" )
+           ( "xml-input-file", po::value<std::string>(&inputFileName)->default_value("h2o2.xml"), "Cantera xml input file name" )
            ( "phase", po::value<std::string>(&inpGroup), "name of phase in Cantera xml input file" )
            ( "timings", "Generate comparison timings between Cantera and PoKiTT across several problem sizes" )
            ( "pokitt-reps", po::value<size_t>(&pokittReps), "Repeat the PoKiTT tests and report the average execution time")
@@ -308,13 +333,7 @@ int main( int iarg, char* carg[] )
     po::store( po::parse_command_line(iarg,carg,desc), args );
     po::notify(args);
 
-    timings = args.count("timings") > 0;
-
-    if (!args.count("xml-input-file")){
-      std::cout << "You must enter an xml input file for Cantera" << std::endl;
-      std::cout << desc << std::endl;
-      return 1;
-    }
+    timings = args.count("timings") || args.count("pokitt-reps");
 
     if (args.count("help")) {
       std::cout << desc << "\n";
@@ -333,7 +352,10 @@ int main( int iarg, char* carg[] )
 
     TestHelper status( !timings );
     status( driver( timings, pokittReps, canteraReps ), "Reaction Rates" );
-
+#ifdef ENABLE_CUDA
+    cudaDeviceSynchronize();
+    cudaProfilerStop();
+#endif
     if( status.ok() ){
       std::cout << "\nPASS\n";
       return 0;
