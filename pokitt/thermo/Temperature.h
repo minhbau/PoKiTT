@@ -87,7 +87,10 @@ class Temperature
   std::vector<int> polyTypeVec_; // vector of polynomial types
   int nSpec_; // number of species to iterate over
   bool shomateFlag_; // flag if shomate polynomial is present
+
   const double tol_; // tolerance for Newton's method
+  const double maxTemp_; //temperatures above this will throw an exception, default is 5000K
+  const int maxIterations_; // number of iterations before exception is thrown, default is 20
 
 
   Temperature( const Expr::TagList& massFracTags,
@@ -174,7 +177,10 @@ class TemperatureFromE0
   std::vector<int> polyTypeVec_; // vector of polynomial types
   int nSpec_; // number of species to iterate over
   bool shomateFlag_; // flag if Shomate polynomial is present
+
   const double tol_; // tolerance for Newton's method
+  const double maxTemp_; //temperatures above this will throw an exception, default is 5000K
+  const int maxIterations_; // number of iterations before exception is thrown, default is 20
 
   TemperatureFromE0( const Expr::TagList& massFracTags,
                      const Expr::Tag& e0Tag,
@@ -228,7 +234,9 @@ Temperature( const Expr::TagList& massFracTags,
              const double tol )
   : Expr::Expression<FieldT>(),
     shomateFlag_ ( false ),
-    tol_( tol )
+    tol_( tol ),
+    maxTemp_( 5000 ),
+    maxIterations_( 20 )
 {
   this->set_gpu_runnable( true );
 
@@ -333,8 +341,6 @@ evaluate()
 # endif
   bool isConverged = false;
   int iterations = 0;
-  const int maxIts = 20;
-  const double exceptionTemp = 5000; // maximum temperature before exception is thrown
   while( !isConverged ){
     delH <<= enth;
     dhdT <<= 0.0;
@@ -346,14 +352,14 @@ evaluate()
 #   ifndef ENABLE_CUDA
     const double maxTval = nebo_max(temp);
     const double minTval = nebo_min(temp);
-    if( maxTval >= exceptionTemp ){
+    if( maxTval >= maxTemp_ ){
       std::ostringstream msg;
         msg << std::endl
             << "Error in pokitt::Temperature::evaluate()." << std::endl
             << "Temperature is too high" << std::endl;
-        find_bad_points( msg, temp, exceptionTemp, false );
+        find_bad_points( msg, temp, maxTemp_, false );
         msg << "Total   iterations = " << iterations << std::endl
-            << "Maximum iterations = " << maxIts << std::endl
+            << "Maximum iterations = " << maxIterations_ << std::endl
             << "Set tolerance      = " << tol_ << std::endl
             << __FILE__ << " : " << __LINE__ << std::endl;
         throw std::runtime_error( msg.str() );
@@ -365,7 +371,7 @@ evaluate()
             << "Temperature is below 0" << std::endl;
         find_bad_points( msg, temp, 0, true );
         msg << "Total   iterations = " << iterations << std::endl
-            << "Maximum iterations = " << maxIts << std::endl
+            << "Maximum iterations = " << maxIterations_ << std::endl
             << "Set tolerance      = " << tol_ << std::endl
             << __FILE__ << " : " << __LINE__ << std::endl;
         throw std::runtime_error( msg.str() );
@@ -377,7 +383,7 @@ evaluate()
             << "Temperature is NaN" << std::endl;
         find_bad_points( msg, temp, NAN, false );
         msg << "Total   iterations = " << iterations << std::endl
-            << "Maximum iterations = " << maxIts << std::endl
+            << "Maximum iterations = " << maxIterations_ << std::endl
             << "Set tolerance      = " << tol_ << std::endl
             << __FILE__ << " : " << __LINE__ << std::endl;
         throw std::runtime_error( msg.str() );
@@ -471,13 +477,13 @@ evaluate()
     isConverged = err < tol_; // Converged when the temperature has changed by less than specified tolerance
     ++iterations;
 
-    if( !isConverged && iterations == maxIts ){
+    if( !isConverged && iterations == maxIterations_ ){
       std::ostringstream msg;
         msg << std::endl
             << "Error in pokitt::Temperature::evaluate()." << std::endl
             << "Iteration count exceeded" << std::endl
             << "Total   iterations = " << iterations << std::endl
-            << "Maximum iterations = " << maxIts << std::endl
+            << "Maximum iterations = " << maxIterations_ << std::endl
             << "Set tolerance              = " << tol_ << std::endl
             << "Largest pointwise residual = " << err << std::endl
             << __FILE__ << " : " << __LINE__ << std::endl;
@@ -581,7 +587,9 @@ TemperatureFromE0( const Expr::TagList& massFracTags,
                    const double tol )
   : Expr::Expression<FieldT>(),
     tol_( tol ),
-    shomateFlag_ ( false )
+    shomateFlag_ ( false ),
+    maxTemp_( 5000 ),
+    maxIterations_( 20 )
 {
   this->set_gpu_runnable( true );
 
@@ -695,8 +703,6 @@ evaluate()
 
   bool isConverged = false;
   int iterations = 0;
-  const int maxIts = 20;
-  const double exceptionTemp = 5000; // maximum temperature before exception is thrown
     while( !isConverged ){
       delE0 <<= e0 - ke;
       dE0dT <<= 0.0;
@@ -708,14 +714,14 @@ evaluate()
 #     ifndef ENABLE_CUDA
       const double maxTval = nebo_max(temp);
       const double minTval = nebo_min(temp);
-      if( maxTval >= exceptionTemp ){
+      if( maxTval >= maxTemp_ ){
         std::ostringstream msg;
           msg << std::endl
               << "Error in pokitt::TemperatureFromE0::evaluate()." << std::endl
               << "Temperature is too high" << std::endl;
-          find_bad_points( msg, temp, exceptionTemp, false );
+          find_bad_points( msg, temp, maxTemp_, false );
           msg << "Total   iterations = " << iterations << std::endl
-              << "Maximum iterations = " << maxIts << std::endl
+              << "Maximum iterations = " << maxIterations_ << std::endl
               << "Set tolerance      = " << tol_ << std::endl
               << __FILE__ << " : " << __LINE__ << std::endl;
           throw std::runtime_error( msg.str() );
@@ -727,7 +733,7 @@ evaluate()
               << "Temperature is below 0" << std::endl;
           find_bad_points( msg, temp, 0, true );
           msg << "Total   iterations = " << iterations << std::endl
-              << "Maximum iterations = " << maxIts << std::endl
+              << "Maximum iterations = " << maxIterations_ << std::endl
               << "Set tolerance      = " << tol_ << std::endl
               << __FILE__ << " : " << __LINE__ << std::endl;
           throw std::runtime_error( msg.str() );
@@ -739,7 +745,7 @@ evaluate()
               << "Temperature is NaN" << std::endl;
           find_bad_points( msg, temp, NAN, false );
           msg << "Total   iterations = " << iterations << std::endl
-              << "Maximum iterations = " << maxIts << std::endl
+              << "Maximum iterations = " << maxIterations_ << std::endl
               << "Set tolerance      = " << tol_ << std::endl
               << __FILE__ << " : " << __LINE__ << std::endl;
           throw std::runtime_error( msg.str() );
@@ -835,13 +841,13 @@ evaluate()
       isConverged = ( err < tol_ ); // Converged when the temperature has changed by less than set tolerance
       ++iterations;
 
-      if( !isConverged && iterations == maxIts ){
+      if( !isConverged && iterations == maxIterations_ ){
         std::ostringstream msg;
           msg << std::endl
               << "Error in pokitt::TemperatureFromE0::evaluate()." << std::endl
               << "Iteration count exceeded" << std::endl
               << "Total   iterations = " << iterations << std::endl
-              << "Maximum iterations = " << maxIts << std::endl
+              << "Maximum iterations = " << maxIterations_ << std::endl
               << "Set tolerance              = " << tol_ << std::endl
               << "Largest pointwise residual = " << err << std::endl
               << __FILE__ << " : " << __LINE__ << std::endl;

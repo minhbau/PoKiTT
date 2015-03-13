@@ -66,6 +66,8 @@ public:
 
 private:
 
+  // overwrite base class virtual functions
+  Expr::ExpressionID initial_condition( Expr::ExpressionFactory& execFactory ){ return Expr::ExpressionID::null_id(); }
   void setup_boundary_conditions( Expr::ExpressionFactory& ){}
 
 };
