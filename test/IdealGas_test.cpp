@@ -29,6 +29,7 @@
  *      Author: Nathan Yonkee
  */
 
+#include <numeric>
 #include <iostream>
 #include "TestHelper.h"
 #include "LinearMassFracs.h"
@@ -281,18 +282,27 @@ bool driver( const bool timings,
 #   ifdef ENABLE_CUDA
     xcoord.set_device_as_active( GPU_INDEX );
 #   endif
-
-    if( timings ) std::cout << std::endl << property_name(gasQuantity) + " test - " << nPoints << std::endl;
-
     initTree.execute_tree();
-    SpatialOps::Timer gasTimer;
-    gasTimer.start();
-    for( size_t rep = 0; rep < pokittReps; ++rep ){
-      execTree.execute_tree();
-    }
-    gasTimer.stop();
 
-    if( timings ) std::cout << "PoKiTT  " + property_name(gasQuantity) + " time " << gasTimer.elapsed_time()/pokittReps << std::endl;
+    if( timings ){
+      std::cout << std::endl << property_name(gasQuantity) + " test - " << nPoints << std::endl;
+      execTree.execute_tree();// sets memory high-water mark
+    }
+
+    SpatialOps::Timer timer;
+    std::vector< double > times;
+    for( size_t rep = 0; rep < pokittReps; ++rep ){
+      timer.reset();
+      execTree.execute_tree();
+      times.push_back( timer.stop() );
+    }
+
+    if( timings ){
+      std::sort( times.begin(), times.end() );
+      const int chop = floor(pokittReps/4);
+      const double avgTime = std::accumulate( times.begin() + chop, times.end()-chop, 0.0 )/(pokittReps-2*chop);
+      std::cout << "PoKiTT  " + property_name(gasQuantity) + " time " << avgTime << std::endl;
+    }
 
     CellFieldPtrT canteraResult = get_cantera_result( timings, canteraReps, gasQuantity, *gasMix, fml, yiTags, tTag, refTag );
     CellField& gasField = fml.field_ref< CellField >( gasTag );

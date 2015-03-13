@@ -29,6 +29,7 @@
  *      Author: Nathan Yonkee
  */
 
+#include <numeric>
 #include <iostream>
 #include "TestHelper.h"
 #include "LinearMassFracs.h"
@@ -291,18 +292,28 @@ bool driver( const bool timings,
 #   ifdef ENABLE_CUDA
     xcoord.set_device_as_active( GPU_INDEX );
 #   endif
+    initTree.execute_tree();
 
-    if( timings ) std::cout << std::endl << "T from " << energy_name(energyType) << " test - " << nPoints << std::endl;
-
-    SpatialOps::Timer tTimer;
-    for( size_t rep = 0; rep < pokittReps; ++rep ){
-      initTree.execute_tree(); // set initial guess
-      tTimer.start();
-      execTree.execute_tree();
-      tTimer.stop();
+    if( timings ){
+      std::cout << std::endl << "T from " << energy_name(energyType) << " test - " << nPoints << std::endl;
+      execTree.execute_tree(); // sets memory high-water mark
     }
 
-    if( timings ) std::cout << "PoKiTT  T from " + energy_name(energyType) + " time " << tTimer.elapsed_time()/pokittReps << std::endl;
+    SpatialOps::Timer timer;
+    std::vector< double > times;
+    for( size_t rep = 0; rep < pokittReps; ++rep ){
+      initTree.execute_tree(); // set initial guess
+      timer.reset();
+      execTree.execute_tree();
+      times.push_back( timer.stop() );
+    }
+
+    if( timings ){
+      std::sort( times.begin(), times.end() );
+      const int chop = floor(pokittReps/4);
+      const double avgTime = std::accumulate( times.begin() + chop, times.end()-chop, 0.0 )/(pokittReps-2*chop);
+      std::cout << "PoKiTT  T from " + energy_name(energyType) + " time " << avgTime << std::endl;
+    }
 
     initTree.execute_tree(); // set initial guess for Cantera
     CellFieldPtrT canteraResult = get_cantera_result( timings, canteraReps, energyType, *gasMix, fml, tTag, yiTags, energyTag, nuTag, pTag );

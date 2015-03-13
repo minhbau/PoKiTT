@@ -29,6 +29,7 @@
  *      Author: Nathan Yonkee
  */
 
+#include <numeric>
 #include <iostream>
 #include "TestHelper.h"
 #include "LinearMassFracs.h"
@@ -353,17 +354,27 @@ bool driver( const bool timings,
 #   ifdef ENABLE_CUDA
     xcoord.set_device_as_active( GPU_INDEX );
 #   endif
-
-    if( timings ) std::cout << std::endl << thermo_name(thermoQuantity) << " test - " << nPoints << std::endl;
-
     initTree.execute_tree();
-    SpatialOps::Timer thermoTimer;  thermoTimer.start();
-    for( size_t rep = 0; rep < pokittReps; ++rep ){
-      execTree.execute_tree();
-    }
-    thermoTimer.stop();
 
-    if( timings ) std::cout << "PoKiTT  " + thermo_name(thermoQuantity) + " time " << thermoTimer.elapsed_time()/pokittReps << std::endl;
+    if( timings ){
+      std::cout << std::endl << thermo_name(thermoQuantity) << " test - " << nPoints << std::endl;
+      execTree.execute_tree(); // sets memory high-water mark
+    }
+
+    SpatialOps::Timer timer;
+    std::vector< double > times;
+    for( size_t rep = 0; rep < pokittReps; ++rep ){
+      timer.reset();
+      execTree.execute_tree();
+      times.push_back( timer.stop() );
+    }
+
+    if( timings ){
+      std::sort( times.begin(), times.end() );
+      const int chop = floor(pokittReps/4);
+      const double avgTime = std::accumulate( times.begin() + chop, times.end()-chop, 0.0 )/(pokittReps-2*chop);
+      std::cout << "PoKiTT  " + thermo_name(thermoQuantity) + " time " << avgTime << std::endl;
+    }
 
     const std::vector< CellFieldPtrT > canteraResults = get_cantera_results( mix,
                                                                              timings,

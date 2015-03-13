@@ -230,7 +230,7 @@ bool driver( const bool timings,
 
   std::vector<SO::IntVec> sizeVec;
   if( timings ){
-    sizeVec.push_back( SO::IntVec(1022, 1022, 1) );
+    sizeVec.push_back( SO::IntVec(2046, 1022, 1) );
     sizeVec.push_back( SO::IntVec(1022, 1022, 1) );
     sizeVec.push_back( SO::IntVec(510,  510,  1) );
     sizeVec.push_back( SO::IntVec(254,  254,  1) );
@@ -254,31 +254,26 @@ bool driver( const bool timings,
 #   ifdef ENABLE_CUDA
     xcoord.set_device_as_active( GPU_INDEX );
 #   endif
-
-    if( timings ) std::cout << std::endl << "Reaction rates test - " << nPoints << std::endl;
-
     initTree.execute_tree();
-    SO::Timer rxnTimer;
-    std::vector< double > times;
-    double ti=0.0;
-    if( timings )
-      execTree.execute_tree(); // sets memory high-water mark
-    for( size_t rep = 0; rep < pokittReps; ++rep ){
-      rxnTimer.start();
-      execTree.execute_tree();
-      rxnTimer.stop();
-      if( timings ){
-        std::cout << "PoKiTT  reaction rate time " << rxnTimer.elapsed_time() - ti << std::endl;
-        times.push_back(rxnTimer.elapsed_time() - ti);
-        ti =rxnTimer.elapsed_time();
 
-      }
+    if( timings ){
+      std::cout << std::endl << "Reaction rates test - " << nPoints << std::endl;
+      execTree.execute_tree(); // sets memory high-water mark
+    }
+
+    SpatialOps::Timer timer;
+    std::vector< double > times;
+    for( size_t rep = 0; rep < pokittReps; ++rep ){
+      timer.reset();
+      execTree.execute_tree();
+      times.push_back( timer.stop() );
     }
 
     if( timings ){
       std::sort( times.begin(), times.end() );
-      int chop = floor(pokittReps/4);
-      std::cout << "PoKiTT  reaction rate time " << std::accumulate((times.begin() + chop), (times.end()-chop), 0.0 )/(pokittReps-2*chop) << std::endl;
+      const int chop = floor(pokittReps/4);
+      const double avgTime = std::accumulate( times.begin() + chop, times.end()-chop, 0.0 )/(pokittReps-2*chop);
+      std::cout << "PoKiTT  reaction rate time " << avgTime << std::endl;
     }
 
     const std::vector< CellFieldPtrT > canteraResults = get_cantera_results( timings,
@@ -333,7 +328,7 @@ int main( int iarg, char* carg[] )
     po::store( po::parse_command_line(iarg,carg,desc), args );
     po::notify(args);
 
-    timings = args.count("timings") || args.count("pokitt-reps");
+    timings = args.count("timings") || args.count("pokitt-reps") || args.count("cantera-reps");
 
     if (args.count("help")) {
       std::cout << desc << "\n";

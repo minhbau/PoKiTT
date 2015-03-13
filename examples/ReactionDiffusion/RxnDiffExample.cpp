@@ -30,6 +30,7 @@
  */
 
 #include <iostream>
+#include <numeric>
 
 #include <expression/ExprLib.h>
 
@@ -108,7 +109,7 @@ bool driver( const bool timings,
 
   std::vector< IntVec > sizeVec;
   if( timings ){
-    sizeVec.push_back( IntVec(1022, 1022, 1 ) );
+    sizeVec.push_back( IntVec(1022, 510, 1 ) );
     sizeVec.push_back( IntVec(510,  510,  1 ) );
     sizeVec.push_back( IntVec(254,  254,  1 ) );
     sizeVec.push_back( IntVec(126,  126,  1 ) );
@@ -179,20 +180,28 @@ bool driver( const bool timings,
 
     initTree.execute_tree();
 
-    if( timings ) std::cout << "\nPoKiTT Reaction Diffusion size " << xcoord.window_with_ghost().glob_npts() << std::endl;
+    if( timings ){
+      std::cout << "\nPoKiTT Reaction Diffusion size " << xcoord.window_with_ghost().glob_npts() << std::endl;
+      timeIntegrator.step( dt ); // sets high water mark on memory
+    }
     SpatialOps::Timer timer;
-    timer.start();
+    std::vector< double > times;
     for( size_t s = 0; s <= nSteps; ++s ){
       if( s%5000 == 0 && print){
-        timer.stop();
-        std::cout<<"Fields at time "<< s*dt << "; step " << s << "; simulation run time " << timer.elapsed_time() << std::endl;
+        std::cout<<"Fields at time "<< s*dt << "; step " << s << std::endl;
         print_fields( fml, tag_list( tagMgr[T], tagMgr.rN( 0 ), tagMgr.rhoYiN( 0 ) ) );
-        timer.start();
       }
+      timer.reset();
       timeIntegrator.step( dt );
+      times.push_back( timer.stop() );
     }
-    timer.stop();
-    if( timings ) std::cout << "PoKiTT Reaction Diffusion time per step " << timer.elapsed_time() / (nSteps + 1) << std::endl;
+
+    if( timings ){
+      std::sort( times.begin(), times.end() );
+      const int chop = floor(nSteps/4);
+      const double avgTime = std::accumulate( times.begin() + chop, times.end()-chop, 0.0 )/( nSteps + 1 - 2*chop);
+      std::cout << "PoKiTT Reaction Diffusion time per step " << avgTime << std::endl;
+    }
 
     CellField& t = fml.field_ref< CellField >( tagMgr[T] );
 #   ifdef ENABLE_CUDA
