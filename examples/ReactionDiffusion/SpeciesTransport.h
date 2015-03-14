@@ -66,6 +66,8 @@ public:
 
 private:
 
+  // overwrite base class virtual functions
+  Expr::ExpressionID initial_condition( Expr::ExpressionFactory& execFactory ){ return Expr::ExpressionID::null_id(); }
   void setup_boundary_conditions( Expr::ExpressionFactory& ){}
 
 };
@@ -200,7 +202,7 @@ register_one_time_expressions( Expr::ExpressionFactory& execFactory )
   execFactory.register_expression( new MassFracs       ( tagM_.yiN(), tagM_[RHO],  tagM_.rhoYiN()         ) );
   execFactory.register_expression( new Pressure        ( tagM_[P],    tagM_[T],    tagM_[RHO], tagM_[MMW] ) );
   execFactory.register_expression( new DiffusionCoeffs ( tagM_.dN(),  tagM_[T],    tagM_[P],   tagM_.yiN(), tagM_[MMW] ) );
-  execFactory.register_expression( new ReactionRates   ( tagM_.rN(),  tagM_[T],    tagM_[P],   tagM_.yiN(), tagM_[MMW] ) );
+  execFactory.register_expression( new ReactionRates   ( tagM_.rN(),  tagM_[T],    tagM_[RHO],   tagM_.yiN(), tagM_[MMW] ) );
   execFactory.register_expression( new MassFluxX       ( tagM_.jxN(), tagM_.yiN(), tagM_[RHO], tagM_[MMW],  tagM_.dN() ) );
   execFactory.register_expression( new MassFluxY       ( tagM_.jyN(), tagM_.yiN(), tagM_[RHO], tagM_[MMW],  tagM_.dN() ) );
 }

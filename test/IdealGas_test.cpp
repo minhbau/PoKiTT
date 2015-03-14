@@ -29,6 +29,7 @@
  *      Author: Nathan Yonkee
  */
 
+#include <numeric>
 #include <iostream>
 #include "TestHelper.h"
 #include "LinearMassFracs.h"
@@ -281,18 +282,27 @@ bool driver( const bool timings,
 #   ifdef ENABLE_CUDA
     xcoord.set_device_as_active( GPU_INDEX );
 #   endif
-
-    if( timings ) std::cout << std::endl << property_name(gasQuantity) + " test - " << nPoints << std::endl;
-
     initTree.execute_tree();
-    SpatialOps::Timer gasTimer;
-    gasTimer.start();
-    for( size_t rep = 0; rep < pokittReps; ++rep ){
-      execTree.execute_tree();
-    }
-    gasTimer.stop();
 
-    if( timings ) std::cout << "PoKiTT  " + property_name(gasQuantity) + " time " << gasTimer.elapsed_time()/pokittReps << std::endl;
+    if( timings ){
+      std::cout << std::endl << property_name(gasQuantity) + " test - " << nPoints << std::endl;
+      execTree.execute_tree();// sets memory high-water mark
+    }
+
+    SpatialOps::Timer timer;
+    std::vector< double > times;
+    for( size_t rep = 0; rep < pokittReps; ++rep ){
+      timer.reset();
+      execTree.execute_tree();
+      times.push_back( timer.stop() );
+    }
+
+    if( timings ){
+      std::sort( times.begin(), times.end() );
+      const int chop = floor(pokittReps/4);
+      const double avgTime = std::accumulate( times.begin() + chop, times.end()-chop, 0.0 )/(pokittReps-2*chop);
+      std::cout << "PoKiTT  " + property_name(gasQuantity) + " time " << avgTime << std::endl;
+    }
 
     CellFieldPtrT canteraResult = get_cantera_result( timings, canteraReps, gasQuantity, *gasMix, fml, yiTags, tTag, refTag );
     CellField& gasField = fml.field_ref< CellField >( gasTag );
@@ -322,7 +332,7 @@ int main( int iarg, char* carg[] )
   po::options_description desc("Supported Options");
   desc.add_options()
                ( "help", "print help message" )
-               ( "xml-input-file", po::value<std::string>(&inputFileName), "Cantera xml input file name" )
+               ( "xml-input-file", po::value<std::string>(&inputFileName)->default_value("h2o2.xml"), "Cantera xml input file name" )
                ( "phase", po::value<std::string>(&inpGroup), "name of phase in Cantera xml input file" )
                ( "timings", "Generate comparison timings between Cantera and PoKiTT across several problem sizes" )
                ( "pokitt-reps", po::value<size_t>(&pokittReps), "Repeat the PoKiTT tests and report the average execution time")
@@ -333,13 +343,7 @@ int main( int iarg, char* carg[] )
     po::store( po::parse_command_line(iarg,carg,desc), args );
     po::notify(args);
 
-    timings = args.count("timings") > 0;
-
-    if (!args.count("xml-input-file")){
-      std::cout << "You must enter an xml input file for Cantera" << std::endl;
-      std::cout << desc << std::endl;
-      return 1;
-    }
+    timings = args.count("timings") || args.count("pokitt-reps") || args.count("cantera-reps");
 
     if (args.count("help")) {
       std::cout << desc << "\n";
