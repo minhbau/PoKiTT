@@ -187,6 +187,7 @@ bool driver( const bool timings,
     if( timings ){
       std::cout << "\nPoKiTT Reaction Diffusion size " << xcoord.window_with_ghost().glob_npts() << std::endl;
       timeIntegrator.step( dt ); // sets high water mark on memory
+      timeIntegrator.request_timings();
     }
     SpatialOps::Timer timer;
     std::vector< double > times;
