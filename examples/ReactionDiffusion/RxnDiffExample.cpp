@@ -39,13 +39,17 @@
 #include <spatialops/util/TimeLogger.h>
 
 #include <pokitt/CanteraObjects.h>
+#include "PoKiTTVersion.h"
+
 #include "test/TestHelper.h"
+
 #include "EnthalpyTransport.h"
 #include "SpeciesTransport.h"
+#include "TagManager.h"
+
 #include <boost/lexical_cast.hpp>
 #include <boost/foreach.hpp>
 #include <boost/program_options.hpp>
-#include "TagManager.h"
 
 namespace Cantera_CXX{ class IdealGasMix; }
 
@@ -259,6 +263,25 @@ int main( int iarg, char* carg[] )
   try{
     const CanteraObjects::Setup setup( "Mix", inputFileName, inpGroup );
     CanteraObjects::setup_cantera( setup );
+
+    {
+      Cantera_CXX::IdealGasMix* const gasMix = CanteraObjects::get_gasmix();
+      std::cout << "Reaction-diffusion example\n"
+          <<"\n--------------------------------------------------------------\n"
+          << "BUILD INFORMATION:\n"
+          << "\n\t PoKiTT     git hash: \t" << PoKiTTVersionHash
+          << "\n\t ExprLib    git hash: \t" << EXPR_REPO_HASH
+          << "\n\t SpatialOps git hash: \t" << SOPS_REPO_HASH
+          <<"--------------------------------------------------------------\n"
+          << "MECHANISM INFORMATION\n"
+          << "\n\tXML input file: " << inputFileName
+          << "\n\tPhase name    : " << gasMix->name()
+          << "\n\t# species     : " << gasMix->nSpecies()
+          << "\n\t# reactions   : " << gasMix->nReactions()
+          <<"\n--------------------------------------------------------------\n\n";
+      CanteraObjects::restore_gasmix(gasMix);
+    }
+
 
     TestHelper status( !timings );
     status( driver( timings, print, nSteps, dt ), "Reaction Diffusion" );
