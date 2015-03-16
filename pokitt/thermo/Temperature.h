@@ -27,12 +27,9 @@
 
 #include <expression/Expression.h>
 
-#include <cantera/kernel/ct_defs.h> // contains value of gas constant
-#include <cantera/kernel/speciesThermoTypes.h> // contains definitions for which polynomial is being used
-
 #include <pokitt/CanteraObjects.h> // include Cantera wrapper
 
-#include <math.h> // isnan error checking
+#include <cmath> // isnan error checking
 
 namespace pokitt{
 
@@ -73,19 +70,15 @@ class Temperature
     : public Expr::Expression<FieldT>
 {
   typedef std::vector<FieldT*> SpecT;
-  typedef std::vector<double> PolyVals; // values used for polynomial
   const Expr::Tag enthTag_;
   const Expr::TagList massFracTags_;
 
   DECLARE_FIELD( FieldT, enth_ )
   DECLARE_VECTOR_OF_FIELDS( FieldT, massFracs_ )
 
-  PolyVals minTVec_; // vector of minimum temperatures for polynomial evaluations
-  PolyVals maxTVec_; // vector of maximum temperatures for polynomial evaluations
-  std::vector< PolyVals > cVec_; // vector of polynomial coefficients
-  std::vector< PolyVals > cFracVec_; // vector of polynomial coefficients divided by integers
-  std::vector<int> polyTypeVec_; // vector of polynomial types
-  int nSpec_; // number of species to iterate over
+  std::vector< ThermData > specThermVec_;
+  std::vector< std::vector<double> > cFracVec_; // vector of polynomial coefficients divided by integers carried from integration
+  const int nSpec_; // number of species to iterate over
   bool shomateFlag_; // flag if shomate polynomial is present
 
   const double tol_; // tolerance for Newton's method
@@ -95,7 +88,9 @@ class Temperature
 
   Temperature( const Expr::TagList& massFracTags,
                const Expr::Tag& enthTag,
-               const double tol );
+               const double tol,
+               const double maxTemp,
+               const int maxIterations);
 public:
 
   class Builder : public Expr::ExpressionBuilder
@@ -113,6 +108,8 @@ public:
              const Expr::TagList& massFracTags,
              const Expr::Tag& enthTag,
              const double tol = 1e-3,
+             const double maxTemp = 5000,
+             const int maxIterations = 20,
              const int nghost = DEFAULT_NUMBER_OF_GHOSTS );
 
     Expr::ExpressionBase* build() const;
@@ -120,7 +117,9 @@ public:
   private:
     const Expr::Tag enthTag_;
     const Expr::TagList massFracTags_;
-    const double tol_;
+    const double tol_, maxTemp_;
+    const int maxIterations_;
+
   };
 
   ~Temperature(){}
@@ -231,56 +230,37 @@ template< typename FieldT >
 Temperature<FieldT>::
 Temperature( const Expr::TagList& massFracTags,
              const Expr::Tag& enthTag,
-             const double tol )
+             const double tol,
+             const double maxTemp,
+             const int maxIterations )
   : Expr::Expression<FieldT>(),
-    shomateFlag_ ( false ),
     tol_( tol ),
-    maxTemp_( 5000 ),
-    maxIterations_( 20 )
+    maxTemp_( maxTemp ),
+    maxIterations_( maxIterations ),
+    shomateFlag_( false ),
+    nSpec_( CanteraObjects::number_species() )
 {
   this->set_gpu_runnable( true );
 
   enth_ = this->template create_field_request<FieldT>( enthTag );
   this->template create_field_vector_request<FieldT>( massFracTags, massFracs_ );
 
-  Cantera_CXX::IdealGasMix* const gasMix = CanteraObjects::get_gasmix();
-  const Cantera::SpeciesThermo& spThermo = gasMix->speciesThermo();
-
-  nSpec_ = gasMix->nSpecies();
-  const std::vector<double> molecularWeights = gasMix->molecularWeights();
-  std::vector<double> c(15,0); //vector of Cantera's coefficients
-  std::vector<double> cFrac(15,0); //vector of Cantera's coefficients divided by integers
-  int polyType; // type of polynomial - const_cp, shomate, or NASA
-  double minT; // minimum temperature polynomial is valid
-  double maxT; // maximum temperature polynomial is valid
-  double refPressure;
+  const std::vector<double>& molecularWeights = CanteraObjects::molecular_weights();
+  const double gasConstant = CanteraObjects::gas_constant();
 
   for( size_t n=0; n<nSpec_; ++n ){
-    spThermo.reportParams(n, polyType, &c[0], minT, maxT, refPressure);
-    cFrac = c;
-    switch( polyType ){ // check to ensure that we're using a supported polynomial
-    case NASA2   :                      break;
-    case SHOMATE2: shomateFlag_ = true; break;
-    case SIMPLE  :                      break;
-    default:{
-      std::ostringstream msg;
-      msg << __FILE__ << " : " << __LINE__
-          << "\nThermo type not supported,\n Type = " << polyType
-          << ", species # " << n << std::endl;
-      throw std::invalid_argument( msg.str() );
-    }
-    }
-    polyTypeVec_.push_back(polyType); // vector of polynomial types
-    minTVec_.push_back(minT); // vector of minimum temperatures for polynomial evaluations
-    maxTVec_.push_back(maxT); // vector of maximum temperatures for polynomial evaluations
-    switch (polyType) {
-    case SIMPLE:
+    ThermData tData = CanteraObjects::species_thermo( n );
+    std::vector<double>& c = tData.coefficients;
+    ThermoPoly type = tData.type;
+    std::vector<double> cFrac = c;
+    switch ( type ) {
+    case CONST_POLY:
       c[1] /= molecularWeights[n]; // convert to mass basis
       c[3] /= molecularWeights[n]; // convert to mass basis
       break;
-    case NASA2:
+    case NASA_POLY:
       for( std::vector<double>::iterator ic = c.begin() + 1; ic!=c.end(); ++ic){
-        *ic *= Cantera::GasConstant / molecularWeights[n]; // dimensionalize the coefficients to mass basis
+        *ic *= gasConstant / molecularWeights[n]; // dimensionalize the coefficients to mass basis
       }
       cFrac[ 2] = c[ 2] / 2;
       cFrac[ 3] = c[ 3] / 3;
@@ -291,7 +271,8 @@ Temperature( const Expr::TagList& massFracTags,
       cFrac[11] = c[11] / 4;
       cFrac[12] = c[12] / 5;
       break;
-    case SHOMATE2:
+    case SHOMATE_POLY:
+      shomateFlag_ = true;
       for( std::vector<double>::iterator ic = c.begin() + 1; ic!=c.end(); ++ic ){
         *ic *= 1e6 / molecularWeights[n]; // scale the coefficients to keep units consistent on mass basis
       }
@@ -303,10 +284,9 @@ Temperature( const Expr::TagList& massFracTags,
       cFrac[11] = c[11] / 4;
       break;
     }
-    cVec_.push_back(c); // vector of polynomial coefficients
     cFracVec_.push_back(cFrac);
+    specThermVec_.push_back( tData );
   }
-  CanteraObjects::restore_gasmix(gasMix);
 }
 
 //--------------------------------------------------------------------
@@ -317,7 +297,6 @@ Temperature<FieldT>::
 evaluate()
 {
   using namespace SpatialOps;
-  using namespace Cantera;
   FieldT& temp = this->value();
 
   const FieldT& enth = enth_->field_ref();
@@ -391,19 +370,20 @@ evaluate()
 #   endif
     for( size_t n=0; n<nSpec_; ++n ){
       const FieldT& yi = massFracs_[n]->field_ref();
-      const int polyType = polyTypeVec_[n];
-      const std::vector<double>& c = cVec_[n];
+      const ThermData& specTherm = specThermVec_[n];
+      const ThermoPoly type = specTherm.type;
+      const std::vector<double>& c = specTherm.coefficients;
       const std::vector<double>& cFrac = cFracVec_[n];
-      const double minT = minTVec_[n];
-      const double maxT = maxTVec_[n];
+      const double minT = specTherm.minTemp;
+      const double maxT = specTherm.maxTemp;
 #     ifndef ENABLE_CUDA // optimization benefits only the CPU - cond performs betters with if/else than with if/elif/elif/else
       if( maxTval <= maxT && minTval >= minT){ // if true, temperature can only be either high or low
-        switch (polyType) {
-        case SIMPLE: // constant cp
+        switch ( type ) {
+        case CONST_POLY: // constant cp
           delH <<= delH - yi * ( c[1] + c[3]*(temp-c[0]) );
           dhdT <<= dhdT + yi * c[3];
           break;
-        case NASA2:
+        case NASA_POLY:
           delH <<= delH - yi
                  * cond( temp <= c[0], c[ 6] + temp * ( c[1] + temp * ( cFrac[2] + temp * ( cFrac[ 3] + temp * ( cFrac[ 4] + temp * cFrac[ 5] )))) )  // if low temp
                        (               c[13] + temp * ( c[8] + temp * ( cFrac[9] + temp * ( cFrac[10] + temp * ( cFrac[11] + temp * cFrac[12] )))) );  // else if high temp
@@ -412,7 +392,7 @@ evaluate()
                  * cond( temp <= c[0], c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * ( c[ 4] + temp * c[ 5] ))) )  // if low temp
                        (               c[8] + temp * ( c[9] + temp * ( c[10] + temp * ( c[11] + temp * c[12] ))) );  // else if high temp
           break;
-        case SHOMATE2:
+        case SHOMATE_POLY:
           delH <<= delH - yi
                  * cond( temp <= c[0], c[ 6] + temp*1e-3 * ( c[1] + temp*1e-3 * ( cFrac[2] + temp*1e-3 * ( cFrac[ 3] + temp*1e-3 * cFrac[ 4] ))) - c[ 5] * *recipT*1e3 ) // if low temp
                        (               c[13] + temp*1e-3 * ( c[8] + temp*1e-3 * ( cFrac[9] + temp*1e-3 * ( cFrac[10] + temp*1e-3 * cFrac[11] ))) - c[12] * *recipT*1e3 );  // else if high range
@@ -421,7 +401,7 @@ evaluate()
                  * cond( temp <= c[0], c[1] + temp*1e-3 * ( c[2] + temp*1e-3 * ( c[ 3] + temp*1e-3 * c[ 4] )) + c[ 5] * *recipRecipT*1e6 )  // if low temp
                        (               c[8] + temp*1e-3 * ( c[9] + temp*1e-3 * ( c[10] + temp*1e-3 * c[11] )) + c[12] * *recipRecipT*1e6 );  // else if high temp
           break;
-        } // switch( polyType )
+        } // switch( type )
       }
     else
 #   endif
@@ -429,12 +409,12 @@ evaluate()
         /* else temperature can be out of bounds low, low temp, high temp, or out of bounds high
          * if out of bounds, properties are interpolated from min or max temp using a constant cp
          */
-        switch (polyType){
-        case SIMPLE: // constant cp
+        switch ( type ){
+        case CONST_POLY: // constant cp
           delH<<=delH - yi * ( c[1] + c[3]*(temp-c[0]) );
           dhdT<<=dhdT + yi * c[3];
           break;
-        case NASA2:
+        case NASA_POLY:
           delH <<= delH - yi
                  * cond( temp <= c[0] && temp >= minT, c[ 6] + temp * ( c[1] + temp * ( cFrac[2] + temp * ( cFrac[ 3] + temp * ( cFrac[ 4] + temp * cFrac[ 5] )))) )  // if low temp
                        ( temp >  c[0] && temp <= maxT, c[13] + temp * ( c[8] + temp * ( cFrac[9] + temp * ( cFrac[10] + temp * ( cFrac[11] + temp * cFrac[12] )))) )  // else if high temp
@@ -448,7 +428,7 @@ evaluate()
                        (                               c[8] + maxT * ( c[9] + maxT * ( c[10] + maxT * ( c[11] + maxT * c[12] ))) ); // else out of bounds - high
 
           break;
-        case SHOMATE2:
+        case SHOMATE_POLY:
           delH <<= delH - yi
                  * cond( temp <= c[0] && temp >= minT, c[ 6] + temp*1e-3 * ( c[1] + temp*1e-3 * ( cFrac[2] + temp*1e-3 * ( cFrac[ 3] + temp*1e-3 * cFrac[ 4] ))) - c[ 5] * *recipT*1e3 ) // if low temp
                        ( temp >  c[0] && temp <= maxT, c[13] + temp*1e-3 * ( c[8] + temp*1e-3 * ( cFrac[9] + temp*1e-3 * ( cFrac[10] + temp*1e-3 * cFrac[11] ))) - c[12] * *recipT*1e3 )  // else if high range
@@ -461,7 +441,7 @@ evaluate()
                        ( temp < minT,                  c[1] + minT*1e-3 * ( c[2] + minT*1e-3 * ( c[ 3] + minT*1e-3 * c[ 4] )) + c[ 5] / (minT*minT*1e-6) )  // else if out of bounds - low
                        (                               c[8] + maxT*1e-3 * ( c[9] + maxT*1e-3 * ( c[10] + maxT*1e-3 * c[11] )) + c[12] / (maxT*maxT*1e-6) ); // else out of bounds - high
 
-        } // switch( polyType )
+        } // switch( type )
       }
     } // species loop
     // Newton's method to find root
@@ -501,7 +481,7 @@ Temperature<FieldT>::
 find_bad_points( std::ostringstream& msg, const FieldT& badField, const double badValue, const bool checkBelow )
 {
   bool checkNaN = false;
-  if( isnan( badValue ) ) checkNaN = true;
+  if( std::isnan( badValue ) ) checkNaN = true;
   typename FieldT::const_iterator iField = badField.begin();
   const SpatialOps::MemoryWindow mw = badField.window_with_ghost();
   int badPoints = 0;
@@ -560,11 +540,15 @@ Builder::Builder( const Expr::Tag& resultTag,
                   const Expr::TagList& massFracTags,
                   const Expr::Tag& enthTag,
                   const double tol,
+                  const double maxTemp,
+                  const int maxIterations,
                   const int nghost )
 : ExpressionBuilder( resultTag, nghost ),
   massFracTags_( massFracTags ),
   enthTag_( enthTag ),
-  tol_( tol )
+  tol_( tol ),
+  maxTemp_( maxTemp ),
+  maxIterations_( maxIterations )
 {}
 
 //--------------------------------------------------------------------
@@ -574,7 +558,7 @@ Expr::ExpressionBase*
 Temperature<FieldT>::
 Builder::build() const
 {
-  return new Temperature<FieldT>( massFracTags_, enthTag_, tol_ );
+  return new Temperature<FieldT>( massFracTags_, enthTag_, tol_, maxTemp_, maxIterations_ );
 }
 
 //--------------------------------------------------------------------

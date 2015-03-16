@@ -33,8 +33,63 @@
 #include <cantera/Cantera.h>
 #include <cantera/transport.h>
 #include <cantera/IdealGasMix.h>
+#include <cantera/kernel/ct_defs.h> // contains value of gas constant
+#include <cantera/kernel/speciesThermoTypes.h> // contains definitions for which polynomial is being used
+#include <cantera/kernel/reaction_defs.h> // reaction type definitions
 
 //====================================================================
+namespace pokitt{
+
+  enum ThermoPoly
+  {
+    UNKNOWN_POLY = 0,
+    CONST_POLY,
+    NASA_POLY,
+    SHOMATE_POLY
+  };
+
+  struct ThermData
+  {
+    ThermData( const Cantera::SpeciesThermo& spThermo, const int i );
+    int index;
+    double minTemp;
+    double maxTemp;
+    ThermoPoly type;
+    std::vector< double > coefficients;
+  };
+
+  enum ReactionType{
+    UNKNOWN_RXN = 0,
+    ELEMENTARY,
+    THIRD_BODY,
+    LINDEMANN,
+    TROE
+  };
+
+  struct RxnData
+  {
+    RxnData( const Cantera::ReactionData& cDat, const std::vector<double>& MW );
+    struct SpeciesRxnData{
+      SpeciesRxnData( int index, int stoich, double mw,  double thdBdyEff );
+      int index;
+      int stoich;
+      double mw;
+      double invMW;
+      double thdBdyEff;
+    };
+    std::vector< SpeciesRxnData > reactants;
+    std::vector< SpeciesRxnData > products;
+    std::vector< SpeciesRxnData > netSpecies;
+    std::vector< SpeciesRxnData > thdBdySpecies;
+    ReactionType type;
+    std::vector<double> kFwdCoefs;
+    std::vector<double> kPressureCoefs;
+    double thdBdyDefault;
+    std::vector<double> troeParams;
+    bool reversible;
+    int netOrder;
+  };
+
 
 class CanteraObjects
 {
@@ -61,6 +116,14 @@ public:
   static void setup_cantera( const Setup& options,
                              const int ncopies = 1 );
 
+  static double gas_constant();
+  static int number_species();
+  static int number_rxns();
+  static const std::vector< double >& molecular_weights();
+
+  static const ThermData& species_thermo( const int i );
+  static const RxnData& rxn_data( const int r );
+
 private:
 
   static CanteraObjects& self();
@@ -72,6 +135,13 @@ private:
   std::queue< std::pair<IdealGas*,Trans*> >  available_;
   GasTransMap gtm_;
 
+  const double gasConstant_;
+  int numSpecies_;
+  int numRxns_;
+  std::vector< double > molecularWeights_;
+  std::map< int, ThermData > thermDataMap_;
+  std::map< int, RxnData > rxnDataMap_;
+
   Setup options_;
   bool hasBeenSetup_;
 
@@ -82,9 +152,11 @@ private:
   CanteraObjects& operator=( const CanteraObjects& );
 
   void build_new();
+  void extract_thermo_data();
+  void extract_kinetics_data();
 
 };
 
 //====================================================================
-
+} // namespace pokitt
 #endif // CanteraObjects_h

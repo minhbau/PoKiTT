@@ -29,8 +29,6 @@
 
 #include <pokitt/CanteraObjects.h> //include cantera wrapper
 
-#include <cantera/kernel/ct_defs.h> // contains value of gas constant
-
 namespace pokitt{
 
 /**
@@ -54,6 +52,8 @@ class Pressure
     : public Expr::Expression<FieldT>
 {
   DECLARE_FIELDS( FieldT, t_, rho_, mmw_ )
+
+  const double gasConstant_;
 
   Pressure( const Expr::Tag& tTag,
             const Expr::Tag& rhoTag,
@@ -100,7 +100,8 @@ Pressure<FieldT>::
 Pressure( const Expr::Tag& tTag,
           const Expr::Tag& rhoTag,
           const Expr::Tag& mmwTag )
-  : Expr::Expression<FieldT>()
+  : Expr::Expression<FieldT>(),
+    gasConstant_( CanteraObjects::gas_constant() )
 {
   this->set_gpu_runnable( true );
 
@@ -127,7 +128,7 @@ evaluate()
   const FieldT& rho = rho_->field_ref();
   const FieldT& t   = t_  ->field_ref();
   const FieldT& mmw = mmw_->field_ref();
-  this->value() <<= rho * Cantera::GasConstant * t / mmw;
+  this->value() <<= rho * gasConstant_ * t / mmw;
 }
 //--------------------------------------------------------------------
 

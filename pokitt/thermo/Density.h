@@ -29,8 +29,6 @@
 
 #include <pokitt/CanteraObjects.h> //include cantera wrapper
 
-#include <cantera/kernel/ct_defs.h> // contains value of gas constant
-
 namespace pokitt{
 
 /**
@@ -54,6 +52,8 @@ class Density
     : public Expr::Expression<FieldT>
 {
   DECLARE_FIELDS( FieldT, t_, p_, mmw_ )
+
+  const double gasConstant_;
 
   Density( const Expr::Tag& tTag,
            const Expr::Tag& pTag,
@@ -100,7 +100,8 @@ Density<FieldT>::
 Density( const Expr::Tag& tTag,
          const Expr::Tag& pTag,
          const Expr::Tag& mmwTag )
-  : Expr::Expression<FieldT>()
+  : Expr::Expression<FieldT>(),
+    gasConstant_( CanteraObjects::gas_constant() )
 {
   this->set_gpu_runnable( true );
 
@@ -128,7 +129,7 @@ evaluate()
   const FieldT& t   =   t_->field_ref();
   const FieldT& p   =   p_->field_ref();
   const FieldT& mmw = mmw_->field_ref();
-  rho <<= p * mmw / ( t * Cantera::GasConstant );
+  rho <<= p * mmw / ( t * gasConstant_ );
 }
 //--------------------------------------------------------------------
 
