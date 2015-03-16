@@ -8,6 +8,7 @@ file( COPY ${XML_FILES} DESTINATION ${CMAKE_CURRENT_BINARY_DIR} )
 #-------------------------------------------------------------------------------
 
 include_directories( ${CMAKE_SOURCE_DIR} )
+include_directories( ${CMAKE_BINARY_DIR}/config )
 
 nebo_add_executable( rxndiff RxnDiffExample.cpp )
 target_link_libraries( rxndiff pokitt )
