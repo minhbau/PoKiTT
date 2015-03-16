@@ -355,7 +355,7 @@ evaluate()
   const FieldT& mmw = mmw_->field_ref();
 
   // for each species: if false add the rate; if true accumulate the rate
-  std::vector< bool > isInitialized( rRate.size(), false);
+  std::vector< bool > isInitialized( rRates.size(), false);
 
   SpatFldPtr<FieldT> logTPtr = SpatialFieldStore::get<FieldT>( t ); // log(t), used in Gibbs evaluation and arrhenius evaluations
   FieldT& logT = *logTPtr;
@@ -563,7 +563,7 @@ evaluate()
     case TWO_ONE:     k <<= k  * square( C_R(0) ) *         C_R(1);            break;
     case ONE_TWO:     k <<= k  *         C_R(0)   * square( C_R(1) );          break;
     default:{
-      typename std::vector<SpecDataVecT >::const_iterator iFwk = reactants.begin();
+      SpecDataVecT::const_iterator iFwk = reactants.begin();
       for( ; iFwk != reactants.end(); ++iFwk){
         switch( iFwk->stoich ){
         case 1: k <<= k * yi_[iFwk->index]->field_ref() * iFwk->invMW * rho; break;
@@ -606,8 +606,8 @@ evaluate()
     SpecDataVecT::const_iterator iNet = netSpecies.begin();
     for( ; iNet != netSpecies.end(); ++iNet ){
       FieldT& ri = *rRates[iNet->index];
-      if( !initialized[iNet->index] ){
-        initialized[iNet->index] = true;
+      if( !isInitialized[iNet->index] ){
+        isInitialized[iNet->index] = true;
         if( rxnDat.reversible ) ri <<=    - ( iNet->stoich * iNet->mw ) * ( k - kr );
         else                    ri <<=    - ( iNet->stoich * iNet->mw ) * ( k      );
       }
@@ -619,7 +619,7 @@ evaluate()
   } // loop over reactions
 
     for( int n = 0; n < nSpec_; ++n ){
-       if( !initialized[n] )*rRates[n] <<= 0.0; //in case of inerts that have 0.0 rxn rates
+       if( !isInitialized[n] )*rRates[n] <<= 0.0; //in case of inerts that have 0.0 rxn rates
     }
 }
 
