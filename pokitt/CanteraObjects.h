@@ -38,7 +38,7 @@
 #include <cantera/kernel/reaction_defs.h> // reaction type definitions
 
 //====================================================================
-namespace pokitt{
+
 
   enum ThermoPoly
   {
@@ -158,5 +158,5 @@ private:
 };
 
 //====================================================================
-} // namespace pokitt
+
 #endif // CanteraObjects_h

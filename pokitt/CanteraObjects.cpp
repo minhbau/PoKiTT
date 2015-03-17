@@ -27,7 +27,7 @@
 
 #include "CanteraObjects.h"
 
-namespace pokitt{
+
 #ifdef EXPRESSION_THREADS
 
 #include <boost/thread/mutex.hpp>
@@ -452,4 +452,4 @@ CanteraObjects::restore_gasmix( Cantera_CXX::IdealGasMix* const gas )
 }
 
 //--------------------------------------------------------------------
-} //namespace pokitt
+
