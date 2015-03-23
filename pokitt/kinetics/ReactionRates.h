@@ -31,14 +31,19 @@
 
 // these are macros to expand out prop(0) + prop(1) + ...
 // this is used to maximize kernel size for the gpu
-#define PROP_SUM2( prop ) (        prop(0) + prop(1))
-#define PROP_SUM3( prop ) (PROP_SUM2(prop) + prop(2))
-#define PROP_SUM4( prop ) (PROP_SUM3(prop) + prop(3))
-#define PROP_SUM5( prop ) (PROP_SUM4(prop) + prop(4))
-#define PROP_SUM6( prop ) (PROP_SUM5(prop) + prop(5))
-#define PROP_SUM7( prop ) (PROP_SUM6(prop) + prop(6))
-#define PROP_SUM8( prop ) (PROP_SUM7(prop) + prop(7))
-#define PROP_SUM9( prop ) (PROP_SUM8(prop) + prop(8))
+#define POKITT_SUM2( prop ) (          prop(0) + prop(1))
+#define POKITT_SUM3( prop ) (POKITT_SUM2(prop) + prop(2))
+#define POKITT_SUM4( prop ) (POKITT_SUM3(prop) + prop(3))
+#define POKITT_SUM5( prop ) (POKITT_SUM4(prop) + prop(4))
+#define POKITT_SUM6( prop ) (POKITT_SUM5(prop) + prop(5))
+#define POKITT_SUM7( prop ) (POKITT_SUM6(prop) + prop(6))
+#define POKITT_SUM8( prop ) (POKITT_SUM7(prop) + prop(7))
+#define POKITT_SUM9( prop ) (POKITT_SUM8(prop) + prop(8))
+
+#define ARRHENIUS( coef ) ( (coef)[0] * exp( (coef)[1] * logT - (coef)[2] * tRecip ) ) // arrhenius kinetics
+
+#define THD_BDY( i )      ( thdBodies [(i)].thdBdyEff *    yi_[thdBodies [(i)].index]->field_ref() ) // third body effects
+#define GIBBS( i )        ( netSpecies[(i)].stoich    * *specG[netSpecies[(i)].index] ) // mass fraction weighted Gibbs energy
 
 namespace pokitt{
 
@@ -115,14 +120,22 @@ enum RateConstantForm{
 // which terms are non-negligible in evaluating Troe falloff
 enum TroeTerms{
   NONE,
-  T1, T2,  T12,
-  T3, T13, T23, T123
+  T1,
+  T2,
+  T12,
+  T3,
+  T13,
+  T23,
+  T123
 };
 
 // similar to the sum macros, this multiplies concentrations in a single kernel
 enum ReactionOrder{
-  ONE,        TWO,
-  ONE_ONE,    TWO_ONE, ONE_TWO,
+  ONE,
+  TWO,
+  ONE_ONE,
+  TWO_ONE,
+  ONE_TWO,
   ONE_ONE_ONE,
   OTHER
 };
@@ -131,8 +144,8 @@ template< typename FieldT >
 class ReactionRates
     : public Expr::Expression<FieldT>
 {
-  typedef std::vector<FieldT*> SpecT;
-  typedef std::vector< RxnData::SpeciesRxnData > SpecDataVecT;
+  typedef std::vector< FieldT* > SpecT;
+  typedef std::vector< RxnData::SpeciesRxnData > SpecDataVecT; // from CanteraObjects.h
 
   DECLARE_FIELDS( FieldT, t_, rho_, mmw_ )
   DECLARE_VECTOR_OF_FIELDS( FieldT, yi_ )
@@ -156,7 +169,7 @@ class ReactionRates
   std::vector< ThermData > specThermVec_;
 
   ReactionRates( const Expr::Tag& tTag,
-                 const Expr::Tag& pTag,
+                 const Expr::Tag& rhoTag,
                  const Expr::TagList& yiTags,
                  const Expr::Tag& mmwTag );
 public:
@@ -305,14 +318,14 @@ ReactionRates( const Expr::Tag& tTag,
 
   for( int r=0; r<nRxns_; ++r){
     RxnData rxnDat = CanteraObjects::rxn_data( r );
-    rxnInfoVec_.push_back( ReactionInfo( rxnDat ) );
     SpecDataVecT::iterator iThd = rxnDat.thdBdySpecies.begin();
     for( ; iThd != rxnDat.thdBdySpecies.end(); ++iThd) // we evaluate M assuming everything is default, this corrects for non-default species
       iThd->thdBdyEff = iThd->invMW * ( iThd->thdBdyEff - rxnDat.thdBdyDefault );
     rxnDataVec_.push_back( rxnDat );
+    rxnInfoVec_.push_back( ReactionInfo( rxnDat ) );
   }
 
-  double gasConstant = CanteraObjects::gas_constant();
+  const double gasConstant = CanteraObjects::gas_constant();
   for( int n=0; n<nSpec_; ++n ){
     ThermData specData = CanteraObjects::species_thermo( n );
     std::vector<double>& c = specData.coefficients;
@@ -334,6 +347,13 @@ ReactionRates( const Expr::Tag& tTag,
       std::ostringstream msg;
       msg << "Error in " __FILE__ << " : " << __LINE__ << std::endl
           <<" Shomate polynomials are not yet supported for calculating reaction rates" << std::endl;
+      throw std::runtime_error( msg.str() );
+      }
+    default:{
+      std::ostringstream msg;
+      msg << "Error in " __FILE__ << " : " << __LINE__ << std::endl
+          << "The Gibbs polynomial type is not supported, see CanteraObjects.h" << std::endl
+          << "species n = " << n << "  polynomial type = " << specData.type << std::endl;
       throw std::runtime_error( msg.str() );
       }
     }
@@ -379,13 +399,6 @@ evaluate()
       *specG[n] <<=       c[1] + c[3] * ( t    - c[0]        ) // H
                   - t * ( c[2] + c[3] * ( logT - log(c[0]) ) ); // -TS
       break;
-    default:{
-      std::ostringstream msg;
-      msg << "Error in " __FILE__ << " : " << __LINE__ << std::endl
-          << "The Gibbs polynomial type is not supported " << std::endl
-          << "type = " << polyType << " see CanteraObjects.h" << std::endl;
-      throw std::runtime_error( msg.str() );
-      }
     } // switch
   } // species loop
 
@@ -424,99 +437,86 @@ evaluate()
     const SpecDataVecT& products   = rxnDat.products;
     const SpecDataVecT& netSpecies = rxnDat.netSpecies;
 
-#   define ARRHENIUS(A,b,E) ((A) * exp( (b) * logT - (E) * tRecip )) // convenience definition
+
     const std::vector<double>& kCoefs = rxnDat.kFwdCoefs;
     switch( rxnInfo.kForm ){
     case CONSTANT:   k <<= kCoefs[0];          break;
     case LINEAR:     k <<= kCoefs[0] * t;      break;
     case QUADRATIC:  k <<= kCoefs[0] * t * t;  break;
     case RECIPROCAL: k <<= kCoefs[0] * tRecip; break;
-    case ARRHENIUS:  k <<= ARRHENIUS( kCoefs[0], kCoefs[1], kCoefs[2] ); break;
-    default:{
-      std::ostringstream msg;
-      msg << "Error in " __FILE__ << " : " << __LINE__ << std::endl
-          <<" The functional form of the rate constant is undefined " << std::endl;
-      throw std::runtime_error( msg.str() );
-      }
+    case ARRHENIUS:  k <<= ARRHENIUS( kCoefs ); break;
     }
 
     const double baseEff = rxnDat.thdBdyDefault;
-#   define THD_BDY(i) ( thdBodies[(i)].thdBdyEff * yi_[thdBodies[(i)].index]->field_ref() ) // represents non-default third bodies
+    const std::vector<double>& kPCoefs = rxnDat.kPressureCoefs;
+    const std::vector<double>& troe = rxnDat.troeParams;
     switch( rxnDat.type ){
     case ELEMENTARY: break;
     case THIRD_BODY:
       switch( thdBodies.size() ){
-      case 0: k <<= k *   baseEff * conc;                                     break;
-      case 1: k <<= k * ( baseEff * conc + rho * (            THD_BDY(0) ) ); break;
-      case 2: k <<= k * ( baseEff * conc + rho * ( PROP_SUM2( THD_BDY  ) ) ); break;
-      case 3: k <<= k * ( baseEff * conc + rho * ( PROP_SUM3( THD_BDY  ) ) ); break;
-      case 4: k <<= k * ( baseEff * conc + rho * ( PROP_SUM4( THD_BDY  ) ) ); break;
-      case 5: k <<= k * ( baseEff * conc + rho * ( PROP_SUM5( THD_BDY  ) ) ); break;
-      case 6: k <<= k * ( baseEff * conc + rho * ( PROP_SUM6( THD_BDY  ) ) ); break;
-      case 7: k <<= k * ( baseEff * conc + rho * ( PROP_SUM7( THD_BDY  ) ) ); break;
-      case 8: k <<= k * ( baseEff * conc + rho * ( PROP_SUM8( THD_BDY  ) ) ); break;
+      case 0: k <<= k *   baseEff * conc;                                       break;
+      case 1: k <<= k * ( baseEff * conc + rho * (            THD_BDY(0) ) );   break;
+      case 2: k <<= k * ( baseEff * conc + rho * ( POKITT_SUM2( THD_BDY  ) ) ); break;
+      case 3: k <<= k * ( baseEff * conc + rho * ( POKITT_SUM3( THD_BDY  ) ) ); break;
+      case 4: k <<= k * ( baseEff * conc + rho * ( POKITT_SUM4( THD_BDY  ) ) ); break;
+      case 5: k <<= k * ( baseEff * conc + rho * ( POKITT_SUM5( THD_BDY  ) ) ); break;
+      case 6: k <<= k * ( baseEff * conc + rho * ( POKITT_SUM6( THD_BDY  ) ) ); break;
+      case 7: k <<= k * ( baseEff * conc + rho * ( POKITT_SUM7( THD_BDY  ) ) ); break;
+      case 8: k <<= k * ( baseEff * conc + rho * ( POKITT_SUM8( THD_BDY  ) ) ); break;
       default:
-        m <<= baseEff * conc + rho * ( PROP_SUM8( THD_BDY  ) );
+        m <<= baseEff * conc + rho * ( POKITT_SUM8( THD_BDY  ) );
         for( int i = 8; i != thdBodies.size(); ++i ) // if we have 9 or more third bodies
           m <<= m + rho * THD_BDY(i);
         k <<= k * m;
         break;
       }
       break;
-    case LINDEMANN:{
-      const double A = rxnDat.kPressureCoefs[0];
-      const double b = rxnDat.kPressureCoefs[1];
-      const double E = rxnDat.kPressureCoefs[2];
+    case LINDEMANN:
       switch( thdBodies.size() ){
-      case 0: k <<= k / ( 1 + k / ( ARRHENIUS(A,b,E) * ( baseEff * conc                                 ) ) );   break;
-      case 1: k <<= k / ( 1 + k / ( ARRHENIUS(A,b,E) * ( baseEff * conc + rho * (            THD_BDY(0) ) ) ) ); break;
-      case 2: k <<= k / ( 1 + k / ( ARRHENIUS(A,b,E) * ( baseEff * conc + rho * ( PROP_SUM2( THD_BDY  ) ) ) ) ); break;
-      case 3: k <<= k / ( 1 + k / ( ARRHENIUS(A,b,E) * ( baseEff * conc + rho * ( PROP_SUM3( THD_BDY  ) ) ) ) ); break;
-      case 4: k <<= k / ( 1 + k / ( ARRHENIUS(A,b,E) * ( baseEff * conc + rho * ( PROP_SUM4( THD_BDY  ) ) ) ) ); break;
-      case 5: k <<= k / ( 1 + k / ( ARRHENIUS(A,b,E) * ( baseEff * conc + rho * ( PROP_SUM5( THD_BDY  ) ) ) ) ); break;
-      case 6: k <<= k / ( 1 + k / ( ARRHENIUS(A,b,E) * ( baseEff * conc + rho * ( PROP_SUM6( THD_BDY  ) ) ) ) ); break;
-      case 7: k <<= k / ( 1 + k / ( ARRHENIUS(A,b,E) * ( baseEff * conc + rho * ( PROP_SUM7( THD_BDY  ) ) ) ) ); break;
-      case 8: k <<= k / ( 1 + k / ( ARRHENIUS(A,b,E) * ( baseEff * conc + rho * ( PROP_SUM8( THD_BDY  ) ) ) ) ); break;
+      case 0: k <<= k / ( 1 + k / ( ARRHENIUS( kPCoefs ) * ( baseEff * conc                                 ) ) );     break;
+      case 1: k <<= k / ( 1 + k / ( ARRHENIUS( kPCoefs ) * ( baseEff * conc + rho * (            THD_BDY(0) ) ) ) );   break;
+      case 2: k <<= k / ( 1 + k / ( ARRHENIUS( kPCoefs ) * ( baseEff * conc + rho * ( POKITT_SUM2( THD_BDY  ) ) ) ) ); break;
+      case 3: k <<= k / ( 1 + k / ( ARRHENIUS( kPCoefs ) * ( baseEff * conc + rho * ( POKITT_SUM3( THD_BDY  ) ) ) ) ); break;
+      case 4: k <<= k / ( 1 + k / ( ARRHENIUS( kPCoefs ) * ( baseEff * conc + rho * ( POKITT_SUM4( THD_BDY  ) ) ) ) ); break;
+      case 5: k <<= k / ( 1 + k / ( ARRHENIUS( kPCoefs ) * ( baseEff * conc + rho * ( POKITT_SUM5( THD_BDY  ) ) ) ) ); break;
+      case 6: k <<= k / ( 1 + k / ( ARRHENIUS( kPCoefs ) * ( baseEff * conc + rho * ( POKITT_SUM6( THD_BDY  ) ) ) ) ); break;
+      case 7: k <<= k / ( 1 + k / ( ARRHENIUS( kPCoefs ) * ( baseEff * conc + rho * ( POKITT_SUM7( THD_BDY  ) ) ) ) ); break;
+      case 8: k <<= k / ( 1 + k / ( ARRHENIUS( kPCoefs ) * ( baseEff * conc + rho * ( POKITT_SUM8( THD_BDY  ) ) ) ) ); break;
       default:
-        m <<= baseEff * conc + rho * ( PROP_SUM8( THD_BDY  ) );
+        m <<= baseEff * conc + rho * ( POKITT_SUM8( THD_BDY ) );
         for( int i = 8; i != thdBodies.size(); ++i )
-          m <<= m + rho* THD_BDY(i);
-        k <<= k / ( 1 + k / ( ARRHENIUS(A,b,E) * m ) );
+          m <<= m + rho * THD_BDY(i);
+        k <<= k / ( 1 + k / ( ARRHENIUS( kPCoefs ) * m ) );
         break;
       } // thd bodies
       break;
-    } // linemann
-    case TROE:{
-      const double A = rxnDat.kPressureCoefs[0];
-      const double b = rxnDat.kPressureCoefs[1];
-      const double E = rxnDat.kPressureCoefs[2];
+    case TROE:
       switch( thdBodies.size() ){
-      case 0: pr <<= ARRHENIUS( A, b, E ) / k * ( baseEff * conc ); break;
-      case 1: pr <<= ARRHENIUS( A, b, E ) / k * ( baseEff * conc + rho * THD_BDY(0) ); break;
-      case 2: pr <<= ARRHENIUS( A, b, E ) / k * ( baseEff * conc + rho * ( PROP_SUM2( THD_BDY ) ) ); break;
-      case 3: pr <<= ARRHENIUS( A, b, E ) / k * ( baseEff * conc + rho * ( PROP_SUM3( THD_BDY ) ) ); break;
-      case 4: pr <<= ARRHENIUS( A, b, E ) / k * ( baseEff * conc + rho * ( PROP_SUM4( THD_BDY ) ) ); break;
-      case 5: pr <<= ARRHENIUS( A, b, E ) / k * ( baseEff * conc + rho * ( PROP_SUM5( THD_BDY ) ) ); break;
-      case 6: pr <<= ARRHENIUS( A, b, E ) / k * ( baseEff * conc + rho * ( PROP_SUM6( THD_BDY ) ) ); break;
-      case 7: pr <<= ARRHENIUS( A, b, E ) / k * ( baseEff * conc + rho * ( PROP_SUM7( THD_BDY ) ) ); break;
-      case 8: pr <<= ARRHENIUS( A, b, E ) / k * ( baseEff * conc + rho * ( PROP_SUM8( THD_BDY ) ) ); break;
+      case 0: pr <<= ARRHENIUS( kPCoefs ) / k * ( baseEff * conc                                    ); break;
+      case 1: pr <<= ARRHENIUS( kPCoefs ) / k * ( baseEff * conc + rho * (            THD_BDY(0)  ) ); break;
+      case 2: pr <<= ARRHENIUS( kPCoefs ) / k * ( baseEff * conc + rho * ( POKITT_SUM2( THD_BDY ) ) ); break;
+      case 3: pr <<= ARRHENIUS( kPCoefs ) / k * ( baseEff * conc + rho * ( POKITT_SUM3( THD_BDY ) ) ); break;
+      case 4: pr <<= ARRHENIUS( kPCoefs ) / k * ( baseEff * conc + rho * ( POKITT_SUM4( THD_BDY ) ) ); break;
+      case 5: pr <<= ARRHENIUS( kPCoefs ) / k * ( baseEff * conc + rho * ( POKITT_SUM5( THD_BDY ) ) ); break;
+      case 6: pr <<= ARRHENIUS( kPCoefs ) / k * ( baseEff * conc + rho * ( POKITT_SUM6( THD_BDY ) ) ); break;
+      case 7: pr <<= ARRHENIUS( kPCoefs ) / k * ( baseEff * conc + rho * ( POKITT_SUM7( THD_BDY ) ) ); break;
+      case 8: pr <<= ARRHENIUS( kPCoefs ) / k * ( baseEff * conc + rho * ( POKITT_SUM8( THD_BDY ) ) ); break;
       default:
-        m <<= baseEff * conc;
-        for( int i = 0; i != thdBodies.size(); ++i )
-          m <<= m + THD_BDY(i) * rho;
-        pr <<= ARRHENIUS( A, b, E ) / k * m;
+        m <<= baseEff * conc + rho * ( POKITT_SUM8( THD_BDY ) );
+        for( int i = 8; i != thdBodies.size(); ++i )
+          m <<= m + rho * THD_BDY(i);
+        pr <<= ARRHENIUS( kPCoefs ) / k * m;
         break;
       } //thd bodies
 
-      const std::vector<double>&      troe = rxnDat.troeParams;
       switch( rxnInfo.troeForm ){
-      case T1:   logFCent <<= log10( (1-troe[0]) * exp(-t/troe[1])                                                      ); break;
-      case T2:   logFCent <<= log10(                                 troe[0] * exp(-t/troe[2])                          ); break;
-      case T12:  logFCent <<= log10( (1-troe[0]) * exp(-t/troe[1]) + troe[0] * exp(-t/troe[2])                          ); break;
-      case T3:   logFCent <<= log10(                                                             exp(-tRecip * troe[3]) ); break;
-      case T13:  logFCent <<= log10( (1-troe[0]) * exp(-t/troe[1])                             + exp(-tRecip * troe[3]) ); break;
-      case T23:  logFCent <<= log10(                                 troe[0] * exp(-t/troe[2]) + exp(-tRecip * troe[3]) ); break;
       case T123: logFCent <<= log10( (1-troe[0]) * exp(-t/troe[1]) + troe[0] * exp(-t/troe[2]) + exp(-tRecip * troe[3]) ); break;
+      case T12:  logFCent <<= log10( (1-troe[0]) * exp(-t/troe[1]) + troe[0] * exp(-t/troe[2]) + 0.0                    ); break;
+      case T1:   logFCent <<= log10( (1-troe[0]) * exp(-t/troe[1]) +        0.0                + 0.0                    ); break;
+      case T23:  logFCent <<= log10(            0.0                + troe[0] * exp(-t/troe[2]) + exp(-tRecip * troe[3]) ); break;
+      case T2:   logFCent <<= log10(            0.0                + troe[0] * exp(-t/troe[2]) + 0.0                    ); break;
+      case T13:  logFCent <<= log10( (1-troe[0]) * exp(-t/troe[1]) +        0.0                + exp(-tRecip * troe[3]) ); break;
+      case T3:   logFCent <<= log10(            0.0                +        0.0                + exp(-tRecip * troe[3]) ); break;
       case NONE:
       default:{
         std::ostringstream msg;
@@ -534,80 +534,64 @@ evaluate()
       logPrC <<= log10( pr ) + CTROE;
       k <<= k * pow(10, logFCent / (1 + square( F1 ) ) ) * pr / (1+pr);
       break;
-    } // troe
     } //  switch( rxnDat.type )
-#   undef ARRHENIUS
-#   undef THD_BDY
-#   undef CTROE
-#   undef NTROE
-#   undef F1
 
-#   define GIBBS(i) ( netSpecies[(i)].stoich * *specG[ netSpecies[(i)].index ]  ) // mass fraction weighted Gibbs energy
     if( rxnDat.reversible ){
       const int netOrder = rxnDat.netOrder;
       switch( netSpecies.size() ){
-      case 3: kr <<= k * exp( netOrder * logConc - tRecip * invGasConstant_ * ( PROP_SUM3( GIBBS ) ) ); break;
-      case 2: kr <<= k * exp( netOrder * logConc - tRecip * invGasConstant_ * ( PROP_SUM2( GIBBS ) ) ); break;
-      case 4: kr <<= k * exp( netOrder * logConc - tRecip * invGasConstant_ * ( PROP_SUM4( GIBBS ) ) ); break;
-      case 5: kr <<= k * exp( netOrder * logConc - tRecip * invGasConstant_ * ( PROP_SUM5( GIBBS ) ) ); break;
+      case 3: kr <<= k * exp( netOrder * logConc - tRecip * invGasConstant_ * ( POKITT_SUM3( GIBBS ) ) ); break;
+      case 2: kr <<= k * exp( netOrder * logConc - tRecip * invGasConstant_ * ( POKITT_SUM2( GIBBS ) ) ); break;
+      case 4: kr <<= k * exp( netOrder * logConc - tRecip * invGasConstant_ * ( POKITT_SUM4( GIBBS ) ) ); break;
+      case 5: kr <<= k * exp( netOrder * logConc - tRecip * invGasConstant_ * ( POKITT_SUM5( GIBBS ) ) ); break;
       }
     }
-#   undef GIBBS
 
 #   define C_R(i) ( yi_[reactants[(i)].index]->field_ref() * rho * reactants[(i)].invMW ) // concentration of the reactants
+#   define C_P(i) ( yi_[products [(i)].index]->field_ref() * rho * products [(i)].invMW ) // concentration of products
     switch( rxnInfo.forwardOrder ){
-    case ONE:         k <<= k  *         C_R(0);                               break;
-    case TWO:         k <<= k  * square( C_R(0) );                             break;
-    case ONE_ONE:     k <<= k  *         C_R(0)   *         C_R(1);            break;
-    case ONE_ONE_ONE: k <<= k  *         C_R(0)   *         C_R(1)   * C_R(2); break;
-    case TWO_ONE:     k <<= k  * square( C_R(0) ) *         C_R(1);            break;
-    case ONE_TWO:     k <<= k  *         C_R(0)   * square( C_R(1) );          break;
-    default:{
-      SpecDataVecT::const_iterator iFwk = reactants.begin();
-      for( ; iFwk != reactants.end(); ++iFwk){
-        switch( iFwk->stoich ){
-        case 1: k <<= k * yi_[iFwk->index]->field_ref() * iFwk->invMW * rho; break;
-        case 2: k <<= k * square( yi_[iFwk->index]->field_ref() * iFwk->invMW * rho ); break;
-        case 3: k <<= k * cube( yi_[iFwk->index]->field_ref() * iFwk->invMW * rho ); break;
+    case ONE:         k <<= k  *         C_R(0);                              break;
+    case TWO:         k <<= k  * square( C_R(0) );                            break;
+    case ONE_ONE:     k <<= k  *         C_R(0)   *         C_R(1);           break;
+    case ONE_ONE_ONE: k <<= k  *         C_R(0)   *         C_R(1)  * C_R(2); break;
+    case TWO_ONE:     k <<= k  * square( C_R(0) ) *         C_R(1);           break;
+    case ONE_TWO:     k <<= k  *         C_R(0)   * square( C_R(1) );         break;
+    default:
+      for( int i = 0; i != reactants.size(); ++i){
+        switch( reactants[i].stoich ){
+        case 1: k <<= k *         C_R(i)  ; break;
+        case 2: k <<= k * square( C_R(i) ); break;
+        case 3: k <<= k * cube(   C_R(i) ); break;
         }
       }
+      break;
     }
-    }
-#undef C_R
-#define C_P(i) ( yi_[products[(i)].index]->field_ref() * rho * products[(i)].invMW )
+
     if( rxnDat.reversible ){
       switch( rxnInfo.reverseOrder ){
-      case ONE:
-        kr <<= kr  * C_P(0);  break;
-      case TWO:
-        kr <<= kr  * square( C_P(0) ); break;
-      case ONE_ONE:
-        kr <<= kr  *  C_P(0) * C_P(1); break;
-      case ONE_ONE_ONE:
-        kr <<= kr  * C_P(0) * C_P(1) * C_P(2); break;
-      case TWO_ONE:
-        kr <<= kr  * square( C_P(0) ) * C_P(1) ; break;
-      case ONE_TWO:
-        kr <<= kr  * C_P(0) * square( C_P(1) ); break;
-      default:{
-        SpecDataVecT::const_iterator iBck = products.begin();
-        for( ; iBck != products.end(); ++iBck ){
-          switch( iBck->stoich ){
-          case -1: kr <<= kr *  yi_[iBck->index]->field_ref() * iBck->invMW * rho; break;
-          case -2: kr <<= kr * square( yi_[iBck->index]->field_ref() * iBck->invMW  * rho ); break;
-          case -3: kr <<= kr * cube( yi_[iBck->index]->field_ref() * iBck->invMW  * rho ); break;
+      case ONE:         kr <<= kr *         C_P(0);                            break;
+      case TWO:         kr <<= kr * square( C_P(0) );                          break;
+      case ONE_ONE:     kr <<= kr *         C_P(0)         * C_P(1);           break;
+      case ONE_ONE_ONE: kr <<= kr *         C_P(0)         * C_P(1)  * C_P(2); break;
+      case TWO_ONE:     kr <<= kr * square( C_P(0) )       * C_P(1);           break;
+      case ONE_TWO:     kr <<= kr *         C_P(0) * square( C_P(1) );         break;
+      default:
+        for( int i = 0; i != products.size(); ++i){
+          switch( products[i].stoich ){
+          case 1: kr <<= kr *         C_P(i)  ; break;
+          case 2: kr <<= kr * square( C_P(i) ); break;
+          case 3: kr <<= kr * cube(   C_P(i) ); break;
           }
         }
         break;
       }
     }
-    }
-#undef C_P
+
     SpecDataVecT::const_iterator iNet = netSpecies.begin();
     for( ; iNet != netSpecies.end(); ++iNet ){
-      FieldT& ri = *rRates[iNet->index];
-      if( !isInitialized[iNet->index] ){
-        isInitialized[iNet->index] = true;
+      const int index = iNet->index;
+      FieldT& ri = *rRates[index];
+      if( !isInitialized[index] ){
+        isInitialized[index] = true;
         if( rxnDat.reversible ) ri <<=    - ( iNet->stoich * iNet->mw ) * ( k - kr );
         else                    ri <<=    - ( iNet->stoich * iNet->mw ) * ( k      );
       }
@@ -615,12 +599,13 @@ evaluate()
         if( rxnDat.reversible ) ri <<= ri - ( iNet->stoich * iNet->mw ) * ( k - kr );
         else                    ri <<= ri - ( iNet->stoich * iNet->mw ) * ( k      );
       }
-    }
+    } // sum reaction rates into products and reactants
+
   } // loop over reactions
 
-    for( int n = 0; n < nSpec_; ++n ){
-       if( !isInitialized[n] )*rRates[n] <<= 0.0; //in case of inerts that have 0.0 rxn rates
-    }
+  for( int n = 0; n < nSpec_; ++n ){
+    if( !isInitialized[n] ) *rRates[n] <<= 0.0; // in case of inerts that have 0.0 rate
+  }
 }
 
 //--------------------------------------------------------------------
@@ -651,13 +636,22 @@ Builder::build() const
 }
 
 } // namespace pokitt
-#undef PROP_SUM2
-#undef PROP_SUM3
-#undef PROP_SUM4
-#undef PROP_SUM5
-#undef PROP_SUM6
-#undef PROP_SUM7
-#undef PROP_SUM8
-#undef PROP_SUM9
+#undef POKITT_SUM2
+#undef POKITT_SUM3
+#undef POKITT_SUM4
+#undef POKITT_SUM5
+#undef POKITT_SUM6
+#undef POKITT_SUM7
+#undef POKITT_SUM8
+#undef POKITT_SUM9
+
+#undef ARRHENIUS
+#undef THD_BDY
+#undef CTROE
+#undef NTROE
+#undef F1
+#undef GIBBS
+#undef C_R
+#undef C_P
 
 #endif // ReactionRates_Expr_h
