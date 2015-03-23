@@ -183,22 +183,30 @@ bool driver( const bool timings,
     grid.set_coord<SO::YDIR>( ycoord );
 
     initTree.execute_tree();
-
-    if( timings ){
-      std::cout << "\nPoKiTT Reaction Diffusion size " << xcoord.window_with_ghost().glob_npts() << std::endl;
-      timeIntegrator.step( dt ); // sets high water mark on memory
-      timeIntegrator.request_timings();
-    }
+    int s = -1;
     SpatialOps::Timer timer;
     std::vector< double > times;
-    for( size_t s = 0; s <= nSteps; ++s ){
-      if( s%5000 == 0 && print){
-        std::cout<<"Fields at time "<< s*dt << "; step " << s << std::endl;
-        print_fields( fml, tag_list( tagMgr[T], tagMgr.rN( 0 ), tagMgr.rhoYiN( 0 ) ) );
+    if( timings ){
+      std::cout << "\nPoKiTT Reaction Diffusion size " << xcoord.window_with_ghost().glob_npts() << std::endl;
+      timeIntegrator.request_timings();
+    }
+    try{
+      if( timings ) timeIntegrator.step( dt ); // sets high water mark on memory
+      for( s = 0; s <= nSteps; ++s ){
+        if( s%5000 == 0 && print){
+          std::cout<<"Fields at time "<< s*dt << "; step " << s << std::endl;
+          print_fields( fml, tag_list( tagMgr[T], tagMgr.rN( 0 ), tagMgr.rhoYiN( 0 ) ) );
+        }
+        timer.reset();
+        timeIntegrator.step( dt );
+        times.push_back( timer.stop() );
       }
-      timer.reset();
-      timeIntegrator.step( dt );
-      times.push_back( timer.stop() );
+    }
+    catch( std::runtime_error& err ){
+      std::ostringstream msg;
+      msg << " \n Error occured during iteration s = " << s << std::endl
+          << err.what() << std::endl;
+      throw std::runtime_error( msg.str() );
     }
 
     if( timings ){
@@ -229,18 +237,18 @@ int main( int iarg, char* carg[] )
   std::string inpGroup;
   bool timings = false;
   bool print   = false;
-  size_t nSteps = 5000;
-  double dt = 1e-10;
+  size_t nSteps;
+  double dt;
 
   po::options_description desc("Supported Options");
   desc.add_options()
                ( "help", "print help message" )
-               ( "xml-input-file", po::value<std::string>(&inputFileName)->default_value("h2o2.xml"), "Cantera xml input file name" )
+               ( "xml-input-file,i", po::value<std::string>(&inputFileName)->default_value("h2o2.xml"), "Cantera xml input file name" )
                ( "phase", po::value<std::string>(&inpGroup), "name of phase in Cantera xml input file" )
-               ( "timings", "Generate comparison timings between Cantera and PoKiTT across several problem sizes" )
-               ( "print-fields", "Print field values for Temperature, mass of H2, and mass of OH every 2000 time steps")
-               ( "nsteps", po::value<size_t>(&nSteps)->default_value(5000), "How many time steps to take" )
-               ( "dt",     po::value<double>(&dt)->default_value(1e-10),    "Size of time steps (s) to take"  );
+               ( "timings,t", "Generate comparison timings between Cantera and PoKiTT across several problem sizes" )
+               ( "print-fields,p", "Print field values for Temperature, mass of H2, and mass of OH every 5000 time steps")
+               ( "nsteps,n", po::value<size_t>(&nSteps)->default_value(5000), "How many time steps to take" )
+               ( "dt",     po::value<double>(&dt)->default_value(1e-15),    "Size of time steps (s) to take"  );
 
   // parse the command line options input describing the problem
   try {
@@ -248,13 +256,13 @@ int main( int iarg, char* carg[] )
     po::store( po::parse_command_line(iarg,carg,desc), args );
     po::notify(args);
 
-    print = args.count("print-fields") > 0;
+    print = args.count("print-fields");
 #   ifdef ENABLE_CUDA
     if( print )
       throw std::runtime_error("print-fields is not (yet) supported with CUDA");
 #   endif
 
-    timings = args.count("timings") > 0;
+    timings = args.count("timings");
 
     if( timings && args["nsteps"].defaulted() )
       nSteps = 5;
@@ -282,7 +290,7 @@ int main( int iarg, char* carg[] )
           << "\n\t PoKiTT     git hash: \t" << PoKiTTVersionHash
           << "\n\t ExprLib    git hash: \t" << EXPR_REPO_HASH
           << "\n\t SpatialOps git hash: \t" << SOPS_REPO_HASH
-          <<"--------------------------------------------------------------\n"
+          <<"\n--------------------------------------------------------------\n"
           << "MECHANISM INFORMATION\n"
           << "\n\tXML input file: " << inputFileName
           << "\n\tPhase name    : " << gasMix->name()
@@ -291,7 +299,6 @@ int main( int iarg, char* carg[] )
           <<"\n--------------------------------------------------------------\n\n";
       CanteraObjects::restore_gasmix(gasMix);
     }
-
 
     TestHelper status( !timings );
     status( driver( timings, print, nSteps, dt ), "Reaction Diffusion" );
