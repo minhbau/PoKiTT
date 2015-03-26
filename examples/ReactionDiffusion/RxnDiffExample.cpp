@@ -52,7 +52,8 @@
 #include <boost/foreach.hpp>
 #include <boost/program_options.hpp>
 
-namespace Cantera_CXX{ class IdealGasMix; }
+#include <cantera/kernel/global.h>
+#include <cantera/kernel/ctexceptions.h>
 
 namespace SO = SpatialOps;
 typedef SO::SVolField  CellField;
@@ -81,10 +82,9 @@ bool driver( const bool timings,
              const double dt )
 {
   TestHelper status( !timings );
-  Cantera_CXX::IdealGasMix* const gasMix = CanteraObjects::get_gasmix();
-  const int nSpec=gasMix->nSpecies();
+  const int nSpec = CanteraObjects::number_species();
 
-  const double rho0 = 0.3;
+  const double rho0 = 1.0;
   const double length = 1e-3;
   const double tMax = 1700;
   const double tDev = 0.2*length;
@@ -195,7 +195,7 @@ bool driver( const bool timings,
       for( s = 0; s <= nSteps; ++s ){
         if( s%5000 == 0 && print){
           std::cout<<"Fields at time "<< s*dt << "; step " << s << std::endl;
-          print_fields( fml, tag_list( tagMgr[T], tagMgr.rN( 0 ), tagMgr.rhoYiN( 0 ) ) );
+          print_fields( fml, tag_list( tagMgr[T], tagMgr[R_N][0], tagMgr[RHOYI_N][0], tagMgr[YI_N][0], tagMgr[RHOYI_N][3], tagMgr[YI_N][3] ) );
         }
         timer.reset();
         timeIntegrator.step( dt );
@@ -283,7 +283,6 @@ int main( int iarg, char* carg[] )
     CanteraObjects::setup_cantera( setup );
 
     {
-      Cantera_CXX::IdealGasMix* const gasMix = CanteraObjects::get_gasmix();
       std::cout << "Reaction-diffusion example\n"
           <<"\n--------------------------------------------------------------\n"
           << "BUILD INFORMATION:\n"
@@ -293,11 +292,10 @@ int main( int iarg, char* carg[] )
           <<"\n--------------------------------------------------------------\n"
           << "MECHANISM INFORMATION\n"
           << "\n\tXML input file: " << inputFileName
-          << "\n\tPhase name    : " << gasMix->name()
-          << "\n\t# species     : " << gasMix->nSpecies()
-          << "\n\t# reactions   : " << gasMix->nReactions()
+          << "\n\tPhase name    : " << CanteraObjects::phase_name()
+          << "\n\t# species     : " << CanteraObjects::number_species()
+          << "\n\t# reactions   : " << CanteraObjects::number_rxns()
           <<"\n--------------------------------------------------------------\n\n";
-      CanteraObjects::restore_gasmix(gasMix);
     }
 
     TestHelper status( !timings );

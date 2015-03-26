@@ -48,13 +48,11 @@
 #include <boost/foreach.hpp>
 #include <boost/program_options.hpp>
 
-#include <cantera/IdealGasMix.h>
+#include <cantera/transport.h>
 
 namespace SO = SpatialOps;
 typedef   SO::SVolField CellField;
 typedef SO::SpatFldPtr<CellField> CellFieldPtrT;
-
-namespace Cantera_CXX{ class IdealGasMix; } //location of polynomial
 
 namespace po = boost::program_options;
 

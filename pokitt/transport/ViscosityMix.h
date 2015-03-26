@@ -68,10 +68,9 @@ class Viscosity
   DECLARE_FIELD( FieldT, temp_ )
   DECLARE_VECTOR_OF_FIELDS( FieldT, massFracs_ )
 
-  int nSpec_; //number of species to iterate over
-  std::vector< std::vector<double> > viscosityCoefs_; // Cantera's vector of coefficients for the pure viscosity polynomials
-  int modelType_; // type of model used by Cantera to estimate pure viscosity
-  std::vector<double> molecularWeights_; // molecular weights
+  const int nSpec_; //number of species to iterate over
+  const std::vector< std::vector<double> > viscosityCoefs_; // Cantera's vector of coefficients for the pure viscosity polynomials
+  const std::vector<double> molecularWeights_; // molecular weights
   std::vector<double> molecularWeightsInv_; // inverse of molecular weights (diving by MW is expensive)
   std::vector< std::vector<double> > molecularWeightRatios_; // pre-compute ratios of molecular weights to reduce evaluation time
   std::vector< std::vector<double> > denominator_; // pre-compute the denominator of the mixing rule to reduce evaluation time
@@ -185,7 +184,10 @@ template< typename FieldT >
 Viscosity<FieldT>::
 Viscosity( const Expr::Tag& temperatureTag,
            const Expr::TagList& massFracTags )
-  : Expr::Expression<FieldT>()
+  : Expr::Expression<FieldT>(),
+    nSpec_( CanteraObjects::number_species() ),
+    molecularWeights_( CanteraObjects::molecular_weights() ),
+    viscosityCoefs_( CanteraObjects::viscosity_coefs() )
 {
   this->set_gpu_runnable( true );
 
@@ -193,14 +195,6 @@ Viscosity( const Expr::Tag& temperatureTag,
 
   this->template create_field_vector_request<FieldT>( massFracTags, massFracs_ );
 
-
-  Cantera::MixTransport* trans = dynamic_cast<Cantera::MixTransport*>( CanteraObjects::get_transport() ); // cast gas transport object as mix transport
-  nSpec_ = trans->thermo().nSpecies();
-
-  viscosityCoefs_ = trans->getViscosityCoefficients();
-  modelType_ = trans->model();
-
-  molecularWeights_ = trans->thermo().molecularWeights();
   molecularWeightsInv_.resize(nSpec_);
   for( size_t n=0; n<nSpec_; ++n)
     molecularWeightsInv_[n] = 1 / molecularWeights_[n];
@@ -232,7 +226,7 @@ Viscosity( const Expr::Tag& temperatureTag,
     }
   }
 # endif
-  CanteraObjects::restore_transport( trans );
+
 }
 
 //--------------------------------------------------------------------
@@ -259,17 +253,12 @@ evaluate()
   FieldT& logt = *logtPtr;
   logt <<= log( temp );
 
-  if( modelType_ == Cantera::cMixtureAveraged ) { // as opposed to CK mode
-    tOneFourthPtr = SpatialFieldStore::get<FieldT>(temp);
-    *tOneFourthPtr <<= pow( temp, 0.25 );
-  }
+  tOneFourthPtr = SpatialFieldStore::get<FieldT>(temp);
+  *tOneFourthPtr <<= pow( temp, 0.25 );
 
   for( size_t n = 0; n<nSpec_; ++n ){
     const std::vector<double>& viscCoefs = viscosityCoefs_[n];
-    if( modelType_ == Cantera::cMixtureAveraged )
-      *sqrtSpeciesVis[n] <<= *tOneFourthPtr * ( viscCoefs[0] + logt * ( viscCoefs[1] + logt * ( viscCoefs[2] + logt * ( viscCoefs[3] + logt * viscCoefs[4] ))) );
-    else
-      *sqrtSpeciesVis[n] <<=      exp ( 0.5 * ( viscCoefs[0] + logt * ( viscCoefs[1] + logt * ( viscCoefs[2] + logt *   viscCoefs[3]                        )) ));
+    *sqrtSpeciesVis[n] <<= *tOneFourthPtr * ( viscCoefs[0] + logt * ( viscCoefs[1] + logt * ( viscCoefs[2] + logt * ( viscCoefs[3] + logt * viscCoefs[4] ))) );
   }
 
   mixVis <<= 0.0; // set result to 0 before summing species contributions

@@ -295,6 +295,15 @@ ReactionInfo::ReactionInfo( const RxnData& dat )
       else troeForm = T123;
       break;
     } // Troe3 vs Troe4
+    break;
+  default: {
+    std::ostringstream msg;
+    msg << __FILE__ << " : " << __LINE__
+        << "\n Unknown reaction type somehow evaded detection\n"
+        << "This should have been caught during construction of CanteraObjects\n"
+        << "Check your xml input file to ensure it is not corrupted\n";
+    throw std::runtime_error( msg.str() );
+    }
   } // switch( dat.type )
 }
 
@@ -322,7 +331,14 @@ ReactionRates( const Expr::Tag& tTag,
     for( ; iThd != rxnDat.thdBdySpecies.end(); ++iThd) // we evaluate M assuming everything is default, this corrects for non-default species
       iThd->thdBdyEff = iThd->invMW * ( iThd->thdBdyEff - rxnDat.thdBdyDefault );
     rxnDataVec_.push_back( rxnDat );
-    rxnInfoVec_.push_back( ReactionInfo( rxnDat ) );
+    try{
+      rxnInfoVec_.push_back( ReactionInfo( rxnDat ) );
+    }
+    catch( std::runtime_error& err ){
+      std::ostringstream msg;
+      msg << err.what() << "\n Error detecting while building ReactionInfo for rxn r = " << r << "\n";
+      throw( std::runtime_error( msg.str() ) );
+    }
   }
 
   const double gasConstant = CanteraObjects::gas_constant();
@@ -399,6 +415,14 @@ evaluate()
       *specG[n] <<=       c[1] + c[3] * ( t    - c[0]        ) // H
                   - t * ( c[2] + c[3] * ( logT - log(c[0]) ) ); // -TS
       break;
+    default: {
+      std::ostringstream msg;
+      msg << __FILE__ << " : " << __LINE__
+          << "\n Unsupported thermo model for species " << n << " somehow evaded detection\n"
+          << "This should have been caught during construction of this expression or CanteraObjects\n"
+          << "Check your xml input file to ensure it is not corrupted\n";
+      throw std::runtime_error( msg.str() );
+      }
     } // switch
   } // species loop
 
@@ -534,6 +558,14 @@ evaluate()
       logPrC <<= log10( pr ) + CTROE;
       k <<= k * pow(10, logFCent / (1 + square( F1 ) ) ) * pr / (1+pr);
       break;
+    default: {
+      std::ostringstream msg;
+      msg << __FILE__ << " : " << __LINE__
+          << "\n Unidentified reaction type for reaction r = " << r << " somehow evaded detection\n"
+          << "This should have been caught during construction of CanteraObjects\n"
+          << "Check your xml input file to ensure it is not corrupted\n";
+      throw std::runtime_error( msg.str() );
+      }
     } //  switch( rxnDat.type )
 
     if( rxnDat.reversible ){

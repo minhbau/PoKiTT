@@ -10,111 +10,96 @@
 
 #include <boost/lexical_cast.hpp>
 #include <expression/Tag.h>
-using Expr::Tag;
-using Expr::TagList;
 
 namespace pokitt{
 
-  enum TagName{
-    RHOYI,
-    H,
-    YI,
-    T,
-    P,
-    RHO,
-    MMW,
-    R,
-    LAM,
-    D,
-    J,
-    Q,
-    QX,
-    QY,
-    XCOORD,
-    YCOORD,
-  };
+enum TagName{
+  RHO, YI, RHOYI, MMW,
+
+  T, P, H,
+
+  R, D, LAM,
+
+  J, Q, QX, QY,
+
+  XCOORD, YCOORD
+};
+
+enum TagListName{
+  YI_N, RHOYI_N,
+
+  H_N,
+
+  R_N, D_N,
+
+  JX_N, JY_N
+};
 
 class TagManager{
-  const Tag rhoYi_;
-  const Tag h_;
 
-  const Tag yi_;
-  const Tag t_;
-  const Tag p_;
-  const Tag rho_;
-  const Tag mmw_;
-  const Tag r_;
-  const Tag lam_;
-  const Tag d_;
-  const Tag j_;
-  const Tag q_;
-  const Tag qx_;
-  const Tag qy_;
+  const Expr::Tag rho_, yi_, rhoYi_, mmw_;
+  const Expr::Tag t_,   p_,  h_;
+  const Expr::Tag r_,   d_,  lam_;
+  const Expr::Tag j_,   q_,  qx_,    qy_;
+  const Expr::Tag x_,   y_;
 
-  const Tag x_;
-  const Tag y_;
+  Expr::TagList yiTags_, rhoYiTags_;
+  Expr::TagList hiTags_;
+  Expr::TagList rTags_,  dTags_;
+  Expr::TagList jxTags_, jyTags_;
 
-  TagList rTags_;
-  TagList dTags_;
-  TagList yiTags_;
-  TagList rhoYiTags_;
-  TagList jxTags_;
-  TagList jyTags_;
-  TagList hiTags_;
+  const Expr::Tag empty_;
+  const Expr::TagList emptyList_;
 
 public:
 
-  const Tag& operator[](TagName name) const{
+  const Expr::Tag& operator[]( TagName name ) const{
     switch( name ){
-    case RHOYI:  return rhoYi_; break;
-    case H:      return h_;     break;
-    case YI:     return yi_;    break;
-    case T:      return t_;     break;
-    case P:      return p_;     break;
-    case RHO:    return rho_;   break;
-    case MMW:    return mmw_;   break;
-    case R:      return r_;     break;
-    case LAM:    return lam_;   break;
-    case D:      return d_;     break;
-    case J:      return j_;     break;
-    case Q:      return q_;     break;
-    case QX:     return qx_;    break;
-    case QY:     return qy_;    break;
-    case XCOORD: return x_;     break;
-    case YCOORD: return y_;     break;
+    case RHO:    return rho_;
+    case YI:     return yi_;
+    case RHOYI:  return rhoYi_;
+    case MMW:    return mmw_;
+    case T:      return t_;
+    case P:      return p_;
+    case H:      return h_;
+    case R:      return r_;
+    case D:      return d_;
+    case LAM:    return lam_;
+    case J:      return j_;
+    case Q:      return q_;
+    case QX:     return qx_;
+    case QY:     return qy_;
+    case XCOORD: return x_;
+    case YCOORD: return y_;
+    default:     return empty_;
     }
   }
 
-  const TagList& rN()              const { return rTags_;     }
-  const TagList& dN()              const { return dTags_;     }
-  const TagList& yiN()             const { return yiTags_;    }
-  const TagList& rhoYiN()          const { return rhoYiTags_; }
-  const TagList& jxN()             const { return jxTags_;    }
-  const TagList& hiN()             const { return hiTags_;    }
-  const TagList& jyN()             const { return jyTags_;    }
-
-  const Tag& yiN   ( const int n ) const { return yiTags_[n];    }
-  const Tag& rhoYiN( const int n ) const { return rhoYiTags_[n]; }
-  const Tag& rN    ( const int n ) const { return rTags_[n];     }
-  const Tag& jxN   ( const int n ) const { return jxTags_[n];    }
-  const Tag& jyN   ( const int n ) const { return jyTags_[n];    }
-  const Tag& hiN   ( const int n ) const { return hiTags_[n];    }
+  const Expr::TagList& operator[]( TagListName name ) const{
+    switch( name ){
+    case YI_N:    return yiTags_;
+    case RHOYI_N: return rhoYiTags_;
+    case H_N:     return hiTags_;
+    case R_N:     return rTags_;
+    case D_N:     return dTags_;
+    case JX_N:    return jxTags_;
+    case JY_N:    return jyTags_;
+    default:      return emptyList_;
+    }
+  }
 
   TagManager( const int nSpec,
-              const Tag& rhoYi,
-              const Tag& h,
-              const Tag& yi,
-              const Tag& t,
-              const Tag& p,
-              const Tag& rho,
-              const Tag& mmw,
-              const Tag& r,
-              const Tag& lam,
-              const Tag& d,
-              const Tag& j,
-              const Tag& q,
-              const Tag& x,
-              const Tag& y ):
+              const Expr::Tag& rhoYi, const Expr::Tag& h, const Expr::Tag& yi, const Expr::Tag& t,
+              const Expr::Tag& p,
+              const Expr::Tag& rho,
+              const Expr::Tag& mmw,
+              const Expr::Tag& r,
+              const Expr::Tag& lam,
+              const Expr::Tag& d,
+              const Expr::Tag& j,
+              const Expr::Tag& q,
+              const Expr::Tag& x,
+              const Expr::Tag& y ):
                 rhoYi_(rhoYi),
                 h_(h),
                 yi_(yi),
@@ -129,10 +114,13 @@ public:
                 q_(q),
                 x_(x),
                 y_(y),
-                qx_( Tag( q, "x" ) ),
-                qy_( Tag( q, "y" ) )
+                qx_( Expr::Tag( q, "x" ) ),
+                qy_( Expr::Tag( q, "y" ) ),
+                empty_( Expr::Tag() ),
+                emptyList_( Expr::tag_list( Expr::Tag() ) )
 
-{
+  {
+    using Expr::Tag;
     for( size_t n=0; n<nSpec; ++n ){
       std::string spec = boost::lexical_cast<std::string>(n);
       hiTags_.push_back( Tag( h_.name() + spec, Expr::STATE_NONE ) );
@@ -141,12 +129,12 @@ public:
       jyTags_.push_back( Tag( j_,  "y" + spec   ) );
       rTags_.push_back(  Tag( r_,  spec         ) );
       dTags_.push_back(  Tag( d_,  spec         ) );
-      if( n != (nSpec - 1) ){
-        rhoYiTags_.push_back( Tag( rhoYi_, spec ) );
-      }
+      rhoYiTags_.push_back( Tag( rhoYi_, spec ) );
     }
-}
+    rhoYiTags_.pop_back();
+  }
+
 };
 
-}
+} // namespace pokitt
 #endif /* EXAMPLES_REACTIONDIFFUSION_TAGMANAGER_H_ */

@@ -25,21 +25,21 @@
 #ifndef SpeciesTransport_h
 #define SpeciesTransport_h
 
-#include <expression/ExprLib.h>
-#include <expression/TransportEquation.h>
-
-#include "SpeciesRHS.h"
-#include "MassFractions.h"
-#include "SpeciesDiffusion.h"
 #include "TagManager.h"
+#include "MassFractions.h"
+#include "SpeciesRHS.h"
+#include "SpeciesDiffusion.h"
 #include <pokitt/thermo/Pressure.h>
 #include <pokitt/MixtureMolWeight.h>
 #include <pokitt/kinetics/ReactionRates.h>
 #include <pokitt/transport/DiffusionCoeffMix.h>
 
-using namespace pokitt;
-using Expr::Tag;
-using Expr::TagList;
+#include <expression/ExprLib.h>
+#include <expression/TransportEquation.h>
+#include <expression/BoundaryConditionExpression.h>
+
+
+namespace pokitt{
 
 template< typename FieldT >
 class SpeciesTransport : public Expr::TransportEquation
@@ -54,9 +54,9 @@ public:
                      const TagManager& tagM,
                      const int n);
 
-  ~SpeciesTransport();
+  ~SpeciesTransport() {};
 
-  void setup_boundary_conditions(const SO::Grid& grid, Expr::ExpressionFactory& execFactory );
+  void setup_boundary_conditions(const SpatialOps::Grid& grid, Expr::ExpressionFactory& execFactory );
 
   void register_one_time_expressions(Expr::ExpressionFactory& execFactory );
 
@@ -81,52 +81,46 @@ SpeciesTransport<FieldT>::
 SpeciesTransport( Expr::ExpressionFactory& execFactory,
                    const TagManager& tagM,
                    const int n)
-                  : Expr::TransportEquation( tagM.rhoYiN(n).name(),
-                    Tag( tagM.rhoYiN(n), "_RHS" ) ),
+                  : Expr::TransportEquation( tagM[RHOYI_N][n].name(),
+                    Expr::Tag( tagM[RHOYI_N][n], "_RHS" ) ),
                     tagM_( tagM ),
                     n_( n )
 {
   typedef typename SpeciesRHS <FieldT>::Builder SpeciesRHS;
 
-  execFactory.register_expression( new SpeciesRHS ( this->get_rhs_tag(), tagM_.rN(n_), tag_list( tagM_.jxN(n_), tagM_.jyN(n_) ) ) );
+  execFactory.register_expression( new SpeciesRHS ( this->get_rhs_tag(), tagM_[R_N][n_], tag_list( tagM_[JX_N][n_], tagM_[JY_N][n_] ) ) );
 }
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-SpeciesTransport<FieldT>::~SpeciesTransport()
-{}
 
 //--------------------------------------------------------------------
 
 template< typename FieldT >
 void
 SpeciesTransport<FieldT>::
-setup_boundary_conditions( const SO::Grid& grid, Expr::ExpressionFactory& execFactory )
+setup_boundary_conditions( const SpatialOps::Grid& grid, Expr::ExpressionFactory& execFactory )
 {
-  typedef typename SO::FaceTypes<FieldT> FaceTypes;
+  typedef typename SpatialOps::FaceTypes<FieldT> FaceTypes;
   typedef typename FaceTypes::XFace XFluxT;
   typedef typename FaceTypes::YFace YFluxT;
 
-  SO::GhostData ghosts( IntVec( 1, 1, 0), IntVec( 1, 1, 0 ) ); // 1 on +-x and +- y and 0 on z
-  std::vector<IntVec> xminusPts, xplusPts, yminusPts, yplusPts;
+  SpatialOps::GhostData ghosts( SpatialOps::IntVec( 1, 1, 0), SpatialOps::IntVec( 1, 1, 0 ) ); // 1 on +-x and +- y and 0 on z
+  std::vector<SpatialOps::IntVec> xminusPts, xplusPts, yminusPts, yplusPts;
 
   for( int i=0; i < grid.extent(1); ++i ){
-    xminusPts.push_back( IntVec(0,              i, 0) );
-    xplusPts. push_back( IntVec(grid.extent(0), i, 0) );
+    xminusPts.push_back( SpatialOps::IntVec(0,              i, 0) );
+    xplusPts. push_back( SpatialOps::IntVec(grid.extent(0), i, 0) );
   }
   for(int i = 0; i < grid.extent(0); i++){
-    yminusPts.push_back( IntVec(i,              0, 0) );
-    yplusPts. push_back( IntVec(i, grid.extent(1), 0) );
+    yminusPts.push_back( SpatialOps::IntVec(i,              0, 0) );
+    yplusPts. push_back( SpatialOps::IntVec(i, grid.extent(1), 0) );
   }
 
-  const typename SO::BoundaryCellInfo xInfo = SO::BoundaryCellInfo::build<XFluxT>(true,true,true);
-  const typename SO::BoundaryCellInfo yInfo = SO::BoundaryCellInfo::build<YFluxT>(true,true,true);
-  const SO::MemoryWindow xwindow( SO::get_window_with_ghost( grid.extent(), ghosts, xInfo ) );
-  const SO::MemoryWindow ywindow( SO::get_window_with_ghost( grid.extent(), ghosts, yInfo ) );
+  const typename SpatialOps::BoundaryCellInfo xInfo = SpatialOps::BoundaryCellInfo::build<XFluxT>(true,true,true);
+  const typename SpatialOps::BoundaryCellInfo yInfo = SpatialOps::BoundaryCellInfo::build<YFluxT>(true,true,true);
+  const SpatialOps::MemoryWindow xwindow( SpatialOps::get_window_with_ghost( grid.extent(), ghosts, xInfo ) );
+  const SpatialOps::MemoryWindow ywindow( SpatialOps::get_window_with_ghost( grid.extent(), ghosts, yInfo ) );
 
-  typedef typename Expr::ConstantBCOpExpression<FieldT,SO::XDIR>::Builder XBC;
-  typedef typename Expr::ConstantBCOpExpression<FieldT,SO::YDIR>::Builder YBC;
+  typedef typename Expr::ConstantBCOpExpression<FieldT,SpatialOps::XDIR>::Builder XBC;
+  typedef typename Expr::ConstantBCOpExpression<FieldT,SpatialOps::YDIR>::Builder YBC;
 
   typename XBC::MaskPtr xminus( new typename XBC::MaskType( xwindow, xInfo, ghosts, xminusPts ) );
   typename XBC::MaskPtr xplus ( new typename XBC::MaskType( xwindow, xInfo, ghosts, xplusPts  ) );
@@ -141,20 +135,20 @@ setup_boundary_conditions( const SO::Grid& grid, Expr::ExpressionFactory& execFa
   yplus ->add_consumer( GPU_INDEX );
 # endif
 
-  Tag xmbcTag( this->solution_variable_name() + "_xmbc", Expr::STATE_NONE );
-  Tag xpbcTag( this->solution_variable_name() + "_xpbc", Expr::STATE_NONE );
-  Tag ymbcTag( this->solution_variable_name() + "_ymbc", Expr::STATE_NONE );
-  Tag ypbcTag( this->solution_variable_name() + "_ypbc", Expr::STATE_NONE );
+  Expr::Tag xmbcTag( this->solution_variable_name() + "_xmbc", Expr::STATE_NONE );
+  Expr::Tag xpbcTag( this->solution_variable_name() + "_xpbc", Expr::STATE_NONE );
+  Expr::Tag ymbcTag( this->solution_variable_name() + "_ymbc", Expr::STATE_NONE );
+  Expr::Tag ypbcTag( this->solution_variable_name() + "_ypbc", Expr::STATE_NONE );
 
-  execFactory.register_expression( new XBC( xmbcTag, xminus, SO::NEUMANN, SO::MINUS_SIDE, 0.0 ) );
-  execFactory.register_expression( new XBC( xpbcTag, xplus , SO::NEUMANN, SO::PLUS_SIDE,  0.0 ) );
-  execFactory.register_expression( new YBC( ymbcTag, yminus, SO::NEUMANN, SO::MINUS_SIDE, 0.0 ) );
-  execFactory.register_expression( new YBC( ypbcTag, yplus , SO::NEUMANN, SO::PLUS_SIDE,  0.0 ) );
+  execFactory.register_expression( new XBC( xmbcTag, xminus, SpatialOps::NEUMANN, SpatialOps::MINUS_SIDE, 0.0 ) );
+  execFactory.register_expression( new XBC( xpbcTag, xplus , SpatialOps::NEUMANN, SpatialOps::PLUS_SIDE,  0.0 ) );
+  execFactory.register_expression( new YBC( ymbcTag, yminus, SpatialOps::NEUMANN, SpatialOps::MINUS_SIDE, 0.0 ) );
+  execFactory.register_expression( new YBC( ypbcTag, yplus , SpatialOps::NEUMANN, SpatialOps::PLUS_SIDE,  0.0 ) );
 
-  execFactory.attach_modifier_expression( xmbcTag, Tag( this->solution_variable_name(), Expr::STATE_N ) );
-  execFactory.attach_modifier_expression( xpbcTag, Tag( this->solution_variable_name(), Expr::STATE_N ) );
-  execFactory.attach_modifier_expression( ymbcTag, Tag( this->solution_variable_name(), Expr::STATE_N ) );
-  execFactory.attach_modifier_expression( ypbcTag, Tag( this->solution_variable_name(), Expr::STATE_N ) );
+  execFactory.attach_modifier_expression( xmbcTag, Expr::Tag( this->solution_variable_name(), Expr::STATE_N ) );
+  execFactory.attach_modifier_expression( xpbcTag, Expr::Tag( this->solution_variable_name(), Expr::STATE_N ) );
+  execFactory.attach_modifier_expression( ymbcTag, Expr::Tag( this->solution_variable_name(), Expr::STATE_N ) );
+  execFactory.attach_modifier_expression( ypbcTag, Expr::Tag( this->solution_variable_name(), Expr::STATE_N ) );
 }
 
 template< typename FieldT >
@@ -170,8 +164,8 @@ initial_condition( Expr::ExpressionFactory& initFactory,
 
   if( !initFactory.have_entry(tagM_[RHO]) )
     initFactory.register_expression( new Rho( tagM_[RHO],    rho0 ) );
-  initFactory.register_expression(   new Yi(  tagM_.yiN(n_), yi   ) );
-  return initFactory.register_expression( new RhoYi ( Tag( this->solution_variable_name(), Expr::STATE_N), tagM_[RHO], yi, 0.0  ) );
+  initFactory.register_expression(   new Yi(  tagM_[YI_N][n_], yi   ) );
+  return initFactory.register_expression( new RhoYi ( Expr::Tag( this->solution_variable_name(), Expr::STATE_N), tagM_[RHO], yi, 0.0  ) );
 }
 
 //--------------------------------------------------------------------
@@ -198,16 +192,17 @@ register_one_time_expressions( Expr::ExpressionFactory& execFactory )
   typedef typename SpeciesDiffFlux  <YFluxT>::Builder MassFluxY;
 
   execFactory.register_expression( new Density         ( tagM_[RHO]   ) );
-  execFactory.register_expression( new MixMolWeight    ( tagM_[MMW],  tagM_.yiN()  ) );
-  execFactory.register_expression( new MassFracs       ( tagM_.yiN(), tagM_[RHO],  tagM_.rhoYiN()         ) );
+  execFactory.register_expression( new MixMolWeight    ( tagM_[MMW],  tagM_[YI_N]  ) );
+  execFactory.register_expression( new MassFracs       ( tagM_[YI_N], tagM_[RHO],  tagM_[RHOYI_N]         ) );
   execFactory.register_expression( new Pressure        ( tagM_[P],    tagM_[T],    tagM_[RHO], tagM_[MMW] ) );
-  execFactory.register_expression( new DiffusionCoeffs ( tagM_.dN(),  tagM_[T],    tagM_[P],   tagM_.yiN(), tagM_[MMW] ) );
-  execFactory.register_expression( new ReactionRates   ( tagM_.rN(),  tagM_[T],    tagM_[RHO],   tagM_.yiN(), tagM_[MMW] ) );
-  execFactory.register_expression( new MassFluxX       ( tagM_.jxN(), tagM_.yiN(), tagM_[RHO], tagM_[MMW],  tagM_.dN() ) );
-  execFactory.register_expression( new MassFluxY       ( tagM_.jyN(), tagM_.yiN(), tagM_[RHO], tagM_[MMW],  tagM_.dN() ) );
+  execFactory.register_expression( new DiffusionCoeffs ( tagM_[D_N],  tagM_[T],    tagM_[P],   tagM_[YI_N], tagM_[MMW] ) );
+  execFactory.register_expression( new ReactionRates   ( tagM_[R_N],  tagM_[T],    tagM_[RHO],   tagM_[YI_N], tagM_[MMW] ) );
+  execFactory.register_expression( new MassFluxX       ( tagM_[JX_N], tagM_[YI_N], tagM_[RHO], tagM_[MMW],  tagM_[D_N] ) );
+  execFactory.register_expression( new MassFluxY       ( tagM_[JY_N], tagM_[YI_N], tagM_[RHO], tagM_[MMW],  tagM_[D_N] ) );
 }
 
 //--------------------------------------------------------------------
 
+} // namespace pokitt
 
 #endif // SpeciesTransport_h

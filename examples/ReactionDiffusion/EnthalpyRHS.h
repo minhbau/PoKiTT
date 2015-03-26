@@ -26,10 +26,14 @@
 #define EnthalpyRHS_Expr_h
 
 #include <expression/Expression.h>
+#include <spatialops/OperatorDatabase.h>
 
 /**
  *  \class EnthalpyRHS
  */
+
+namespace pokitt{
+
 template< typename FieldT >
 class EnthalpyRHS
  : public Expr::Expression< FieldT >
@@ -74,7 +78,7 @@ public:
     const Expr::TagList fluxTags_;
   };
 
-  ~EnthalpyRHS();
+  ~EnthalpyRHS(){};
   void bind_operators( const SpatialOps::OperatorDatabase& opDB );
   void evaluate();
 };
@@ -102,13 +106,6 @@ EnthalpyRHS( const Expr::Tag& rhoTag,
 
   rho_ = this->template create_field_request<FieldT>( rhoTag );
 }
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-EnthalpyRHS<FieldT>::
-~EnthalpyRHS()
-{}
 
 //--------------------------------------------------------------------
 
@@ -161,5 +158,6 @@ Builder::build() const
   return new EnthalpyRHS<FieldT>( rhoTag_, fluxTags_ );
 }
 
+}; // namespace pokitt
 
 #endif // EnthalpyRHS_Expr_h

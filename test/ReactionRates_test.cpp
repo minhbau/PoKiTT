@@ -49,13 +49,6 @@
 
 #include <cantera/IdealGasMix.h>
 
-#ifdef ENABLE_CUDA
-#include <cuda_profiler_api.h>
-#include <cuda_runtime_api.h>
-#endif
-
-namespace Cantera_CXX{ class IdealGasMix; }
-
 namespace SO = SpatialOps;
 typedef SO::SVolField  CellField;
 typedef SO::SpatFldPtr<CellField> CellFieldPtrT;
@@ -347,10 +340,7 @@ int main( int iarg, char* carg[] )
 
     TestHelper status( !timings );
     status( driver( timings, pokittReps, canteraReps ), "Reaction Rates" );
-#ifdef ENABLE_CUDA
-    cudaDeviceSynchronize();
-    cudaProfilerStop();
-#endif
+
     if( status.ok() ){
       std::cout << "\nPASS\n";
       return 0;

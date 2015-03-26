@@ -65,6 +65,8 @@ class InternalEnergy
   bool shomateFlag_; // true if any polynomial is shomate
   std::vector< ThermData > specThermVec_;
 
+  std::ostringstream exceptionMsg_; // generic exception to be thrown
+
   InternalEnergy( const Expr::Tag& tTag,
                   const Expr::TagList& massFracTags );
 public:
@@ -118,6 +120,8 @@ class SpeciesInternalEnergy
   const int n_; //index of species to be evaluated
   ThermData specTherm_;
 
+  std::ostringstream exceptionMsg_; // generic exception to be thrown
+
   SpeciesInternalEnergy( const Expr::Tag& tTag,
                          const int n );
 public:
@@ -162,6 +166,9 @@ InternalEnergy( const Expr::Tag& tTag,
     nSpec_( CanteraObjects::number_species() )
 {
   this->set_gpu_runnable( true );
+
+  exceptionMsg_ << "\nUnidentified polynomial type somehow evaded detection\n"
+                << "This should be have been caught in Cantera Objects\n";
 
   t_ = this->template create_field_request<FieldT>(tTag);
   this->template create_field_vector_request<FieldT>( massFracTags, massFracs_ );
@@ -218,6 +225,11 @@ InternalEnergy( const Expr::Tag& tTag,
       c[ 5] *= 1e3;
       c[12] *= 1e3;
       break;
+    default: {
+      std::ostringstream msg;
+      msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_;
+      throw std::runtime_error( msg.str() );
+      }
     }
     specThermVec_.push_back( tData );
   }
@@ -268,6 +280,11 @@ evaluate()
         e <<= e + yi * cond( temp <= c[0] , c[ 6] + temp * ( c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * c[ 4] ))) - c[ 5] * *recipT ) // if low temp
                            (                c[13] + temp * ( c[8] + temp * ( c[9] + temp * ( c[10] + temp * c[11] ))) - c[12] * *recipT );  // else if high range
         break;
+      default: {
+        std::ostringstream msg;
+        msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_;
+        throw std::runtime_error( msg.str() );
+        }
       }
     }
     else
@@ -292,6 +309,11 @@ evaluate()
                            ( temp <  minT,                 c[ 6] + c[1] * temp + minT * ( 2*c[2] * temp + minT * ( 3*c[ 3] * temp - c[2] + minT * ( 4*c[ 4] * temp - 2*c[ 3] + minT * -3*c[ 4] ))) + ( c[ 5] * temp / minT - 2*c[ 5] ) / minT ) // else if out of bounds - low
                            (                               c[13] + c[8] * temp + maxT * ( 2*c[9] * temp + maxT * ( 3*c[10] * temp - c[9] + maxT * ( 4*c[11] * temp - 2*c[10] + maxT * -3*c[11] ))) + ( c[12] * temp / maxT - 2*c[12] ) / maxT ); // else out of bounds - high
         break;
+      default: {
+        std::ostringstream msg;
+        msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_;
+        throw std::runtime_error( msg.str() );
+        }
       }
     }
   }
@@ -329,6 +351,9 @@ SpeciesInternalEnergy( const Expr::Tag& tTag,
     specTherm_( CanteraObjects::species_thermo( n ) )
 {
   this->set_gpu_runnable( true );
+
+  exceptionMsg_ << "\nUnidentified polynomial type somehow evaded detection\n"
+                << "This should be have been caught in Cantera Objects\n";
 
   t_ = this->template create_field_request<FieldT>( tTag );
 
@@ -380,7 +405,11 @@ SpeciesInternalEnergy( const Expr::Tag& tTag,
     c[ 5] *= 1e3;
     c[12] *= 1e3;
     break;
-
+  default: {
+    std::ostringstream msg;
+    msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n_ << exceptionMsg_;
+    throw std::runtime_error( msg.str() );
+    }
   }
 }
 
@@ -418,6 +447,11 @@ evaluate()
               ( temp <  minT,                 c[ 6] + c[1] * temp + minT * ( 2*c[2] * temp + minT * ( 3*c[ 3] * temp - c[2] + minT * ( 4*c[ 4] * temp - 2*c[ 3] + minT * -3*c[ 4] ))) + ( c[ 5] * temp / minT - 2*c[ 5] ) / minT ) // else if out of bounds - low
               (                               c[13] + c[8] * temp + maxT * ( 2*c[9] * temp + maxT * ( 3*c[10] * temp - c[9] + maxT * ( 4*c[11] * temp - 2*c[10] + maxT * -3*c[11] ))) + ( c[12] * temp / maxT - 2*c[12] ) / maxT ); // else out of bounds - high
     break;
+  default: {
+    std::ostringstream msg;
+    msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n_ << exceptionMsg_;
+    throw std::runtime_error( msg.str() );
+    }
   }
 }
 

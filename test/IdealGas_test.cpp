@@ -53,8 +53,6 @@ namespace SO = SpatialOps;
 typedef SO::SVolField  CellField;
 typedef SO::SpatFldPtr<CellField> CellFieldPtrT;
 
-namespace Cantera_CXX{ class IdealGasMix; }
-
 namespace po = boost::program_options;
 
 using namespace pokitt;

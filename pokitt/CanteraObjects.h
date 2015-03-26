@@ -30,15 +30,16 @@
 
 #include <boost/bimap.hpp>
 
-#include <cantera/Cantera.h>
-#include <cantera/transport.h>
-#include <cantera/IdealGasMix.h>
-#include <cantera/kernel/ct_defs.h> // contains value of gas constant
-#include <cantera/kernel/speciesThermoTypes.h> // contains definitions for which polynomial is being used
-#include <cantera/kernel/reaction_defs.h> // reaction type definitions
-
 //====================================================================
 
+namespace Cantera{
+  class SpeciesThermo;
+  class ReactionData;
+  class Transport;
+}
+namespace Cantera_CXX{
+  class IdealGasMix;
+}
 
   enum ThermoPoly
   {
@@ -116,13 +117,20 @@ public:
   static void setup_cantera( const Setup& options,
                              const int ncopies = 1 );
 
+  static const std::string& phase_name();
   static double gas_constant();
   static int number_species();
   static int number_rxns();
   static const std::vector< double >& molecular_weights();
 
+  static const std::string& species_name( const int i );
   static const ThermData& species_thermo( const int i );
   static const RxnData& rxn_data( const int r );
+
+  typedef std::vector< std::vector< double > > transportCoefsT;
+  static const transportCoefsT& diffusion_coefs();
+  static const transportCoefsT& viscosity_coefs();
+  static const transportCoefsT& thermal_cond_coefs();
 
 private:
 
@@ -135,12 +143,18 @@ private:
   std::queue< std::pair<IdealGas*,Trans*> >  available_;
   GasTransMap gtm_;
 
+  std::string phaseName_;
   const double gasConstant_;
   int numSpecies_;
   int numRxns_;
   std::vector< double > molecularWeights_;
+
+  std::map< int, std::string > speciesNames_;
   std::map< int, ThermData > thermDataMap_;
   std::map< int, RxnData > rxnDataMap_;
+  transportCoefsT diffusionCoefs_;
+  transportCoefsT viscosityCoefs_;
+  transportCoefsT thermalCondCoefs_;
 
   Setup options_;
   bool hasBeenSetup_;
@@ -154,6 +168,7 @@ private:
   void build_new();
   void extract_thermo_data();
   void extract_kinetics_data();
+  void extract_mix_transport_data();
 
 };
 

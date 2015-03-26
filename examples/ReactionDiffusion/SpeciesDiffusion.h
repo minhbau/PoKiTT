@@ -25,8 +25,8 @@
 #ifndef SpeciesDiffusion_h
 #define SpeciesDiffusion_h
 
-
-#include <expression/ExprLib.h>
+#include <expression/Expression.h>
+#include <spatialops/OperatorDatabase.h>
 
 
 /**

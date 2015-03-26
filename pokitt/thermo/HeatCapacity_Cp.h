@@ -77,6 +77,8 @@ class HeatCapacity_Cp
   bool shomateFlag_; // true if any polynomial is shomate
   std::vector< ThermData > specThermVec_;
 
+  std::ostringstream exceptionMsg_; // generic exception to be thrown
+
   HeatCapacity_Cp( const Expr::Tag& tTag,
                    const Expr::TagList& massFracTags );
 
@@ -144,6 +146,8 @@ class SpeciesHeatCapacity_Cp
   const int n_; //index of species to be evaluated
   ThermData specTherm_;
 
+  std::ostringstream exceptionMsg_; // generic exception to be thrown
+
   SpeciesHeatCapacity_Cp( const Expr::Tag& tTag,
                           const int n );
 public:
@@ -192,6 +196,9 @@ HeatCapacity_Cp( const Expr::Tag& tTag,
 {
   this->set_gpu_runnable( true );
 
+  exceptionMsg_ << "\nUnidentified polynomial type somehow evaded detection\n"
+                << "This should be have been caught in Cantera Objects\n";
+
   t_ = this->template create_field_request<FieldT>( tTag );
   this->template create_field_vector_request<FieldT>( massFracTags, massFracs_ );
 
@@ -225,6 +232,11 @@ HeatCapacity_Cp( const Expr::Tag& tTag,
       c[ 5] *= 1e6;
       c[12] *= 1e6;
       break;
+    default: {
+      std::ostringstream msg;
+      msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_;
+      throw std::runtime_error( msg.str() );
+      }
     }
     specThermVec_.push_back( tData );
   }
@@ -289,6 +301,11 @@ evaluate()
         cp <<= cp + yi * cond( t <= c[0] , c[1] + t  * ( c[2] + t  * ( c[ 3] + t  * c[ 4])) + c[ 5] * *recipRecipT )  // if low temp
                              (             c[8] + t  * ( c[9] + t  * ( c[10] + t  * c[11])) + c[12] * *recipRecipT );  // else if high temp
         break;
+      default: {
+        std::ostringstream msg;
+        msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_;
+        throw std::runtime_error( msg.str() );
+        }
       }
     }
     else
@@ -313,6 +330,11 @@ evaluate()
                              ( t < minT,               c[1] + minT * ( c[2] + minT * ( c[ 3] + minT * c[ 4])) + c[ 5] / (minT*minT)  )  // else if out of bounds - low
                              (                         c[8] + maxT * ( c[9] + maxT * ( c[10] + maxT * c[11])) + c[12] / (maxT*maxT)  ); // else out of bounds - high
         break;
+      default: {
+        std::ostringstream msg;
+        msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_;
+        throw std::runtime_error( msg.str() );
+        }
       }
     }
   }
@@ -353,6 +375,9 @@ SpeciesHeatCapacity_Cp( const Expr::Tag& tTag,
 {
   this->set_gpu_runnable( true );
 
+  exceptionMsg_ << "\nUnidentified polynomial type somehow evaded detection\n"
+                << "This should be have been caught in Cantera Objects\n";
+
   t_ = this->template create_field_request<FieldT>(tTag);
 
   const std::vector<double>& molecularWeights = CanteraObjects::molecular_weights();
@@ -382,6 +407,11 @@ SpeciesHeatCapacity_Cp( const Expr::Tag& tTag,
     c[ 5] *= 1e6;
     c[12] *= 1e6;
     break;
+  default: {
+    std::ostringstream msg;
+    msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n_ << exceptionMsg_;
+    throw std::runtime_error( msg.str() );
+    }
   }
 
 }
@@ -426,6 +456,11 @@ evaluate()
                ( t < minT,               c[1] + minT * ( c[2] + minT * ( c[ 3] + minT * c[ 4])) + c[ 5] / (minT*minT) )  // else if out of bounds - low
                (                         c[8] + maxT * ( c[9] + maxT * ( c[10] + maxT * c[11])) + c[12] / (maxT*maxT) ); // else out of bounds - high
     break;
+  default: {
+    std::ostringstream msg;
+    msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n_ << exceptionMsg_;
+    throw std::runtime_error( msg.str() );
+    }
   }
 }
 

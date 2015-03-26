@@ -60,10 +60,9 @@ class ThermalConductivity
   DECLARE_FIELDS( FieldT, temperature_, mmw_ )
   DECLARE_VECTOR_OF_FIELDS( FieldT, massFracs_ )
 
-  int nSpec_; //number of species to iterate over
+  const int nSpec_; //number of species to iterate over
   std::vector< std::vector<double> > tCondCoefs_;
-  int modelType_; // type of model used by Cantera to estimate pure viscosity
-  std::vector<double> molecularWeights_; // molecular weights
+  const std::vector<double> molecularWeights_; // molecular weights
   std::vector<double> molecularWeightsInv_; // inverse of molecular weights (diving by MW is expensive)
 
   ThermalConductivity( const Expr::Tag& temperatureTag,
@@ -114,7 +113,10 @@ ThermalConductivity<FieldT>::
 ThermalConductivity( const Expr::Tag& temperatureTag,
                      const Expr::TagList& massFracTags,
                      const Expr::Tag& mmwTag )
-  : Expr::Expression<FieldT>()
+  : Expr::Expression<FieldT>(),
+    nSpec_( CanteraObjects::number_species() ),
+    molecularWeights_( CanteraObjects::molecular_weights() ),
+    tCondCoefs_( CanteraObjects::thermal_cond_coefs() )
 {
   this->set_gpu_runnable( true );
 
@@ -123,18 +125,9 @@ ThermalConductivity( const Expr::Tag& temperatureTag,
 
   this->template create_field_vector_request<FieldT>( massFracTags, massFracs_ );
 
-  Cantera::MixTransport* trans = dynamic_cast<Cantera::MixTransport*>( CanteraObjects::get_transport() ); // cast gas transport object as mix transport
-  nSpec_ = trans->thermo().nSpecies();
-
-  tCondCoefs_ = trans->getConductivityCoefficients();
-  modelType_ = trans->model();
-
-  molecularWeights_ = trans->thermo().molecularWeights();
   molecularWeightsInv_.resize(nSpec_);
   for( size_t n=0; n<nSpec_; ++n)
     molecularWeightsInv_[n] = 1 / molecularWeights_[n];
-
-  CanteraObjects::restore_transport( trans );
 }
 
 //--------------------------------------------------------------------
@@ -174,18 +167,13 @@ evaluate()
   sum        <<= 0.0; // set sum to 0 before loop
   inverseSum <<= 0.0; // set inverse sum to 0 before loop
 
-  if( modelType_ == Cantera::cMixtureAveraged ) { // as opposed to CK mode
-    sqrtTPtr = SpatialFieldStore::get<FieldT>(temp);
-    *sqrtTPtr <<= sqrt( temp );
-  }
+  sqrtTPtr = SpatialFieldStore::get<FieldT>(temp);
+  *sqrtTPtr <<= sqrt( temp );
 
   for( size_t n = 0; n < nSpec_; ++n){
     const FieldT& yi = massFracs_[n]->field_ref();
     const std::vector<double>& tCondCoefs = tCondCoefs_[n];
-    if( modelType_ == Cantera::cMixtureAveraged )
-      speciesTCond <<= *sqrtTPtr * ( tCondCoefs[0] + logt * ( tCondCoefs[1] + logt * ( tCondCoefs[2] + logt * ( tCondCoefs[3] + logt * tCondCoefs[4] ))) );
-    else
-      speciesTCond <<=         exp ( tCondCoefs[0] + logt * ( tCondCoefs[1] + logt * ( tCondCoefs[2] + logt *   tCondCoefs[3]                         )) );
+    speciesTCond <<= *sqrtTPtr * ( tCondCoefs[0] + logt * ( tCondCoefs[1] + logt * ( tCondCoefs[2] + logt * ( tCondCoefs[3] + logt * tCondCoefs[4] ))) );
     sum        <<= sum        + yi * speciesTCond * molecularWeightsInv_[n];
     inverseSum <<= inverseSum + yi / speciesTCond * molecularWeightsInv_[n];
   }

@@ -85,6 +85,7 @@ class Temperature
   const double maxTemp_; //temperatures above this will throw an exception, default is 5000K
   const int maxIterations_; // number of iterations before exception is thrown, default is 20
 
+  std::ostringstream exceptionMsg_; // generic exception to be thrown
 
   Temperature( const Expr::TagList& massFracTags,
                const Expr::Tag& enthTag,
@@ -176,6 +177,8 @@ class TemperatureFromE0
   const double maxTemp_; //temperatures above this will throw an exception, default is 5000K
   const int maxIterations_; // number of iterations before exception is thrown, default is 20
 
+  std::ostringstream exceptionMsg_; // generic exception to be thrown
+
   TemperatureFromE0( const Expr::TagList& massFracTags,
                      const Expr::Tag& e0Tag,
                      const Expr::Tag& keTag,
@@ -242,6 +245,9 @@ Temperature( const Expr::TagList& massFracTags,
 {
   this->set_gpu_runnable( true );
 
+  exceptionMsg_ << "\nUnidentified polynomial type somehow evaded detection\n"
+                << "This should be have been caught in Cantera Objects\n";
+
   enth_ = this->template create_field_request<FieldT>( enthTag );
   this->template create_field_vector_request<FieldT>( massFracTags, massFracs_ );
 
@@ -283,6 +289,11 @@ Temperature( const Expr::TagList& massFracTags,
       cFrac[10] = c[10] / 3;
       cFrac[11] = c[11] / 4;
       break;
+    default: {
+      std::ostringstream msg;
+      msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_;
+      throw std::runtime_error( msg.str() );
+      }
     }
     cFracVec_.push_back(cFrac);
     specThermVec_.push_back( tData );
@@ -401,6 +412,11 @@ evaluate()
                  * cond( temp <= c[0], c[1] + temp*1e-3 * ( c[2] + temp*1e-3 * ( c[ 3] + temp*1e-3 * c[ 4] )) + c[ 5] * *recipRecipT*1e6 )  // if low temp
                        (               c[8] + temp*1e-3 * ( c[9] + temp*1e-3 * ( c[10] + temp*1e-3 * c[11] )) + c[12] * *recipRecipT*1e6 );  // else if high temp
           break;
+        default: {
+          std::ostringstream msg;
+          msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_;
+          throw std::runtime_error( msg.str() );
+          }
         } // switch( type )
       }
     else
@@ -440,7 +456,12 @@ evaluate()
                        ( temp >  c[0] && temp <= maxT, c[8] + temp*1e-3 * ( c[9] + temp*1e-3 * ( c[10] + temp*1e-3 * c[11] )) + c[12] * *recipRecipT*1e6  )  // else if high temp
                        ( temp < minT,                  c[1] + minT*1e-3 * ( c[2] + minT*1e-3 * ( c[ 3] + minT*1e-3 * c[ 4] )) + c[ 5] / (minT*minT*1e-6) )  // else if out of bounds - low
                        (                               c[8] + maxT*1e-3 * ( c[9] + maxT*1e-3 * ( c[10] + maxT*1e-3 * c[11] )) + c[12] / (maxT*maxT*1e-6) ); // else out of bounds - high
-
+          break;
+        default: {
+          std::ostringstream msg;
+          msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_;
+          throw std::runtime_error( msg.str() );
+          }
         } // switch( type )
       }
     } // species loop
@@ -580,6 +601,9 @@ TemperatureFromE0( const Expr::TagList& massFracTags,
 {
   this->set_gpu_runnable( true );
 
+  exceptionMsg_ << "\nUnidentified polynomial type somehow evaded detection\n"
+                << "This should be have been caught in Cantera Objects\n";
+
   e0_ = this->template create_field_request<FieldT>( e0Tag );
   ke_ = this->template create_field_request<FieldT>( keTag );
   this->template create_field_vector_request<FieldT>( massFracTags, massFracs_ );
@@ -628,6 +652,11 @@ TemperatureFromE0( const Expr::TagList& massFracTags,
       cFrac[10] = c[10] / 3;
       cFrac[11] = c[11] / 4;
       break;
+    default: {
+      std::ostringstream msg;
+      msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_;
+      throw std::runtime_error( msg.str() );
+      }
     }
     cFracVec_.push_back( cFrac );
     specThermVec_.push_back( tData );
@@ -749,6 +778,11 @@ evaluate()
                   * cond( temp <= c[0], c[1] + temp*1e-3 * ( c[2] + temp*1e-3 * ( c[ 3] + temp*1e-3 * c[ 4])) + c[ 5] * *recipRecipT*1e6  )  // if low temp
                         (               c[8] + temp*1e-3 * ( c[9] + temp*1e-3 * ( c[10] + temp*1e-3 * c[11])) + c[12] * *recipRecipT*1e6  );  // else if high temp
           break;
+        default: {
+          std::ostringstream msg;
+          msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_;
+          throw std::runtime_error( msg.str() );
+          }
         } // switch( polyType )
       }
       else
@@ -791,6 +825,11 @@ evaluate()
                         ( temp < minT,                  c[1] + minT*1e-3 * ( c[2] + minT*1e-3 * ( c[ 3] + minT*1e-3 * c[ 4])) + c[ 5] / (minT*minT*1e-6) )  // else if out of bounds - low
                         (                               c[8] + maxT*1e-3 * ( c[9] + maxT*1e-3 * ( c[10] + maxT*1e-3 * c[11])) + c[12] / (maxT*maxT*1e-6) ); // else out of bounds - high
           break;
+        default: {
+          std::ostringstream msg;
+          msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_;
+          throw std::runtime_error( msg.str() );
+          }
         } // switch( polyType )
       }
     } // species loop

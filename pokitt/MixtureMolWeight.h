@@ -38,14 +38,13 @@ template< typename FieldT >
 class MixtureMolWeight
  : public Expr::Expression<FieldT>
 {
-  const std::vector<double>& specMW_;
+
   std::vector<double> molecularWeightsInv_;
   const int nSpec_;
 
   DECLARE_VECTOR_OF_FIELDS( FieldT, massFracs_ )
 
-  MixtureMolWeight( const Expr::TagList& massFracTags,
-                    const std::vector<double>& specMw  );
+  MixtureMolWeight( const Expr::TagList& massFracTags );
 public:
   class Builder : public Expr::ExpressionBuilder
   {
@@ -62,7 +61,6 @@ public:
 
   private:
     const Expr::TagList massFracTags_;
-    std::vector<double> specMW_;
   };
 
   ~MixtureMolWeight(){}
@@ -81,19 +79,18 @@ public:
 
 template< typename FieldT >
 MixtureMolWeight<FieldT>::
-MixtureMolWeight( const Expr::TagList& massFracTags,
-                  const std::vector<double>& specMW )
+MixtureMolWeight( const Expr::TagList& massFracTags )
   : Expr::Expression<FieldT>(),
-    specMW_(specMW),
-    nSpec_( specMW.size() )
+    nSpec_( CanteraObjects::number_species() )
 {
   this->set_gpu_runnable( true );
 
   assert( massFracTags.size() == nSpec_ );
 
+  const std::vector<double>& specMW = CanteraObjects::molecular_weights();
   molecularWeightsInv_.resize(nSpec_);
   for( size_t n=0; n<nSpec_; ++n)
-    molecularWeightsInv_[n] = 1 / specMW_[n];
+    molecularWeightsInv_[n] = 1 / specMW[n];
 
   this->template create_field_vector_request<FieldT>( massFracTags, massFracs_ );
 }
@@ -127,9 +124,7 @@ Builder::Builder( const Expr::Tag& resultTag,
   : ExpressionBuilder( resultTag ),
     massFracTags_( massFracTags )
 {
-  Cantera_CXX::IdealGasMix* const gasMix = CanteraObjects::get_gasmix();
-  specMW_ = gasMix->molecularWeights();
-  CanteraObjects::restore_gasmix(gasMix);
+
 }
 
 //--------------------------------------------------------------------
@@ -139,7 +134,7 @@ Expr::ExpressionBase*
 MixtureMolWeight<FieldT>::
 Builder::build() const
 {
-  return new MixtureMolWeight<FieldT>( massFracTags_, specMW_ );
+  return new MixtureMolWeight<FieldT>( massFracTags_ );
 }
 
 } // namespace pokitt

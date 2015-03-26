@@ -27,6 +27,13 @@
 
 #include "CanteraObjects.h"
 
+#include <cantera/Cantera.h>
+#include <cantera/transport.h>
+#include <cantera/IdealGasMix.h>
+
+#include <cantera/kernel/ct_defs.h> // contains value of gas constant
+#include <cantera/kernel/speciesThermoTypes.h> // contains definitions for which polynomial is being used
+#include <cantera/kernel/reaction_defs.h> // reaction type definitions
 
 #ifdef EXPRESSION_THREADS
 
@@ -210,10 +217,9 @@ Setup( const std::string transName,
 //====================================================================
 
 CanteraObjects::CanteraObjects()
-  : gasConstant_( Cantera::GasConstant )
-{
-  hasBeenSetup_ = false;
-}
+  : gasConstant_( Cantera::GasConstant ),
+    hasBeenSetup_( false )
+{}
 
 //--------------------------------------------------------------------
 
@@ -246,12 +252,12 @@ CanteraObjects::setup_cantera( const Setup& options,
 			       const int ncopies )
 {
   CanteraObjects& co = CanteraObjects::self();
-
   assert( !co.hasBeenSetup_ );
   co.options_ = options;
   for( int i=0; i<ncopies; ++i ) co.build_new();
   co.extract_thermo_data();
   co.extract_kinetics_data();
+  co.extract_mix_transport_data();
   co.hasBeenSetup_ = true;
 }
 
@@ -281,11 +287,13 @@ CanteraObjects::extract_thermo_data()
 {
   assert( !hasBeenSetup_ );
   IdealGas* gas = available_.front().first;
+  phaseName_ = gas->name();
   numSpecies_ = gas->nSpecies();
   molecularWeights_ = gas->molecularWeights();
   const Cantera::SpeciesThermo& spThermo = gas->speciesThermo();
   for( int i = 0; i != numSpecies_; ++i ){
     thermDataMap_.insert( std::pair< int, ThermData >( i, ThermData( spThermo, i ) ) );
+    speciesNames_.insert( std::pair< int, std::string>( i, gas->speciesName(i) ) );
   }
 }
 
@@ -306,11 +314,34 @@ CanteraObjects::extract_kinetics_data()
     }
     catch( std::runtime_error& err ){
       std::ostringstream msg;
-      msg << " \n Error occured when parsing data for reaction " << r << std::endl
+      msg << __FILE__ << " : " << __LINE__
+          << " \n Error occured when parsing data for reaction " << r << std::endl
           << err.what() << std::endl;
       throw std::runtime_error( msg.str() );
     }
   }
+}
+
+//--------------------------------------------------------------------
+
+void
+CanteraObjects::extract_mix_transport_data()
+{
+  assert( !hasBeenSetup_ );
+  Trans* trans = available_.front().second;
+  if( trans->model() != Cantera::cMixtureAveraged){
+    std::ostringstream msg;
+    msg << __FILE__ << " : " << __LINE__
+        << " \n Unsupported model for transport properties detected " << std::endl
+        << " Only mixture average transport properties are currently supported" << std::endl
+        << " Supplied model = " << trans->model() << std::endl
+        << " See Cantera::TransportBase.h for model definitions" << std::endl;
+    throw std::runtime_error( msg.str() );
+  }
+  Cantera::MixTransport* mixTrans = dynamic_cast<Cantera::MixTransport*>( trans ); // cast gas transport object as mix transport
+  diffusionCoefs_ = mixTrans->getDiffusionPolyCoefficients(); // diffusion coefficient parameters
+  viscosityCoefs_ = mixTrans->getViscosityCoefficients();
+  thermalCondCoefs_ = mixTrans->getConductivityCoefficients();
 }
 
 //--------------------------------------------------------------------
@@ -388,6 +419,25 @@ CanteraObjects::molecular_weights()
 
 //--------------------------------------------------------------------
 
+const std::string&
+CanteraObjects::species_name( const int i )
+{
+  CanteraMutex lock;
+  CanteraObjects& co = CanteraObjects::self();
+  assert( co.hasBeenSetup_ );
+  if( co.speciesNames_.find(i) != co.speciesNames_.end() )
+    return co.speciesNames_.find(i)->second;
+  else{
+    std::ostringstream msg;
+    msg << "Error in " __FILE__ << " : " << __LINE__ << std::endl
+        <<" species_name called for a species that doesn't exist " << std::endl
+        <<" Species # "<< i << std::endl;
+    throw std::runtime_error( msg.str() );
+  }
+}
+
+//--------------------------------------------------------------------
+
 const ThermData&
 CanteraObjects::species_thermo( const int i )
 {
@@ -422,6 +472,50 @@ CanteraObjects::rxn_data( const int r )
         <<" Reaction # "<< r << std::endl;
     throw std::runtime_error( msg.str() );
   }
+}
+
+//--------------------------------------------------------------------
+
+const std::vector< std::vector< double > >&
+CanteraObjects::diffusion_coefs()
+{
+  CanteraMutex lock;
+  CanteraObjects& co = CanteraObjects::self();
+  assert( co.hasBeenSetup_ );
+  return co.diffusionCoefs_;
+}
+
+//--------------------------------------------------------------------
+
+const std::vector< std::vector< double > >&
+CanteraObjects::viscosity_coefs()
+{
+  CanteraMutex lock;
+  CanteraObjects& co = CanteraObjects::self();
+  assert( co.hasBeenSetup_ );
+  return co.viscosityCoefs_;
+}
+
+//--------------------------------------------------------------------
+
+const std::vector< std::vector< double > >&
+CanteraObjects::thermal_cond_coefs()
+{
+  CanteraMutex lock;
+  CanteraObjects& co = CanteraObjects::self();
+  assert( co.hasBeenSetup_ );
+  return co.thermalCondCoefs_;
+}
+
+//--------------------------------------------------------------------
+
+const std::string&
+CanteraObjects::phase_name()
+{
+  CanteraMutex lock;
+  CanteraObjects& co = CanteraObjects::self();
+  assert( co.hasBeenSetup_ );
+  return co.phaseName_;
 }
 
 //--------------------------------------------------------------------

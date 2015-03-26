@@ -25,8 +25,8 @@
 #ifndef HeatFlux_h
 #define HeatFlux_h
 
-
-#include <expression/ExprLib.h>
+#include <expression/Expression.h>
+#include <spatialops/OperatorDatabase.h>
 
 template< typename FluxT >
 class HeatFlux : public Expr::Expression< FluxT >
