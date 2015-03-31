@@ -333,6 +333,7 @@ int main( int iarg, char* carg[] )
   bool timings = false;
   size_t pokittReps = 1;
   size_t canteraReps = 1;
+  po::variables_map args;
 
   // parse the command line options input describing the problem
   try {
@@ -343,9 +344,10 @@ int main( int iarg, char* carg[] )
            ( "phase", po::value<std::string>(&inpGroup), "name of phase in Cantera xml input file" )
            ( "timings", "Generate comparison timings between Cantera and PoKiTT across several problem sizes" )
            ( "pokitt-reps", po::value<size_t>(&pokittReps), "Repeat the PoKiTT tests and report the average execution time")
-           ( "cantera-reps", po::value<size_t>(&canteraReps), "Repeat the Cantera tests and report the average execution time");
+           ( "cantera-reps", po::value<size_t>(&canteraReps), "Repeat the Cantera tests and report the average execution time")
+           ( "disable-t-from-h", "Turn the temperature from enthalpy test off to reduce total run time")
+           ( "disable-t-from-e0", "Turn the temperature from internal energy test off to reduce total run time");
 
-    po::variables_map args;
     po::store( po::parse_command_line(iarg,carg,desc), args );
     po::notify(args);
 
@@ -367,9 +369,11 @@ int main( int iarg, char* carg[] )
     CanteraObjects::setup_cantera( setup );
 
     TestHelper status( !timings );
-    status( driver( timings, pokittReps, canteraReps, H  ), "T from " + energy_name(H ) );
+    if( args.count( "disable-t-from-h" ) < 1 )
+      status( driver( timings, pokittReps, canteraReps, H  ), "T from " + energy_name(H ) );
     std::cout << std::endl;
-    status( driver( timings, pokittReps, canteraReps, E0 ), "T from " + energy_name(E0) );
+    if( args.count( "disable-t-from-e0" ) < 1 )
+      status( driver( timings, pokittReps, canteraReps, E0 ), "T from " + energy_name(E0) );
 
     if( status.ok() ){
       std::cout << "\nPASS\n";

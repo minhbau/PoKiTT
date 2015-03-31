@@ -395,6 +395,7 @@ bool driver( const bool timings,
 
 int main( int iarg, char* carg[] )
 {
+  po::variables_map args;
   std::string inputFileName;
   std::string inpGroup;
   bool timings = false;
@@ -410,9 +411,12 @@ int main( int iarg, char* carg[] )
            ( "phase", po::value<std::string>(&inpGroup), "name of phase in Cantera xml input file" )
            ( "timings", "Generate comparison timings between Cantera and PoKiTT across several problem sizes" )
            ( "pokitt-reps", po::value<size_t>(&pokittReps), "Repeat the PoKiTT tests and report the average execution time")
-           ( "cantera-reps", po::value<size_t>(&canteraReps), "Repeat the Cantera tests and report the average execution time");
+           ( "cantera-reps", po::value<size_t>(&canteraReps), "Repeat the Cantera tests and report the average execution time")
+           ( "disable-d-mass", "Turn the diffusion coefficients - mol avareged - test off to reduce total run time")
+           ( "disable-d-mol", "Turn the diffusion coefficients - mass avareged - test off to reduce total run time")
+           ( "disable-t-cond", "Turn the thermal conductivity test off to reduce total run time")
+           ( "disable-visc", "Turn the viscosity test off to reduce total run time");
 
-    po::variables_map args;
     po::store( po::parse_command_line(iarg,carg,desc), args );
     po::notify(args);
 
@@ -434,10 +438,14 @@ int main( int iarg, char* carg[] )
     CanteraObjects::setup_cantera( setup );
 
     TestHelper status( !timings );
-    status( driver( timings, pokittReps, canteraReps, DIFF_MASS ), transport_name(DIFF_MASS ) );
-    status( driver( timings, pokittReps, canteraReps, DIFF_MOL  ), transport_name(DIFF_MOL  ) );
-    status( driver( timings, pokittReps, canteraReps, TCOND     ), transport_name(TCOND     ) );
-    status( driver( timings, pokittReps, canteraReps, VISC      ), transport_name(VISC      ) );
+    if( args.count( "disable-d-mass" ) < 1 )
+      status( driver( timings, pokittReps, canteraReps, DIFF_MASS ), transport_name(DIFF_MASS ) );
+    if( args.count( "disable-d-mol" ) < 1 )
+      status( driver( timings, pokittReps, canteraReps, DIFF_MOL  ), transport_name(DIFF_MOL  ) );
+    if( args.count( "disable-t-cond" ) < 1 )
+      status( driver( timings, pokittReps, canteraReps, TCOND     ), transport_name(TCOND     ) );
+    if( args.count( "disable-visc" ) < 1 )
+      status( driver( timings, pokittReps, canteraReps, VISC      ), transport_name(VISC      ) );
 
     if( status.ok() ){
       std::cout << "\nPASS\n";

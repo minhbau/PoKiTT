@@ -79,7 +79,8 @@ void print_fields( Expr::FieldManagerList& fml, const TagList& fieldTags ){
 bool driver( const bool timings,
              const bool print,
              const size_t nSteps,
-             const double dt )
+             const double dt,
+             const size_t maxPoints )
 {
   TestHelper status( !timings );
   const int nSpec = CanteraObjects::number_species();
@@ -111,16 +112,19 @@ bool driver( const bool timings,
       Tag( "YCoord",    Expr::STATE_NONE ) // YCOORD
   );
 
+  size_t maxXDim = (maxPoints) - (maxPoints)%10;
   std::vector< IntVec > sizeVec;
   if( timings ){
-    sizeVec.push_back( IntVec(1022, 510, 1 ) );
-    sizeVec.push_back( IntVec(510,  510,  1 ) );
-    sizeVec.push_back( IntVec(254,  254,  1 ) );
-    sizeVec.push_back( IntVec(126,  126,  1 ) );
-    sizeVec.push_back( IntVec( 62,  62,   1 ) );
-    sizeVec.push_back( IntVec( 30,  30,   1 ) );
+    sizeVec.push_back( IntVec( maxXDim/10 - 2,  8,  1 ) );
+    if( 1024 * 512 < maxPoints ) sizeVec.push_back( IntVec(1022, 510, 1 ) );
+    if( 512  * 512 < maxPoints ) sizeVec.push_back( IntVec(510,  510, 1 ) );
+    if( 256  * 256 < maxPoints ) sizeVec.push_back( IntVec(254,  254, 1 ) );
+    if( 128  * 128 < maxPoints ) sizeVec.push_back( IntVec(126,  126, 1 ) );
+    if( 64   * 64  < maxPoints ) sizeVec.push_back( IntVec( 62,  62,  1 ) );
+    if( 32   * 32  < maxPoints ) sizeVec.push_back( IntVec( 30,  30,  1 ) );
   }
-  sizeVec.push_back( IntVec( 6,  6,  1 ) );
+  else
+    sizeVec.push_back( IntVec( 6,  6,  1 ) );
   for( std::vector< IntVec >::iterator iSize = sizeVec.begin(); iSize!= sizeVec.end(); ++iSize){
 
     typedef EnthalpyTransport<CellField> EnthalpyTransport;
@@ -238,6 +242,7 @@ int main( int iarg, char* carg[] )
   bool timings = false;
   bool print   = false;
   size_t nSteps;
+  size_t maxPoints;
   double dt;
 
   po::options_description desc("Supported Options");
@@ -248,7 +253,8 @@ int main( int iarg, char* carg[] )
                ( "timings,t", "Generate comparison timings between Cantera and PoKiTT across several problem sizes" )
                ( "print-fields,p", "Print field values for Temperature, mass of H2, and mass of OH every 5000 time steps")
                ( "nsteps,n", po::value<size_t>(&nSteps)->default_value(5000), "How many time steps to take" )
-               ( "dt",     po::value<double>(&dt)->default_value(1e-15),    "Size of time steps (s) to take"  );
+               ( "dt",     po::value<double>(&dt)->default_value(1e-15),    "Size of time steps (s) to take"  )
+               ( "max-points",     po::value<size_t>(&maxPoints)->default_value(1024*1024),    "Run problems at this size or lower (rounded down to nearest 10)"  );
 
   // parse the command line options input describing the problem
   try {
@@ -299,7 +305,7 @@ int main( int iarg, char* carg[] )
     }
 
     TestHelper status( !timings );
-    status( driver( timings, print, nSteps, dt ), "Reaction Diffusion" );
+    status( driver( timings, print, nSteps, dt, maxPoints ), "Reaction Diffusion" );
 
     if( status.ok() ){
       std::cout << "\nPASS\n";

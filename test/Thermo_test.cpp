@@ -355,7 +355,7 @@ bool driver( const bool timings,
     initTree.execute_tree();
 
     if( timings ){
-      std::cout << std::endl << thermo_name(thermoQuantity) << " test - " << nPoints << std::endl;
+      std::cout << std::endl << thermo_name(thermoQuantity) << ((mix) ? " mix ":"") << " test - " << nPoints << std::endl;
       execTree.execute_tree(); // sets memory high-water mark
     }
 
@@ -417,6 +417,7 @@ bool driver( const bool timings,
 
 int main( int iarg, char* carg[] )
 {
+  po::variables_map args;
   std::string inputFileName;
   std::string inpGroup;
   bool mix     = false;
@@ -434,9 +435,12 @@ int main( int iarg, char* carg[] )
            ( "mix", "Triggers mixture heat capacity test.  Otherwise, species heat capacities are tested." )
            ( "timings", "Generate comparison timings between Cantera and PoKiTT across several problem sizes" )
            ( "pokitt-reps", po::value<size_t>(&pokittReps), "Repeat the PoKiTT tests and report the average execution time")
-           ( "cantera-reps", po::value<size_t>(&canteraReps), "Repeat the Cantera tests and report the average execution time");
+           ( "cantera-reps", po::value<size_t>(&canteraReps), "Repeat the Cantera tests and report the average execution time")
+           ( "disable-cp", "Turn the Cp test off to reduce total run time")
+           ( "disable-cv", "Turn the Cv test off to reduce total run time")
+           ( "disable-h", "Turn the enthalpy test off to reduce total run time")
+           ( "disable-e", "Turn the internal energy test off to reduce total run time");
 
-    po::variables_map args;
     po::store( po::parse_command_line(iarg,carg,desc), args );
     po::notify(args);
 
@@ -459,10 +463,14 @@ int main( int iarg, char* carg[] )
     CanteraObjects::setup_cantera( setup );
 
     TestHelper status( !timings );
-    status( driver(  timings, pokittReps, canteraReps, mix, CP   ), thermo_name(CP  ) );
-    status( driver(  timings, pokittReps, canteraReps, mix, CV   ), thermo_name(CV  ) );
-    status( driver(  timings, pokittReps, canteraReps, mix, ENTH ), thermo_name(ENTH) );
-    status( driver(  timings, pokittReps, canteraReps, mix, E    ), thermo_name(E   ) );
+    if( args.count( "disable-cp" ) < 1 )
+      status( driver(  timings, pokittReps, canteraReps, mix, CP   ), thermo_name(CP  ) );
+    if( args.count( "disable-cv" ) < 1 )
+      status( driver(  timings, pokittReps, canteraReps, mix, CV   ), thermo_name(CV  ) );
+    if( args.count( "disable-h" ) < 1 )
+      status( driver(  timings, pokittReps, canteraReps, mix, ENTH ), thermo_name(ENTH) );
+    if( args.count( "disable-e" ) < 1 )
+      status( driver(  timings, pokittReps, canteraReps, mix, E    ), thermo_name(E   ) );
 
     if( status.ok() ){
       std::cout << "\nPASS\n";
