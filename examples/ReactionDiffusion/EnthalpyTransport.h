@@ -196,7 +196,7 @@ initial_condition( Expr::ExpressionFactory& initFactory,
   initFactory.register_expression(        new XCoord      ( tagMgr_[XCOORD] ) );
   initFactory.register_expression(        new YCoord      ( tagMgr_[YCOORD] ) );
   initFactory.register_expression(        new SpecN       ( tagMgr_[YI_N].back(), tagMgr_[YI_N] ) );
-  initFactory.register_expression(        new Temperature0( tagMgr_[T], tagMgr_[XCOORD],  tagMgr_[YCOORD], tMax-tBase, tDev, tDev*2, tMean, tMean/8, tBase ) );
+  initFactory.register_expression(        new Temperature0( tagMgr_[T], tagMgr_[XCOORD],  tagMgr_[YCOORD], tMax-tBase, tDev*100, tDev/2, tMean, tMean/8, tBase ) );
   return initFactory.register_expression( new Enthalpy    ( tagMgr_[H], tagMgr_[T], tagMgr_[YI_N] ) );
 }
 
