@@ -62,6 +62,7 @@ public:
 
   Expr::ExpressionID initial_condition( Expr::ExpressionFactory& initFactory,
                                         const double yi,
+                                        const double slope,
                                         const double rho0);
 
 private:
@@ -156,16 +157,18 @@ Expr::ExpressionID
 SpeciesTransport<FieldT>::
 initial_condition( Expr::ExpressionFactory& initFactory,
                    const double yi,
+                   const double slope,
                    const double rho0 )
 {
   typedef typename Expr::LinearFunction <FieldT>::Builder RhoYi;
   typedef typename Expr::ConstantExpr   <FieldT>::Builder Rho;
-  typedef typename Expr::ConstantExpr   <FieldT>::Builder Yi;
+  typedef typename Expr::LinearFunction <FieldT>::Builder Yi;
 
   if( !initFactory.have_entry(tagM_[RHO]) )
     initFactory.register_expression( new Rho( tagM_[RHO],    rho0 ) );
-  initFactory.register_expression(   new Yi(  tagM_[YI_N][n_], yi   ) );
-  return initFactory.register_expression( new RhoYi ( Expr::Tag( this->solution_variable_name(), Expr::STATE_N), tagM_[RHO], yi, 0.0  ) );
+
+  initFactory.register_expression(   new Yi(  tagM_[YI_N][n_], tagM_[XCOORD], slope, yi   ) );
+  return initFactory.register_expression( new RhoYi ( Expr::Tag( this->solution_variable_name(), Expr::STATE_N), tagM_[YI_N][n_], rho0, 0.0  ) );
 }
 
 //--------------------------------------------------------------------

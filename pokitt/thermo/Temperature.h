@@ -342,42 +342,42 @@ evaluate()
 #   ifndef ENABLE_CUDA
     const double maxTval = nebo_max(temp);
     const double minTval = nebo_min(temp);
-    if( maxTval >= maxTemp_ ){
-      std::ostringstream msg;
-        msg << std::endl
-            << "Error in pokitt::Temperature::evaluate()." << std::endl
-            << "Temperature is too high" << std::endl;
-        find_bad_points( msg, temp, maxTemp_, false );
-        msg << "Total   iterations = " << iterations << std::endl
-            << "Maximum iterations = " << maxIterations_ << std::endl
-            << "Set tolerance      = " << tol_ << std::endl
-            << __FILE__ << " : " << __LINE__ << std::endl;
-        throw std::runtime_error( msg.str() );
-    }
-    if( minTval <= 0.0 ){
-      std::ostringstream msg;
-        msg << std::endl
-            << "Error in pokitt::Temperature::evaluate()." << std::endl
-            << "Temperature is below 0" << std::endl;
-        find_bad_points( msg, temp, 0, true );
-        msg << "Total   iterations = " << iterations << std::endl
-            << "Maximum iterations = " << maxIterations_ << std::endl
-            << "Set tolerance      = " << tol_ << std::endl
-            << __FILE__ << " : " << __LINE__ << std::endl;
-        throw std::runtime_error( msg.str() );
-    }
-    if( isnan( nebo_sum_interior( temp ) ) ){
-      std::ostringstream msg;
-        msg << std::endl
-            << "Error in pokitt::Temperature::evaluate()." << std::endl
-            << "Temperature is NaN" << std::endl;
-        find_bad_points( msg, temp, NAN, false );
-        msg << "Total   iterations = " << iterations << std::endl
-            << "Maximum iterations = " << maxIterations_ << std::endl
-            << "Set tolerance      = " << tol_ << std::endl
-            << __FILE__ << " : " << __LINE__ << std::endl;
-        throw std::runtime_error( msg.str() );
-    }
+//    if( maxTval >= maxTemp_ ){
+//      std::ostringstream msg;
+//        msg << std::endl
+//            << "Error in pokitt::Temperature::evaluate()." << std::endl
+//            << "Temperature is too high" << std::endl;
+//        find_bad_points( msg, temp, maxTemp_, false );
+//        msg << "Total   iterations = " << iterations << std::endl
+//            << "Maximum iterations = " << maxIterations_ << std::endl
+//            << "Set tolerance      = " << tol_ << std::endl
+//            << __FILE__ << " : " << __LINE__ << std::endl;
+//        throw std::runtime_error( msg.str() );
+//    }
+//    if( minTval <= 0.0 ){
+//      std::ostringstream msg;
+//        msg << std::endl
+//            << "Error in pokitt::Temperature::evaluate()." << std::endl
+//            << "Temperature is below 0" << std::endl;
+//        find_bad_points( msg, temp, 0, true );
+//        msg << "Total   iterations = " << iterations << std::endl
+//            << "Maximum iterations = " << maxIterations_ << std::endl
+//            << "Set tolerance      = " << tol_ << std::endl
+//            << __FILE__ << " : " << __LINE__ << std::endl;
+//        throw std::runtime_error( msg.str() );
+//    }
+//    if( isnan( nebo_sum_interior( temp ) ) ){
+//      std::ostringstream msg;
+//        msg << std::endl
+//            << "Error in pokitt::Temperature::evaluate()." << std::endl
+//            << "Temperature is NaN" << std::endl;
+//        find_bad_points( msg, temp, NAN, false );
+//        msg << "Total   iterations = " << iterations << std::endl
+//            << "Maximum iterations = " << maxIterations_ << std::endl
+//            << "Set tolerance      = " << tol_ << std::endl
+//            << __FILE__ << " : " << __LINE__ << std::endl;
+//        throw std::runtime_error( msg.str() );
+//    }
 #   endif
     for( size_t n=0; n<nSpec_; ++n ){
       const FieldT& yi = massFracs_[n]->field_ref();

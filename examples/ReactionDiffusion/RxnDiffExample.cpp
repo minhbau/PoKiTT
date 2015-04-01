@@ -72,28 +72,43 @@ void print_fields( Expr::FieldManagerList& fml, const TagList& fieldTags ){
   BOOST_FOREACH( const Tag iTag, fieldTags){
     CellField& field = fml.field_ref< CellField >( iTag );
     std::cout << iTag.name() << std::endl;
-    SO::print_field( field, std::cout );
+    SO::print_field( field, std::cout, true );
+  }
+}
+
+void print_matlab( Expr::FieldManagerList& fml, const TagList& fieldTags, const int s ){
+  BOOST_FOREACH( const Tag iTag, fieldTags){
+
+    CellField& field = fml.field_ref< CellField >( iTag );
+#ifdef ENABLE_CUDA
+   field.validate_device_async( GPU_INDEX );
+#endif
+    SO::write_matlab( field, iTag.name()+boost::lexical_cast<std::string>(s), false);
   }
 }
 
 bool driver( const bool timings,
              const bool print,
+             const bool matlab,
              const size_t nSteps,
              const double dt,
-             const size_t maxPoints )
+             const size_t maxPoints)
 {
   TestHelper status( !timings );
   const int nSpec = CanteraObjects::number_species();
 
   const double rho0 = 1.0;
-  const double length = 1e-3;
+  const double length = 0.1;
   const double tMax = 1700;
-  const double tDev = 0.2*length;
+  const double tDev = 0.1*length;
   const double tMean = length/2;
   const double tBase = 800;
-  std::vector<double> yi(nSpec, 0.0);
-  yi[0]=0.01;
-  yi[3]=0.15;
+  std::vector<double> yi(nSpec, 1e-12);
+  std::vector<double> slope( nSpec, 1e-12 );
+  yi[28]=0.25;
+  slope[28]=0.4;
+  yi[3]=0.25;
+  slope[3]=-0.4;
 
   const TagManager tagMgr( nSpec,           // enum values:
       Tag( "rhoYi",     Expr::STATE_N    ), // RHOYI
@@ -102,12 +117,12 @@ bool driver( const bool timings,
       Tag( "temp",      Expr::STATE_NONE ), // T
       Tag( "pressure",  Expr::STATE_NONE ), // P
       Tag( "density",   Expr::STATE_NONE ), // RHO
-      Tag( "mix MW ",   Expr::STATE_NONE ), // MMW
+      Tag( "mixMW ",   Expr::STATE_NONE ), // MMW
       Tag( "r",         Expr::STATE_NONE ), // R
       Tag( "lambda",    Expr::STATE_NONE ), // LAM
       Tag( "D",         Expr::STATE_NONE ), // D
       Tag( "J",         Expr::STATE_NONE ), // J
-      Tag( "heat flux", Expr::STATE_NONE ), // Q
+      Tag( "heatFlux", Expr::STATE_NONE ), // Q
       Tag( "XCoord",    Expr::STATE_NONE ), // XCOORD
       Tag( "YCoord",    Expr::STATE_NONE ) // YCOORD
   );
@@ -123,8 +138,7 @@ bool driver( const bool timings,
     if( 64   * 64  < maxPoints ) sizeVec.push_back( IntVec( 62,  62,  1 ) );
     if( 32   * 32  < maxPoints ) sizeVec.push_back( IntVec( 30,  30,  1 ) );
   }
-  else
-    sizeVec.push_back( IntVec( 6,  6,  1 ) );
+  sizeVec.push_back( IntVec( 126,  126,  1 ) );
   for( std::vector< IntVec >::iterator iSize = sizeVec.begin(); iSize!= sizeVec.end(); ++iSize){
 
     typedef EnthalpyTransport<CellField> EnthalpyTransport;
@@ -137,10 +151,14 @@ bool driver( const bool timings,
     EnthalpyTransport* hTrans = new EnthalpyTransport( execFactory, tagMgr );
     initIDs.insert( hTrans->initial_condition( initFactory, tMax, tBase, tMean, tDev) );
 
+    typedef typename Expr::ConstantExpr   <CellField>::Builder Rho;
+    initIDs.insert( initFactory.register_expression( new Rho( tagMgr[RHO],    rho0 ) ) );
+
     std::list<SpeciesTransport*> specEqns;
     for( size_t n=0; n<(nSpec-1); ++n ){
       SpeciesTransport* specTrans = new SpeciesTransport( execFactory, tagMgr, n );
-      initIDs.insert( specTrans->initial_condition( initFactory, yi[n], rho0 ) );
+      yi[n] = fabs(yi[n] - 0.5 * slope[n] ) + 1e-12;
+      initIDs.insert( specTrans->initial_condition( initFactory, yi[n], slope[n]/length, rho0 ) );
       specEqns.push_back( specTrans );
     }
     specEqns.front()->register_one_time_expressions( execFactory );
@@ -163,18 +181,16 @@ bool driver( const bool timings,
     hTrans->setup_boundary_conditions( grid, execFactory );
 
     Expr::FieldManagerList& fml = patch.field_manager_list();
-#   ifdef ENABLE_CUDA
-    initTree.set_device_index( GPU_INDEX, fml );
-#   endif
+
     fml.allocate_fields( patch.field_info() );
     SO::OperatorDatabase& opDB = patch.operator_database();
     SO::build_stencils( grid, opDB );
 
     timeIntegrator.finalize( fml, patch.operator_database(), patch.field_info() );
-    {
-      std::ofstream out( "rxn_example.dot" );
-      timeIntegrator.get_tree()->write_tree( out );
-    }
+//    {
+//      std::ofstream out( "rxn_example.dot" );
+//      timeIntegrator.get_tree()->write_tree( out );
+//    }
     timeIntegrator.get_tree()->lock_fields(fml);
 
     initTree.register_fields( fml );
@@ -185,7 +201,10 @@ bool driver( const bool timings,
     CellField& ycoord = fml.field_ref< CellField >( tagMgr[YCOORD] );
     grid.set_coord<SO::XDIR>( xcoord );
     grid.set_coord<SO::YDIR>( ycoord );
-
+#   ifdef ENABLE_CUDA
+    initTree.set_device_index( GPU_INDEX, fml );
+    timeIntegrator.get_tree()->set_device_index( GPU_INDEX, fml );
+#   endif
     initTree.execute_tree();
     int s = -1;
     SpatialOps::Timer timer;
@@ -199,7 +218,11 @@ bool driver( const bool timings,
       for( s = 0; s <= nSteps; ++s ){
         if( s%5000 == 0 && print){
           std::cout<<"Fields at time "<< s*dt << "; step " << s << std::endl;
-          print_fields( fml, tag_list( tagMgr[T], tagMgr[R_N][0], tagMgr[RHOYI_N][0], tagMgr[YI_N][0], tagMgr[RHOYI_N][3], tagMgr[YI_N][3] ) );
+          print_fields( fml, tag_list( tagMgr[T], tagMgr[R_N][28], tagMgr[RHOYI_N][28], tagMgr[RHOYI_N][3] ) );
+        }
+        if( s%10000 == 0 && matlab ){
+          std::cout<<"Fields at time "<< s*dt << "; step " << s << std::endl;
+          print_matlab( fml, tag_list( tagMgr[T], tagMgr[R_N][28], tagMgr[RHOYI_N][28], tagMgr[RHOYI_N][3] ), s );
         }
         timer.reset();
         timeIntegrator.step( dt );
@@ -241,6 +264,7 @@ int main( int iarg, char* carg[] )
   std::string inpGroup;
   bool timings = false;
   bool print   = false;
+  bool matlab = false;
   size_t nSteps;
   size_t maxPoints;
   double dt;
@@ -248,10 +272,11 @@ int main( int iarg, char* carg[] )
   po::options_description desc("Supported Options");
   desc.add_options()
                ( "help", "print help message" )
-               ( "xml-input-file,i", po::value<std::string>(&inputFileName)->default_value("h2o2.xml"), "Cantera xml input file name" )
+               ( "xml-input-file,i", po::value<std::string>(&inputFileName)->default_value("methanol.xml"), "Cantera xml input file name" )
                ( "phase", po::value<std::string>(&inpGroup), "name of phase in Cantera xml input file" )
                ( "timings,t", "Generate comparison timings between Cantera and PoKiTT across several problem sizes" )
                ( "print-fields,p", "Print field values for Temperature, mass of H2, and mass of OH every 5000 time steps")
+               ( "matlab", "Save field values for Temperature, mass of H2, and mass of OH every 10000 time steps")
                ( "nsteps,n", po::value<size_t>(&nSteps)->default_value(5000), "How many time steps to take" )
                ( "dt",     po::value<double>(&dt)->default_value(1e-15),    "Size of time steps (s) to take"  )
                ( "max-points",     po::value<size_t>(&maxPoints)->default_value(1024*1024),    "Run problems at this size or lower (rounded down to nearest 10)"  );
@@ -269,7 +294,7 @@ int main( int iarg, char* carg[] )
 #   endif
 
     timings = args.count("timings");
-
+    matlab = args.count("matlab");
     if( timings && args["nsteps"].defaulted() )
       nSteps = 5;
 
@@ -305,7 +330,7 @@ int main( int iarg, char* carg[] )
     }
 
     TestHelper status( !timings );
-    status( driver( timings, print, nSteps, dt, maxPoints ), "Reaction Diffusion" );
+    status( driver( timings, print, matlab, nSteps, dt, maxPoints ), "Reaction Diffusion" );
 
     if( status.ok() ){
       std::cout << "\nPASS\n";
