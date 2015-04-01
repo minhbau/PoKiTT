@@ -30,6 +30,7 @@
 #include "SpeciesRHS.h"
 #include "SpeciesDiffusion.h"
 #include <pokitt/thermo/Pressure.h>
+#include <pokitt/thermo/Density.h>
 #include <pokitt/MixtureMolWeight.h>
 #include <pokitt/kinetics/ReactionRates.h>
 #include <pokitt/transport/DiffusionCoeffMix.h>
@@ -40,6 +41,51 @@
 
 
 namespace pokitt{
+
+template< typename FieldT >
+class RhoYiIC : public Expr::Expression<FieldT>
+{
+public:
+
+  struct Builder : public Expr::ExpressionBuilder
+  {
+
+    Builder( const Expr::Tag& rhoYi,
+             const Expr::Tag& rho,
+             const Expr::Tag& yi )
+    : Expr::ExpressionBuilder( rhoYi ),
+      rho_( rho ),
+      yi_( yi )
+    {}
+
+    ~Builder(){}
+    Expr::ExpressionBase* build() const{
+      return new RhoYiIC<FieldT>( rho_, yi_ );
+    }
+
+  private:
+    const Expr::Tag rho_, yi_;
+  };
+
+  void evaluate()
+  {
+    using namespace SpatialOps;
+    this->value() <<= yi_->field_ref() * rho_->field_ref();;
+  }
+
+private:
+  RhoYiIC( const Expr::Tag& rhoTag,
+                  const Expr::Tag& yiTag )
+  : Expr::Expression<FieldT>(  )
+  {
+    this->set_gpu_runnable(true);
+    rho_ = this->template create_field_request<FieldT>( rhoTag );
+    yi_ = this->template create_field_request<FieldT>( yiTag );
+  }
+
+  DECLARE_FIELD( FieldT, rho_ )
+  DECLARE_FIELD( FieldT, yi_ )
+};
 
 template< typename FieldT >
 class SpeciesTransport : public Expr::TransportEquation
@@ -58,12 +104,11 @@ public:
 
   void setup_boundary_conditions(const SpatialOps::Grid& grid, Expr::ExpressionFactory& execFactory );
 
-  void register_one_time_expressions(Expr::ExpressionFactory& execFactory );
+  void register_one_time_expressions( Expr::ExpressionFactory& initFactory, Expr::ExpressionFactory& execFactory );
 
   Expr::ExpressionID initial_condition( Expr::ExpressionFactory& initFactory,
                                         const double yi,
-                                        const double slope,
-                                        const double rho0);
+                                        const double slope );
 
 private:
 
@@ -157,18 +202,13 @@ Expr::ExpressionID
 SpeciesTransport<FieldT>::
 initial_condition( Expr::ExpressionFactory& initFactory,
                    const double yi,
-                   const double slope,
-                   const double rho0 )
+                   const double slope )
 {
-  typedef typename Expr::LinearFunction <FieldT>::Builder RhoYi;
-  typedef typename Expr::ConstantExpr   <FieldT>::Builder Rho;
+  typedef typename RhoYiIC <FieldT>::Builder RhoYi;
   typedef typename Expr::LinearFunction <FieldT>::Builder Yi;
 
-  if( !initFactory.have_entry(tagM_[RHO]) )
-    initFactory.register_expression( new Rho( tagM_[RHO],    rho0 ) );
-
   initFactory.register_expression(   new Yi(  tagM_[YI_N][n_], tagM_[XCOORD], slope, yi   ) );
-  return initFactory.register_expression( new RhoYi ( Expr::Tag( this->solution_variable_name(), Expr::STATE_N), tagM_[YI_N][n_], rho0, 0.0  ) );
+  return initFactory.register_expression( new RhoYi ( Expr::Tag( this->solution_variable_name(), Expr::STATE_N), tagM_[YI_N][n_], tagM_[RHO] ) );
 }
 
 //--------------------------------------------------------------------
@@ -176,8 +216,15 @@ initial_condition( Expr::ExpressionFactory& initFactory,
 template< typename FieldT >
 void
 SpeciesTransport<FieldT>::
-register_one_time_expressions( Expr::ExpressionFactory& execFactory )
+register_one_time_expressions( Expr::ExpressionFactory& initFactory, Expr::ExpressionFactory& execFactory )
 {
+  typedef typename Expr::ConstantExpr <FieldT>::Builder P0;
+  typedef typename Density< FieldT >::Builder Rho;
+  typedef typename MixtureMolWeight <FieldT>::Builder MixMolWeight;
+  initFactory.register_expression( new P0         ( tagM_[P], 101000   ) );
+  initFactory.register_expression( new MixMolWeight( tagM_[MMW], tagM_[YI_N]          ) );
+  initFactory.register_expression( new Rho  ( tagM_[RHO], tagM_[T], tagM_[P], tagM_[MMW]) );
+
   if( execFactory.have_entry(tagM_[RHO]) )
     return;
 
@@ -187,7 +234,6 @@ register_one_time_expressions( Expr::ExpressionFactory& execFactory )
 
   typedef typename Expr::PlaceHolder<FieldT>::Builder Density;
   typedef typename MassFractions    <FieldT>::Builder MassFracs;
-  typedef typename MixtureMolWeight <FieldT>::Builder MixMolWeight;
   typedef typename Pressure         <FieldT>::Builder Pressure;
   typedef typename DiffusionCoeff   <FieldT>::Builder DiffusionCoeffs;
   typedef typename ReactionRates    <FieldT>::Builder ReactionRates;

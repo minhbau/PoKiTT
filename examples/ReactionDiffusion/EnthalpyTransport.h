@@ -32,6 +32,7 @@
 #include <pokitt/thermo/Enthalpy.h>
 #include <pokitt/thermo/Temperature.h>
 #include <pokitt/SpeciesN.h>
+#include <pokitt/MixtureMolWeight.h>
 
 #include <expression/ExprLib.h>
 #include <expression/TransportEquation.h>

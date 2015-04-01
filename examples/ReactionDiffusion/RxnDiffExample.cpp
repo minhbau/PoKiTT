@@ -72,6 +72,9 @@ void print_fields( Expr::FieldManagerList& fml, const TagList& fieldTags ){
   BOOST_FOREACH( const Tag iTag, fieldTags){
     CellField& field = fml.field_ref< CellField >( iTag );
     std::cout << iTag.name() << std::endl;
+#ifdef ENABLE_CUDA
+   field.validate_device_async( GPU_INDEX );
+#endif
     SO::print_field( field, std::cout, true );
   }
 }
@@ -138,7 +141,7 @@ bool driver( const bool timings,
     if( 64   * 64  < maxPoints ) sizeVec.push_back( IntVec( 62,  62,  1 ) );
     if( 32   * 32  < maxPoints ) sizeVec.push_back( IntVec( 30,  30,  1 ) );
   }
-  sizeVec.push_back( IntVec( 126,  126,  1 ) );
+  sizeVec.push_back( IntVec( 12,  12,  1 ) );
   for( std::vector< IntVec >::iterator iSize = sizeVec.begin(); iSize!= sizeVec.end(); ++iSize){
 
     typedef EnthalpyTransport<CellField> EnthalpyTransport;
@@ -151,17 +154,17 @@ bool driver( const bool timings,
     EnthalpyTransport* hTrans = new EnthalpyTransport( execFactory, tagMgr );
     initIDs.insert( hTrans->initial_condition( initFactory, tMax, tBase, tMean, tDev) );
 
-    typedef typename Expr::ConstantExpr   <CellField>::Builder Rho;
-    initIDs.insert( initFactory.register_expression( new Rho( tagMgr[RHO],    rho0 ) ) );
+    typedef Expr::ConstantExpr   <CellField>::Builder Rho;
+//    initIDs.insert( initFactory.register_expression( new Rho( tagMgr[RHO],    rho0 ) ) );
 
     std::list<SpeciesTransport*> specEqns;
     for( size_t n=0; n<(nSpec-1); ++n ){
       SpeciesTransport* specTrans = new SpeciesTransport( execFactory, tagMgr, n );
       yi[n] = fabs(yi[n] - 0.5 * slope[n] ) + 1e-12;
-      initIDs.insert( specTrans->initial_condition( initFactory, yi[n], slope[n]/length, rho0 ) );
+      initIDs.insert( specTrans->initial_condition( initFactory, yi[n], slope[n]/length ) );
       specEqns.push_back( specTrans );
     }
-    specEqns.front()->register_one_time_expressions( execFactory );
+    specEqns.front()->register_one_time_expressions( initFactory, execFactory );
 
     Expr::ExpressionTree initTree( initIDs, initFactory, 0 );
 
@@ -218,11 +221,12 @@ bool driver( const bool timings,
       for( s = 0; s <= nSteps; ++s ){
         if( s%5000 == 0 && print){
           std::cout<<"Fields at time "<< s*dt << "; step " << s << std::endl;
-          print_fields( fml, tag_list( tagMgr[T], tagMgr[R_N][28], tagMgr[RHOYI_N][28], tagMgr[RHOYI_N][3] ) );
+          print_fields( fml, tag_list( tagMgr[T],tagMgr[P], tagMgr[R_N][28], tagMgr[RHOYI_N][28], tagMgr[RHOYI_N][3] ) );
         }
         if( s%10000 == 0 && matlab ){
           std::cout<<"Fields at time "<< s*dt << "; step " << s << std::endl;
-          print_matlab( fml, tag_list( tagMgr[T], tagMgr[R_N][28], tagMgr[RHOYI_N][28], tagMgr[RHOYI_N][3] ), s );
+          print_matlab( fml, tag_list( tagMgr[T], tagMgr[P],tagMgr[R_N][28], tagMgr[RHOYI_N][28], tagMgr[RHOYI_N][3] ), s );
+          std::cout << "Done\n";
         }
         timer.reset();
         timeIntegrator.step( dt );
@@ -288,10 +292,6 @@ int main( int iarg, char* carg[] )
     po::notify(args);
 
     print = args.count("print-fields");
-#   ifdef ENABLE_CUDA
-    if( print )
-      throw std::runtime_error("print-fields is not (yet) supported with CUDA");
-#   endif
 
     timings = args.count("timings");
     matlab = args.count("matlab");
