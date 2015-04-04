@@ -378,10 +378,8 @@ evaluate()
 
   logt   <<= log( temp );
 
-  SpatFldPtr<FieldT> dInvPtr = SpatialFieldStore::get<FieldT>(temp);
   SpatFldPtr<FieldT> sum1Ptr = SpatialFieldStore::get<FieldT>(temp);
 
-  FieldT& dInv = *dInvPtr;
   FieldT& sum1 = *sum1Ptr;
 
   tThreeHalvesPtr = SpatialFieldStore::get<FieldT>(temp);
@@ -394,8 +392,7 @@ evaluate()
     const FieldT& yj = massFracs_[j]->field_ref();
       if( j != i){
         const std::vector<double>& coefs = binaryDCoefs_[indices_[i][j]]; // coefficients for pair [i][j]
-        dInv <<= yj / ( *tThreeHalvesPtr * ( coefs[0] + logt * ( coefs[1] + logt * ( coefs[2] + logt * ( coefs[3] + logt * coefs[4] ))) )); // polynomial in t for binary diffusion coefficients
-        sum1 <<= sum1 + dInv * molecularWeightsInv_[j];
+        sum1 <<= sum1 + yj * molecularWeightsInv_[j]/ ( *tThreeHalvesPtr * ( coefs[0] + logt * ( coefs[1] + logt * ( coefs[2] + logt * ( coefs[3] + logt * coefs[4] ))) )) ;
       }
     }
     *mixD[i] <<= ( 1 - yi ) / ( p * sum1 * mmw ); // mixing rule

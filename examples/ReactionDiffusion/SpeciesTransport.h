@@ -186,7 +186,7 @@ register_one_time_expressions( Expr::ExpressionFactory& execFactory )
   typedef typename MassFractions    <FieldT>::Builder MassFracs;
   typedef typename MixtureMolWeight <FieldT>::Builder MixMolWeight;
   typedef typename Pressure         <FieldT>::Builder Pressure;
-  typedef typename DiffusionCoeff   <FieldT>::Builder DiffusionCoeffs;
+  typedef typename DiffusionCoeffMol<FieldT>::Builder DiffusionCoeffs;
   typedef typename ReactionRates    <FieldT>::Builder ReactionRates;
   typedef typename SpeciesDiffFlux  <XFluxT>::Builder MassFluxX;
   typedef typename SpeciesDiffFlux  <YFluxT>::Builder MassFluxY;
