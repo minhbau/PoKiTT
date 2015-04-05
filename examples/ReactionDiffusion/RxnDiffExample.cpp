@@ -68,7 +68,8 @@ namespace po = boost::program_options;
 
 using namespace pokitt;
 
-void print_fields( Expr::FieldManagerList& fml, const TagList& fieldTags ){
+void print_fields( Expr::FieldManagerList& fml, const TagList& fieldTags, const int s, const double dt ){
+  std::cout<<"Fields at time "<< s*dt << "; step " << s << std::endl;
   BOOST_FOREACH( const Tag iTag, fieldTags){
     CellField& field = fml.field_ref< CellField >( iTag );
     std::cout << iTag.name() << std::endl;
@@ -79,15 +80,16 @@ void print_fields( Expr::FieldManagerList& fml, const TagList& fieldTags ){
   }
 }
 
-void print_matlab( Expr::FieldManagerList& fml, const TagList& fieldTags, const int s ){
+void print_matlab( Expr::FieldManagerList& fml, const TagList& fieldTags, const int s, const double dt ){
+  std::cout<<"Writing fields at time "<< s*dt << "; step " << s << std::endl;
   BOOST_FOREACH( const Tag iTag, fieldTags){
-
     CellField& field = fml.field_ref< CellField >( iTag );
 #ifdef ENABLE_CUDA
    field.validate_device_async( GPU_INDEX );
 #endif
     SO::write_matlab( field, iTag.name()+boost::lexical_cast<std::string>(s), false);
   }
+  std::cout << "Done\n";
 }
 
 bool driver( const bool timings,
@@ -154,9 +156,6 @@ bool driver( const bool timings,
     EnthalpyTransport* hTrans = new EnthalpyTransport( execFactory, tagMgr );
     initIDs.insert( hTrans->initial_condition( initFactory, tMax, tBase, tMean, tDev) );
 
-    typedef Expr::ConstantExpr   <CellField>::Builder Rho;
-//    initIDs.insert( initFactory.register_expression( new Rho( tagMgr[RHO],    rho0 ) ) );
-
     std::list<SpeciesTransport*> specEqns;
     for( size_t n=0; n<(nSpec-1); ++n ){
       SpeciesTransport* specTrans = new SpeciesTransport( execFactory, tagMgr, n );
@@ -190,10 +189,10 @@ bool driver( const bool timings,
     SO::build_stencils( grid, opDB );
 
     timeIntegrator.finalize( fml, patch.operator_database(), patch.field_info() );
-//    {
-//      std::ofstream out( "rxn_example.dot" );
-//      timeIntegrator.get_tree()->write_tree( out );
-//    }
+    {
+      std::ofstream out( "rxn_example.dot" );
+      timeIntegrator.get_tree()->write_tree( out );
+    }
     timeIntegrator.get_tree()->lock_fields(fml);
 
     initTree.register_fields( fml );
@@ -220,13 +219,10 @@ bool driver( const bool timings,
       if( timings ) timeIntegrator.step( dt ); // sets high water mark on memory
       for( s = 0; s <= nSteps; ++s ){
         if( s%5000 == 0 && print){
-          std::cout<<"Fields at time "<< s*dt << "; step " << s << std::endl;
-          print_fields( fml, tag_list( tagMgr[T],tagMgr[P], tagMgr[R_N][28], tagMgr[RHOYI_N][28], tagMgr[RHOYI_N][3] ) );
+          print_fields( fml, tag_list( tagMgr[T], tagMgr[R_N][28], tagMgr[RHOYI_N][28], tagMgr[RHOYI_N][3] ), s, dt );
         }
         if( s%10000 == 0 && matlab ){
-          std::cout<<"Fields at time "<< s*dt << "; step " << s << std::endl;
-          print_matlab( fml, tag_list( tagMgr[T], tagMgr[P],tagMgr[R_N][28], tagMgr[RHOYI_N][28], tagMgr[RHOYI_N][3] ), s );
-          std::cout << "Done\n";
+          print_matlab( fml, tag_list( tagMgr[T], tagMgr[R_N][28], tagMgr[RHOYI_N][28], tagMgr[RHOYI_N][3] ), s, dt );
         }
         timer.reset();
         timeIntegrator.step( dt );
