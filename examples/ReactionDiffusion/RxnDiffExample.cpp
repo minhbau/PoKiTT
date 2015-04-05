@@ -68,28 +68,32 @@ namespace po = boost::program_options;
 
 using namespace pokitt;
 
-void print_fields( Expr::FieldManagerList& fml, const TagList& fieldTags, const int s, const double dt ){
+void print_fields( Expr::FieldManagerList& fml, const std::vector< TagList >& fieldTagLists, const int s, const double dt ){
   std::cout<<"Fields at time "<< s*dt << "; step " << s << std::endl;
-  BOOST_FOREACH( const Tag iTag, fieldTags){
-    CellField& field = fml.field_ref< CellField >( iTag );
-    std::cout << iTag.name() << std::endl;
+  BOOST_FOREACH( const TagList fieldTags, fieldTagLists ){
+    BOOST_FOREACH( const Tag iTag, fieldTags){
+      CellField& field = fml.field_ref< CellField >( iTag );
+      std::cout << iTag.name() << std::endl;
 #ifdef ENABLE_CUDA
-   field.validate_device_async( GPU_INDEX );
+      field.validate_device_async( GPU_INDEX );
 #endif
-    SO::print_field( field, std::cout, true );
+      SO::print_field( field, std::cout, true );
+    }
   }
 }
 
-void print_matlab( Expr::FieldManagerList& fml, const TagList& fieldTags, const int s, const double dt ){
+void print_matlab( Expr::FieldManagerList& fml, const std::vector< TagList >& fieldTagLists, const int s, const double dt ){
   std::cout<<"Writing fields at time "<< s*dt << "; step " << s << std::endl;
-  BOOST_FOREACH( const Tag iTag, fieldTags){
-    CellField& field = fml.field_ref< CellField >( iTag );
+  BOOST_FOREACH( const TagList fieldTags, fieldTagLists ){
+    BOOST_FOREACH( const Tag iTag, fieldTags){
+      CellField& field = fml.field_ref< CellField >( iTag );
 #ifdef ENABLE_CUDA
-   field.validate_device_async( GPU_INDEX );
+      field.validate_device_async( GPU_INDEX );
 #endif
-    SO::write_matlab( field, iTag.name()+boost::lexical_cast<std::string>(s), false);
+      SO::write_matlab( field, iTag.name()+boost::lexical_cast<std::string>(s), false);
+    }
   }
-  std::cout << "Done\n";
+  std::cout << "Finished\n";
 }
 
 bool driver( const bool timings,
@@ -102,18 +106,17 @@ bool driver( const bool timings,
   TestHelper status( !timings );
   const int nSpec = CanteraObjects::number_species();
 
-  const double rho0 = 1.0;
-  const double length = 0.1;
+  const SO::DoubleVec length( 0.01, 0.01, 1 );
   const double tMax = 1700;
-  const double tDev = 0.1*length;
-  const double tMean = length/2;
+  const SO::DoubleVec tDev(10*length[0], 0.05*length[1], 1);
+  const SO::DoubleVec tMean( length[0]/2, length[0]/20, 1 );
   const double tBase = 800;
   std::vector<double> yi(nSpec, 1e-12);
-  std::vector<double> slope( nSpec, 1e-12 );
-  yi[28]=0.25;
-  slope[28]=0.4;
-  yi[3]=0.25;
-  slope[3]=-0.4;
+  std::vector<double> slope( nSpec, 0.0 );
+  yi[28]=0.15;
+  slope[28]=0.25;
+  yi[3]=1.5*yi[28];
+  slope[3]=-1.5*slope[28];
 
   const TagManager tagMgr( nSpec,           // enum values:
       Tag( "rhoYi",     Expr::STATE_N    ), // RHOYI
@@ -159,8 +162,8 @@ bool driver( const bool timings,
     std::list<SpeciesTransport*> specEqns;
     for( size_t n=0; n<(nSpec-1); ++n ){
       SpeciesTransport* specTrans = new SpeciesTransport( execFactory, tagMgr, n );
-      yi[n] = fabs(yi[n] - 0.5 * slope[n] ) + 1e-12;
-      initIDs.insert( specTrans->initial_condition( initFactory, yi[n], slope[n]/length ) );
+      double yiIntercept = fabs(yi[n] - 0.5 * slope[n] ) + 1e-10; // for linear function - avoid negative mass fractions
+      initIDs.insert( specTrans->initial_condition( initFactory, yiIntercept, slope[n]/length[0] ) );
       specEqns.push_back( specTrans );
     }
     specEqns.front()->register_one_time_expressions( initFactory, execFactory );
@@ -169,7 +172,7 @@ bool driver( const bool timings,
 
     IntVec gridSize = *iSize;
     Expr::ExprPatch patch( gridSize[0], gridSize[1], gridSize[2] );
-    SO::Grid grid( gridSize, SO::DoubleVec( length, length, 1 ) );
+    SO::Grid grid( gridSize, length );
     SO::GhostData ghosts( IntVec( 1, 1, 0), IntVec( 1, 1, 0 ) ); // 1 on +-x and +- y and 0 on z
 
     Expr::TimeStepper timeIntegrator( execFactory, Expr::FORWARD_EULER, "timestepper", patch.id() );
@@ -211,6 +214,9 @@ bool driver( const bool timings,
     int s = -1;
     SpatialOps::Timer timer;
     std::vector< double > times;
+    std::vector< Expr::TagList > printTags;
+    printTags.push_back( tag_list( tagMgr[T], tagMgr[R_N][28]  ) );
+    printTags.push_back( tag_list( tagMgr[RHOYI_N][28], tagMgr[RHOYI_N][3] ) );
     if( timings ){
       std::cout << "\nPoKiTT Reaction Diffusion size " << xcoord.window_with_ghost().glob_npts() << std::endl;
       timeIntegrator.request_timings();
@@ -219,10 +225,10 @@ bool driver( const bool timings,
       if( timings ) timeIntegrator.step( dt ); // sets high water mark on memory
       for( s = 0; s <= nSteps; ++s ){
         if( s%5000 == 0 && print){
-          print_fields( fml, tag_list( tagMgr[T], tagMgr[R_N][28], tagMgr[RHOYI_N][28], tagMgr[RHOYI_N][3] ), s, dt );
+          print_fields( fml, printTags, s, dt );
         }
         if( s%10000 == 0 && matlab ){
-          print_matlab( fml, tag_list( tagMgr[T], tagMgr[R_N][28], tagMgr[RHOYI_N][28], tagMgr[RHOYI_N][3] ), s, dt );
+          print_matlab( fml, printTags, s, dt );
         }
         timer.reset();
         timeIntegrator.step( dt );

@@ -58,8 +58,8 @@ public:
   Expr::ExpressionID initial_condition( Expr::ExpressionFactory& initFactory,
                                         const double tMax,
                                         const double tDev,
-                                        const double tMean,
-                                        const double tBase );
+                                        const SpatialOps::DoubleVec tMean,
+                                        const SpatialOps::DoubleVec tBase );
 
 private:
 
@@ -185,8 +185,8 @@ EnthalpyTransport<FieldT>::
 initial_condition( Expr::ExpressionFactory& initFactory,
                    const double tMax,
                    const double tBase,
-                   const double tMean,
-                   const double tDev )
+                   const SpatialOps::DoubleVec tMean,
+                   const SpatialOps::DoubleVec tDev )
 {
   typedef typename SpeciesN                <FieldT>::Builder SpecN;
   typedef typename Expr::GaussianFunction2D<FieldT>::Builder Temperature0;
@@ -197,7 +197,7 @@ initial_condition( Expr::ExpressionFactory& initFactory,
   initFactory.register_expression(        new XCoord      ( tagMgr_[XCOORD] ) );
   initFactory.register_expression(        new YCoord      ( tagMgr_[YCOORD] ) );
   initFactory.register_expression(        new SpecN       ( tagMgr_[YI_N].back(), tagMgr_[YI_N] ) );
-  initFactory.register_expression(        new Temperature0( tagMgr_[T], tagMgr_[XCOORD],  tagMgr_[YCOORD], tMax-tBase, tDev*100, tDev/2, tMean, tMean/8, tBase ) );
+  initFactory.register_expression(        new Temperature0( tagMgr_[T], tagMgr_[XCOORD],  tagMgr_[YCOORD], tMax-tBase, tDev[0], tDev[1], tMean[0], tMean[1], tBase ) );
   return initFactory.register_expression( new Enthalpy    ( tagMgr_[H], tagMgr_[T], tagMgr_[YI_N] ) );
 }
 
