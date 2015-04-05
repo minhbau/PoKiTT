@@ -90,7 +90,7 @@ void print_matlab( Expr::FieldManagerList& fml, const std::vector< TagList >& fi
 #ifdef ENABLE_CUDA
       field.validate_device_async( GPU_INDEX );
 #endif
-      SO::write_matlab( field, iTag.name()+boost::lexical_cast<std::string>(s), false);
+      SO::write_matlab( field, iTag.name() + "_" + boost::lexical_cast<std::string>(s)+"_"+CanteraObjects::phase_name(), false);
     }
   }
   std::cout << "Finished\n";
@@ -113,10 +113,37 @@ bool driver( const bool timings,
   const double tBase = 800;
   std::vector<double> yi(nSpec, 1e-12);
   std::vector<double> slope( nSpec, 0.0 );
-  yi[28]=0.15;
-  slope[28]=0.25;
-  yi[3]=1.5*yi[28];
-  slope[3]=-1.5*slope[28];
+
+  int fuelIndex;
+  int oxyIndex;
+  double stoichRatio;
+  if( CanteraObjects::phase_name() == "methanol" ){
+    fuelIndex=28;
+    oxyIndex = 3;
+    stoichRatio = 1.5;
+    yi[fuelIndex] = 0.15;
+  }
+  else if( CanteraObjects::phase_name() == "ohmech" ){
+    fuelIndex=0;
+    oxyIndex = 3;
+    stoichRatio = 8;
+    yi[fuelIndex]=0.02;
+  }
+  else if( CanteraObjects::phase_name() == "gri30_mix"){
+    fuelIndex=13;
+    oxyIndex = 3;
+    stoichRatio = 8;
+    yi[fuelIndex]=0.024;
+  }
+  else{
+    std::cout << "WARNING: Unfamiliar fuel, initializing all mass fractions to 1e-12" << std::endl;
+    fuelIndex = 0;
+    oxyIndex = 1;
+    stoichRatio = 1;
+  }
+  slope[fuelIndex]=1.8*yi[fuelIndex];
+  yi[oxyIndex]=stoichRatio*yi[fuelIndex];
+  slope[oxyIndex]=-stoichRatio*slope[fuelIndex];
 
   const TagManager tagMgr( nSpec,           // enum values:
       Tag( "rhoYi",     Expr::STATE_N    ), // RHOYI
@@ -135,18 +162,22 @@ bool driver( const bool timings,
       Tag( "YCoord",    Expr::STATE_NONE ) // YCOORD
   );
 
-  size_t maxXDim = (maxPoints) - (maxPoints)%10;
   std::vector< IntVec > sizeVec;
+
   if( timings ){
-    sizeVec.push_back( IntVec( maxXDim/10 - 2,  8,  1 ) );
-    if( 1024 * 512 < maxPoints ) sizeVec.push_back( IntVec(1022, 510, 1 ) );
-    if( 512  * 512 < maxPoints ) sizeVec.push_back( IntVec(510,  510, 1 ) );
-    if( 256  * 256 < maxPoints ) sizeVec.push_back( IntVec(254,  254, 1 ) );
-    if( 128  * 128 < maxPoints ) sizeVec.push_back( IntVec(126,  126, 1 ) );
-    if( 64   * 64  < maxPoints ) sizeVec.push_back( IntVec( 62,  62,  1 ) );
-    if( 32   * 32  < maxPoints ) sizeVec.push_back( IntVec( 30,  30,  1 ) );
+    if( maxPoints >= 30 ){
+      size_t maxXDim = (maxPoints) - (maxPoints)%10;
+      sizeVec.push_back( IntVec( maxXDim/10 - 2,  8,  1 ) );
+    }
+    if( 1024 * 512 < maxPoints || maxPoints < 30 ) sizeVec.push_back( IntVec(1022, 510, 1 ) );
+    if( 512  * 512 < maxPoints || maxPoints < 30 ) sizeVec.push_back( IntVec(510,  510, 1 ) );
+    if( 256  * 256 < maxPoints || maxPoints < 30 ) sizeVec.push_back( IntVec(254,  254, 1 ) );
+    if( 128  * 128 < maxPoints || maxPoints < 30 ) sizeVec.push_back( IntVec(126,  126, 1 ) );
+    if( 64   * 64  < maxPoints || maxPoints < 30 ) sizeVec.push_back( IntVec( 62,  62,  1 ) );
+    if( 32   * 32  < maxPoints || maxPoints < 30 ) sizeVec.push_back( IntVec( 30,  30,  1 ) );
   }
-  sizeVec.push_back( IntVec( 12,  12,  1 ) );
+  else
+    sizeVec.push_back( IntVec( 12,  12,  1 ) );
   for( std::vector< IntVec >::iterator iSize = sizeVec.begin(); iSize!= sizeVec.end(); ++iSize){
 
     typedef EnthalpyTransport<CellField> EnthalpyTransport;
@@ -176,7 +207,6 @@ bool driver( const bool timings,
     SO::GhostData ghosts( IntVec( 1, 1, 0), IntVec( 1, 1, 0 ) ); // 1 on +-x and +- y and 0 on z
 
     Expr::TimeStepper timeIntegrator( execFactory, Expr::FORWARD_EULER, "timestepper", patch.id() );
-    timeIntegrator.request_timings();
 
     for( std::list<SpeciesTransport*>::iterator iEqn=specEqns.begin(); iEqn!=specEqns.end(); ++iEqn ){
       timeIntegrator.add_equation<CellField>( (*iEqn)->solution_variable_name(), (*iEqn)->get_rhs_tag(), ghosts );
@@ -215,8 +245,8 @@ bool driver( const bool timings,
     SpatialOps::Timer timer;
     std::vector< double > times;
     std::vector< Expr::TagList > printTags;
-    printTags.push_back( tag_list( tagMgr[T], tagMgr[R_N][28]  ) );
-    printTags.push_back( tag_list( tagMgr[RHOYI_N][28], tagMgr[RHOYI_N][3] ) );
+    printTags.push_back( tag_list( tagMgr[T], tagMgr[R_N][fuelIndex]  ) );
+    printTags.push_back( tag_list( tagMgr[RHOYI_N][fuelIndex], tagMgr[RHOYI_N][oxyIndex] ) );
     if( timings ){
       std::cout << "\nPoKiTT Reaction Diffusion size " << xcoord.window_with_ghost().glob_npts() << std::endl;
       timeIntegrator.request_timings();
@@ -278,14 +308,14 @@ int main( int iarg, char* carg[] )
   po::options_description desc("Supported Options");
   desc.add_options()
                ( "help", "print help message" )
-               ( "xml-input-file,i", po::value<std::string>(&inputFileName)->default_value("methanol.xml"), "Cantera xml input file name" )
+               ( "xml-input-file,i", po::value<std::string>(&inputFileName)->default_value("h2o2.xml"), "Cantera xml input file name" )
                ( "phase", po::value<std::string>(&inpGroup), "name of phase in Cantera xml input file" )
                ( "timings,t", "Generate comparison timings between Cantera and PoKiTT across several problem sizes" )
                ( "print-fields,p", "Print field values for Temperature, mass of H2, and mass of OH every 5000 time steps")
                ( "matlab", "Save field values for Temperature, mass of H2, and mass of OH every 10000 time steps")
                ( "nsteps,n", po::value<size_t>(&nSteps)->default_value(5000), "How many time steps to take" )
                ( "dt",     po::value<double>(&dt)->default_value(1e-15),    "Size of time steps (s) to take"  )
-               ( "max-points",     po::value<size_t>(&maxPoints)->default_value(1024*1024),    "Run problems at this size or lower (rounded down to nearest 10)"  );
+               ( "max-points",     po::value<size_t>(&maxPoints)->default_value(0),    "Run problems at this size or lower (rounded down to nearest 10)"  );
 
   // parse the command line options input describing the problem
   try {

@@ -3,7 +3,7 @@
   <validate reactions="yes" species="yes"/>
 
   <!-- phase gas     -->
-  <phase dim="3" id="gas">
+  <phase dim="3" id="methanol">
     <elementArray datasrc="elements.xml">C H O N</elementArray>
     <speciesArray datasrc="#species_data">
       H       O       OH      O2      H2      
