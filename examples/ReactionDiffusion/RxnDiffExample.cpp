@@ -132,8 +132,8 @@ bool driver( const bool timings,
   else if( CanteraObjects::phase_name() == "gri30_mix"){
     fuelIndex=13;
     oxyIndex = 3;
-    stoichRatio = 8;
-    yi[fuelIndex]=0.024;
+    stoichRatio = 4;
+    yi[fuelIndex]=0.055;
   }
   else{
     std::cout << "WARNING: Unfamiliar fuel, initializing all mass fractions to 1e-12" << std::endl;
