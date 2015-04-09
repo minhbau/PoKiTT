@@ -24,6 +24,8 @@ target_link_libraries( thermo_test pokitt )
 nebo_add_executable( transport_test Transport_test.cpp )
 target_link_libraries( transport_test pokitt )
 
+add_executable( mixfrac_test mixfracTest.cpp )
+target_link_libraries( mixfrac_test pokitt )
 
 add_test( NAME thermo_test_const         COMMAND thermo_test       --xml-input-file=poly_tester.xml --phase=const         )
 add_test( NAME thermo_test_nasa          COMMAND thermo_test       --xml-input-file=poly_tester.xml --phase=nasa          )
@@ -64,3 +66,5 @@ add_test( NAME temperature_test_ethanol  COMMAND temperature_test  --xml-input-f
 add_test( NAME thermo_test_mix_ethanol   COMMAND thermo_test --mix --xml-input-file=ethanol.xml  )
 add_test( NAME thermo_test_ethanol       COMMAND thermo_test       --xml-input-file=ethanol.xml  )
 add_test( NAME transport_test_ethanol    COMMAND transport_test    --xml-input-file=ethanol.xml  )
+
+add_test( NAME mixfrac_test COMMAND mixfrac_test )
