@@ -55,6 +55,10 @@
 #include <cantera/kernel/global.h>
 #include <cantera/kernel/ctexceptions.h>
 
+#ifndef ENABLE_THREADS
+typedef SpatialOps::Timer Timer;
+#endif
+
 namespace SO = SpatialOps;
 typedef SO::SVolField  CellField;
 typedef SO::FaceTypes<CellField> FaceTypes;
@@ -242,7 +246,7 @@ bool driver( const bool timings,
 #   endif
     initTree.execute_tree();
     int s = -1;
-    SpatialOps::Timer timer;
+    Timer timer;
     std::vector< double > times;
     std::vector< Expr::TagList > printTags;
     printTags.push_back( tag_list( tagMgr[T], tagMgr[R_N][fuelIndex]  ) );
