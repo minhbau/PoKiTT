@@ -99,7 +99,7 @@ if( BUILD_UPSTREAM_LIBS )
   # Build SpatialOps
   set( TPL_DIR ${PROJECT_BINARY_DIR}/tpl )
   file( MAKE_DIRECTORY ${TPL_DIR}/build/spatialops )
-  execute_process( COMMAND ${GIT_EXECUTABLE} clone --depth 1 git://software.crsim.utah.edu/SpatialOps.git
+  execute_process( COMMAND ${GIT_EXECUTABLE} clone --depth 1 https://software.crsim.utah.edu:8443/James_Research_Group/SpatialOps.git
                    WORKING_DIRECTORY ${TPL_DIR}
                    RESULT_VARIABLE result  )
   execute_process( COMMAND ${CMAKE_COMMAND} -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
@@ -116,7 +116,7 @@ if( BUILD_UPSTREAM_LIBS )
   
   # Build ExprLib
   file( MAKE_DIRECTORY ${TPL_DIR}/build/exprlib )
-  execute_process( COMMAND ${GIT_EXECUTABLE} clone --depth 1 git://software.crsim.utah.edu/ExprLib.git
+  execute_process( COMMAND ${GIT_EXECUTABLE} clone --depth 1 https://software.crsim.utah.edu:8443/James_Research_Group/ExprLib.git
                    WORKING_DIRECTORY ${TPL_DIR}
                    RESULT_VARIABLE result )
   execute_process( COMMAND ${CMAKE_COMMAND}

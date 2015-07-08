@@ -11,14 +11,8 @@ nonreacting flows.
 \section download Downloading the source code
  The source may be obtained via git:
  \verbatim
- git clone git://software.crsim.utah.edu/PoKiTT.git [destination path]
+ git clone https://software.crsim.utah.edu:8443/James_Research_Group/PoKiTT.git [destination path]
  \endverbatim
- Alternatively, if you have proper access, you can check out via ssh which
- will allow you to push changes back to the origin:
- \verbatim
- git clone ssh://[yourUNID]@software.crsim.utah.edu/uufs/crsim.utah.edu/host/home/git_repos/PoKiTT.git [destination]
- \endverbatim
-
  
 
 \section building Building PoKiTT
@@ -26,7 +20,7 @@ nonreacting flows.
 \subsection simple-build A simple CPU-Only Build
 
 \verbatim
-git clone git://software.crsim.utah.edu/PoKiTT.git
+git clone https://software.crsim.utah.edu:8443/James_Research_Group/PoKiTT.git
 cd PoKiTT; mkdir build; cd build
 cmake .. \
   -DBUILD_UPSTREAM_LIBS=ON
@@ -41,13 +35,13 @@ This assumes that you are building in a directory defined by the variable
 `BUILD_DIR` and that the source is in a directory defined by the variable `SRC_DIR`
 \verbatim
 cd $SRC_DIR
-git clone git://software.crsim.utah.edu/PoKiTT.git .
+git clone https://software.crsim.utah.edu:8443/James_Research_Group/PoKiTT.git .
 
 cd $BUILD_DIR
 
 mkdir tpl; cd tpl;
-git clone --depth=1 git://software.crsim.utah.edu/SpatialOps.git src/SpatialOps
-git clone --depth=1 git://software.crsim.utah.edu/ExprLib.git src/ExprLib
+git clone --depth=1 https://software.crsim.utah.edu:8443/James_Research_Group/SpatialOps.git src/SpatialOps
+git clone --depth=1 https://software.crsim.utah.edu:8443/James_Research_Group/ExprLib.git src/ExprLib
  
 mkdir so; cd so;
 cmake $BUILD_DIR/tpl/src/SpatialOps -DENABLE_CUDA=ON -DENABLE_TESTS=OFF -DENABLE_THREADS=OFF -DENABLE_EXAMPLES=OFF -DCMAKE_INSTALL_PREFIX=${BUILD_DIR}/tpl
