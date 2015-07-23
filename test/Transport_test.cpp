@@ -50,10 +50,6 @@
 
 #include <cantera/transport.h>
 
-#ifndef ENABLE_THREADS
-typedef SpatialOps::Timer Timer;
-#endif
-
 namespace SO = SpatialOps;
 typedef   SO::SVolField CellField;
 typedef SO::SpatFldPtr<CellField> CellFieldPtrT;
@@ -175,7 +171,7 @@ get_cantera_results( const bool timings,
   CellField::const_iterator                          iTemp;
   CellField::const_iterator                          iPress;
 
-  Timer transportTimer;
+  SO::Timer transportTimer;
   std::vector<double> d_result(nSpec,0.0);
   transportTimer.start();
   for( size_t rep=0; rep < canteraReps; ++rep ){
@@ -352,7 +348,7 @@ bool driver( const bool timings,
       execTree.execute_tree(); // sets memory high-water mark
     }
 
-    Timer timer;
+    SO::Timer timer;
     std::vector< double > times;
     for( size_t rep = 0; rep < pokittReps; ++rep ){
       timer.reset();

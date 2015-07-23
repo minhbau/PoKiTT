@@ -50,10 +50,6 @@
 
 #include <cantera/IdealGasMix.h>
 
-#ifndef ENABLE_THREADS
-typedef SpatialOps::Timer Timer;
-#endif
-
 namespace SO = SpatialOps;
 typedef SO::SVolField  CellField;
 typedef SO::SpatFldPtr<CellField> CellFieldPtrT;
@@ -206,7 +202,7 @@ get_cantera_results( const bool mix,
   CellField::const_iterator                          iTemp;
   CellField::iterator                                iCant;
 
-  Timer thermoTimer;
+  SO::Timer thermoTimer;
   if( mix ){
     const CellField::iterator iCantEnd = canteraResults[0]->end();
     thermoTimer.start();
@@ -363,7 +359,7 @@ bool driver( const bool timings,
       execTree.execute_tree(); // sets memory high-water mark
     }
 
-    Timer timer;
+    SO::Timer timer;
     std::vector< double > times;
     for( size_t rep = 0; rep < pokittReps; ++rep ){
       timer.reset();
