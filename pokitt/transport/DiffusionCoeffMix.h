@@ -144,7 +144,7 @@ class DiffusionCoeffMol
   const int nSpec_;                                       ///< number of species to iterate over
   const std::vector<double> molecularWeights_;            ///< molecular weights
   std::vector<double> molecularWeightsInv_;         ///< inverse of molecular weights (diving by MW is expensive)
-  const std::vector< std::vector<double> > binaryDCoefs_; ///< coefficients used by Cantera to calculate binary diffusino coefficients
+  const std::vector< std::vector<double> >& binaryDCoefs_; ///< coefficients used by Cantera to calculate binary diffusion coefficients
 
   /* Cantera uses a polynomial in temperature to evaluate the binary diffusion coefficient of each pair [i][j] = [j][i]
    * indicies_[i][j] stores the index of the set of polynomial coefficients for the pair [i][j]

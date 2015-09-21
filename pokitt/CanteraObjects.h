@@ -127,10 +127,10 @@ public:
   static const ThermData& species_thermo( const int i );
   static const RxnData& rxn_data( const int r );
 
-  typedef std::vector< std::vector< double > > transportCoefsT;
-  static const transportCoefsT& diffusion_coefs();
-  static const transportCoefsT& viscosity_coefs();
-  static const transportCoefsT& thermal_cond_coefs();
+  typedef std::vector< std::vector< double > > TransportCoefsT;
+  static const TransportCoefsT& diffusion_coefs();
+  static const TransportCoefsT& viscosity_coefs();
+  static const TransportCoefsT& thermal_cond_coefs();
 
 private:
 
@@ -152,9 +152,9 @@ private:
   std::map< int, std::string > speciesNames_;
   std::map< int, ThermData > thermDataMap_;
   std::map< int, RxnData > rxnDataMap_;
-  transportCoefsT diffusionCoefs_;
-  transportCoefsT viscosityCoefs_;
-  transportCoefsT thermalCondCoefs_;
+  TransportCoefsT diffusionCoefs_;
+  TransportCoefsT viscosityCoefs_;
+  TransportCoefsT thermalCondCoefs_;
 
   Setup options_;
   bool hasBeenSetup_;
