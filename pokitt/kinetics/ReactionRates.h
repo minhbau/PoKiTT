@@ -266,9 +266,9 @@ ReactionInfo::ReactionInfo( const RxnData& dat )
    * If not, then we determine which power of temperature to use
    */
   if( fabs( dat.kFwdCoefs[2] ) < 1e-6 ){ // i.e. 0 activation energy
-    if(      fabs( dat.kFwdCoefs[1]     ) < 1e-6 ) kForm = CONSTANT; // i.e. b=0
-    else if( fabs( dat.kFwdCoefs[1] - 1 ) < 1e-6 ) kForm = LINEAR; // i.e. b=1
-    else if( fabs( dat.kFwdCoefs[1] - 2 ) < 1e-6 ) kForm = QUADRATIC; // i.e. b=2
+    if(      fabs( dat.kFwdCoefs[1]     ) < 1e-6 ) kForm = CONSTANT;   // i.e. b=0
+    else if( fabs( dat.kFwdCoefs[1] - 1 ) < 1e-6 ) kForm = LINEAR;     // i.e. b=1
+    else if( fabs( dat.kFwdCoefs[1] - 2 ) < 1e-6 ) kForm = QUADRATIC;  // i.e. b=2
     else if( fabs( dat.kFwdCoefs[1] + 1 ) < 1e-6 ) kForm = RECIPROCAL; // i.e. b=-1
     else kForm = ARRHENIUS; // activation energy but non-integer value for b
   }
@@ -348,7 +348,7 @@ ReactionRates( const Expr::Tag& tTag,
     switch ( specData.type ) {
     case CONST_POLY: break;
     case NASA_POLY:
-      for( std::vector<double>::iterator ic = c.begin() + 1; ic!=c.end(); ++ic)
+      for( std::vector<double>::iterator ic = c.begin() + 1; ic!=c.end(); ++ic )
         *ic *= gasConstant; // dimensionalize the coefficients
       c[ 2] /= 2; // perform division of coefficients here - minor optimization
       c[ 3] /= 6;
