@@ -281,8 +281,8 @@ evaluate()
         /* polynomials are applicable in two temperature ranges - high and low
          * If the temperature is out of range, the value is set to the value at the min or max temp
          */
-        cv <<= cv + yi * cond( temp <= c[0] , c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * ( c[ 4] + temp * c[ 5] ))) )  // if low temp
-                             (                c[8] + temp * ( c[9] + temp * ( c[10] + temp * ( c[11] + temp * c[12] ))) );  // else if high temp
+        cv <<= cv + yi * cond( temp <= c[0] , c[8] + temp * ( c[9] + temp * ( c[10] + temp * ( c[11] + temp * c[12] ))) )  // if low temp
+                             (                c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * ( c[ 4] + temp * c[ 5] ))) );  // else if high temp
         break;
       case SHOMATE_POLY:
         cv <<= cv + yi * cond( temp <= c[0] , c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * c[ 4])) + c[ 5] * *recipRecipT )  // if low temp
@@ -306,10 +306,10 @@ evaluate()
         /* polynomials are applicable in two temperature ranges - high and low
          * If the temperature is out of range, the value is set to the value at the min or max temp
          */
-        cv <<= cv + yi * cond( temp <= c[0] && temp >= minT, c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * ( c[ 4] + temp * c[ 5] ))) )  // if low temp
-                             ( temp >  c[0] && temp <= maxT, c[8] + temp * ( c[9] + temp * ( c[10] + temp * ( c[11] + temp * c[12] ))) )  // else if high temp
-                             ( temp < minT,                  c[1] + minT * ( c[2] + minT * ( c[ 3] + minT * ( c[ 4] + minT * c[ 5] ))) )  // else if out of bounds - low
-                             (                               c[8] + maxT * ( c[9] + maxT * ( c[10] + maxT * ( c[11] + maxT * c[12] ))) ); // else out of bounds - high
+        cv <<= cv + yi * cond( temp <= c[0] && temp >= minT, c[8] + temp * ( c[9] + temp * ( c[10] + temp * ( c[11] + temp * c[12] ))) )  // if low temp
+                             ( temp >  c[0] && temp <= maxT, c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * ( c[ 4] + temp * c[ 5] ))) )  // else if high temp
+                             ( temp < minT,                  c[8] + minT * ( c[9] + minT * ( c[10] + minT * ( c[11] + minT * c[12] ))) )  // else if out of bounds - low
+                             (                               c[1] + maxT * ( c[2] + maxT * ( c[ 3] + maxT * ( c[ 4] + maxT * c[ 5] ))) ); // else out of bounds - high
         break;
       case SHOMATE_POLY:
         cv <<= cv + yi * cond( temp <= c[0] && temp >= minT, c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * c[ 4])) + c[ 5] * *recipRecipT )  // if low temp
@@ -430,10 +430,10 @@ evaluate()
     /* polynomials are applicable in two temperature ranges - high and low
      * If the temperature is out of range, the value is set to the value at the min or max temp
      */
-    cv <<= cond( temp <= c[0] && temp >= minT, c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * ( c[ 4] + temp * c[ 5] ))) )  // if low temp
-               ( temp >  c[0] && temp <= maxT, c[8] + temp * ( c[9] + temp * ( c[10] + temp * ( c[11] + temp * c[12] ))) )  // else if high temp
-               ( temp < minT,                  c[1] + minT * ( c[2] + minT * ( c[ 3] + minT * ( c[ 4] + minT * c[ 5] ))) )  // else if out of bounds - low
-               (                               c[8] + maxT * ( c[9] + maxT * ( c[10] + maxT * ( c[11] + maxT * c[12] ))) ); // else out of bounds - high
+    cv <<= cond( temp <= c[0] && temp >= minT, c[8] + temp * ( c[9] + temp * ( c[10] + temp * ( c[11] + temp * c[12] ))) )  // if low temp
+               ( temp >  c[0] && temp <= maxT, c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * ( c[ 4] + temp * c[ 5] ))) )  // else if high temp
+               ( temp < minT,                  c[8] + minT * ( c[9] + minT * ( c[10] + minT * ( c[11] + minT * c[12] ))) )  // else if out of bounds - low
+               (                               c[1] + maxT * ( c[2] + maxT * ( c[ 3] + maxT * ( c[ 4] + maxT * c[ 5] ))) ); // else out of bounds - high
     break;
   case SHOMATE_POLY:
     cv <<= cond( temp <= c[0] && temp >= minT, c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * c[ 4])) + c[ 5] / ( temp * temp ) )  // if low temp

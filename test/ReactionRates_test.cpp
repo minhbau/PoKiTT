@@ -88,7 +88,7 @@ extract_mass_fracs( const Expr::TagList yiTags, Expr::FieldManagerList& fml ){
 const std::vector< CellFieldPtrT >
 get_cantera_results( const bool timings,
                      const size_t canteraReps,
-                     Cantera_CXX::IdealGasMix& gasMix,
+                     Cantera::IdealGasMix& gasMix,
                      Expr::FieldManagerList& fml,
                      const Expr::Tag& tTag,
                      const Expr::TagList& yiTags,
@@ -143,7 +143,7 @@ bool driver( const bool timings,
              const size_t canteraReps )
 {
   TestHelper status( !timings );
-  Cantera_CXX::IdealGasMix* const gasMix = CanteraObjects::get_gasmix();
+  Cantera::IdealGasMix* const gasMix = CanteraObjects::get_gasmix();
   const int nSpec=gasMix->nSpecies();
 
   const Expr::Tag xTag  ( "XCoord",      Expr::STATE_NONE );
@@ -177,8 +177,8 @@ bool driver( const bool timings,
     yID = initFactory.register_expression( new MassFracs    ( yiTags, xTag )             );
     initFactory.register_expression(       new Pressure     ( pTag, gasMix->pressure() ) );
     mID = initFactory.register_expression( new MixMolWeight ( mmwTag, yiTags )           );
-    tID = initFactory.register_expression( new Temperature  ( tTag ,xTag, 2000, 500 )    );
-    pID = initFactory.register_expression( new Density      ( rhoTag, tTag, pTag, mmwTag ) );
+    tID = initFactory.register_expression( new Temperature  ( tTag, xTag, 2000, 500 )    );
+    pID = initFactory.register_expression( new Density      ( rhoTag, tTag, pTag, mmwTag));
     initIDs.insert( tID );
     initIDs.insert( pID );
     initIDs.insert( mID );

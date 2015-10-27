@@ -396,8 +396,8 @@ evaluate()
           break;
         case NASA_POLY:
           delH <<= delH - yi
-                 * cond( temp <= c[0], c[ 6] + temp * ( c[1] + temp * ( cFrac[2] + temp * ( cFrac[ 3] + temp * ( cFrac[ 4] + temp * cFrac[ 5] )))) )  // if low temp
-                       (               c[13] + temp * ( c[8] + temp * ( cFrac[9] + temp * ( cFrac[10] + temp * ( cFrac[11] + temp * cFrac[12] )))) );  // else if high temp
+                 * cond( temp <= c[0], c[13] + temp * ( c[8] + temp * ( cFrac[9] + temp * ( cFrac[10] + temp * ( cFrac[11] + temp * cFrac[12] )))) )  // if low temp
+                       (               c[ 6] + temp * ( c[1] + temp * ( cFrac[2] + temp * ( cFrac[ 3] + temp * ( cFrac[ 4] + temp * cFrac[ 5] )))) );  // else if high temp
 
           dhdT <<= dhdT + yi
                  * cond( temp <= c[0], c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * ( c[ 4] + temp * c[ 5] ))) )  // if low temp
@@ -419,8 +419,8 @@ evaluate()
           }
         } // switch( type )
       }
-    else
-#   endif
+      else
+#     endif
       {
         /* else temperature can be out of bounds low, low temp, high temp, or out of bounds high
          * if out of bounds, properties are interpolated from min or max temp using a constant cp
@@ -432,10 +432,10 @@ evaluate()
           break;
         case NASA_POLY:
           delH <<= delH - yi
-                 * cond( temp <= c[0] && temp >= minT, c[ 6] + temp * ( c[1] + temp * ( cFrac[2] + temp * ( cFrac[ 3] + temp * ( cFrac[ 4] + temp * cFrac[ 5] )))) )  // if low temp
-                       ( temp >  c[0] && temp <= maxT, c[13] + temp * ( c[8] + temp * ( cFrac[9] + temp * ( cFrac[10] + temp * ( cFrac[11] + temp * cFrac[12] )))) )  // else if high temp
-                       ( temp < minT,                  c[ 6] + c[1] * temp + minT * ( c[2] * temp + minT * ( c[ 3] * temp - cFrac[2] + minT * ( c[ 4] * temp - 2*cFrac[ 3] + minT * ( c[ 5] * temp - 3*cFrac[ 4] + minT * -4*cFrac[ 5] )))) )  // else if out of bounds - low
-                       (                               c[13] + c[8] * temp + maxT * ( c[9] * temp + maxT * ( c[10] * temp - cFrac[9] + maxT * ( c[11] * temp - 2*cFrac[10] + maxT * ( c[12] * temp - 3*cFrac[11] + maxT * -4*cFrac[12] )))) ); // else out of bounds - high
+                 * cond( temp <= c[0] && temp >= minT, c[13] + temp * ( c[8] + temp * ( cFrac[9] + temp * ( cFrac[10] + temp * ( cFrac[11] + temp * cFrac[12] )))) )  // if low temp
+                       ( temp >  c[0] && temp <= maxT, c[ 6] + temp * ( c[1] + temp * ( cFrac[2] + temp * ( cFrac[ 3] + temp * ( cFrac[ 4] + temp * cFrac[ 5] )))) )  // else if high temp
+                       ( temp < minT,                  c[13] + c[8] * temp + minT * ( c[9] * temp + minT * ( c[10] * temp - cFrac[9] + minT * ( c[11] * temp - 2*cFrac[10] + minT * ( c[12] * temp - 3*cFrac[11] + minT * -4*cFrac[12] )))) )  // else if out of bounds - low
+                       (                               c[ 6] + c[1] * temp + maxT * ( c[2] * temp + maxT * ( c[ 3] * temp - cFrac[2] + maxT * ( c[ 4] * temp - 2*cFrac[ 3] + maxT * ( c[ 5] * temp - 3*cFrac[ 4] + maxT * -4*cFrac[ 5] )))) ); // else out of bounds - high
 
           dhdT <<= dhdT + yi
                  * cond( temp <= c[0] && temp >= minT, c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * ( c[ 4] + temp * c[ 5] ))) )  // if low temp
@@ -465,6 +465,7 @@ evaluate()
         } // switch( type )
       }
     } // species loop
+
     // Newton's method to find root
     res  <<= delH/dhdT;
     temp <<= temp + res;
@@ -480,21 +481,20 @@ evaluate()
 
     if( !isConverged && iterations == maxIterations_ ){
       std::ostringstream msg;
-        msg << std::endl
-            << "Error in pokitt::Temperature::evaluate()." << std::endl
-            << "Iteration count exceeded" << std::endl
-            << "Total   iterations = " << iterations << std::endl
-            << "Maximum iterations = " << maxIterations_ << std::endl
-            << "Set tolerance              = " << tol_ << std::endl
-            << "Largest pointwise residual = " << err << std::endl
-            << __FILE__ << " : " << __LINE__ << std::endl;
-        throw std::runtime_error( msg.str() );
+      msg << std::endl
+          << "Error in pokitt::Temperature::evaluate()." << std::endl
+          << "Iteration count exceeded" << std::endl
+          << "Total   iterations = " << iterations << std::endl
+          << "Maximum iterations = " << maxIterations_ << std::endl
+          << "Set tolerance              = " << tol_ << std::endl
+          << "Largest pointwise residual = " << err << std::endl
+          << __FILE__ << " : " << __LINE__ << std::endl;
+      throw std::runtime_error( msg.str() );
     }
   }
 }
 
 //--------------------------------------------------------------------
-
 
 template< typename FieldT >
 void
@@ -762,8 +762,8 @@ evaluate()
           break;
         case NASA_POLY:
           delE0 <<= delE0 - yi
-                  * cond( temp <= c[0], c[ 6] + temp * ( c[1] + temp * ( cFrac[2] + temp * ( cFrac[ 3] + temp * ( cFrac[ 4] + temp * cFrac[ 5] )))) )  // if low temp
-                        (               c[13] + temp * ( c[8] + temp * ( cFrac[9] + temp * ( cFrac[10] + temp * ( cFrac[11] + temp * cFrac[12] )))) );  // else if high temp
+                  * cond( temp <= c[0], c[13] + temp * ( c[8] + temp * ( cFrac[9] + temp * ( cFrac[10] + temp * ( cFrac[11] + temp * cFrac[12] )))) )  // if low temp
+                        (               c[ 6] + temp * ( c[1] + temp * ( cFrac[2] + temp * ( cFrac[ 3] + temp * ( cFrac[ 4] + temp * cFrac[ 5] )))) );  // else if high temp
 
           dE0dT <<= dE0dT + yi
                   * cond( temp <= c[0], c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * ( c[ 4] + temp * c[ 5] ))) )  // if low temp
@@ -798,10 +798,10 @@ evaluate()
           break;
         case NASA_POLY:
           delE0 <<= delE0 - yi
-                  * cond( temp <= c[0] && temp >= minT, c[ 6] + temp * ( c[1] + temp * ( cFrac[2] + temp * ( cFrac[ 3] + temp * ( cFrac[ 4] + temp * cFrac[ 5] )))) )  // if low temp
-                        ( temp >  c[0] && temp <= maxT, c[13] + temp * ( c[8] + temp * ( cFrac[9] + temp * ( cFrac[10] + temp * ( cFrac[11] + temp * cFrac[12] )))) )  // else if high temp
-                        ( temp < minT,                  c[ 6] + c[1] * temp + minT * ( c[2] * temp + minT * ( c[ 3] * temp - cFrac[2] + minT * ( c[ 4] * temp - 2*cFrac[ 3] + minT * ( c[ 5] * temp - 3*cFrac[ 4] + minT * -4*cFrac[ 5] )))) )  // else if out of bounds - low
-                        (                               c[13] + c[8] * temp + maxT * ( c[9] * temp + maxT * ( c[10] * temp - cFrac[9] + maxT * ( c[11] * temp - 2*cFrac[10] + maxT * ( c[12] * temp - 3*cFrac[11] + maxT * -4*cFrac[12] )))) ); // else out of bounds - high
+                  * cond( temp <= c[0] && temp >= minT, c[13] + temp * ( c[8] + temp * ( cFrac[9] + temp * ( cFrac[10] + temp * ( cFrac[11] + temp * cFrac[12] )))) )  // if low temp
+                        ( temp >  c[0] && temp <= maxT, c[ 6] + temp * ( c[1] + temp * ( cFrac[2] + temp * ( cFrac[ 3] + temp * ( cFrac[ 4] + temp * cFrac[ 5] )))) )  // else if high temp
+                        ( temp < minT,                  c[13] + c[8] * temp + minT * ( c[9] * temp + minT * ( c[10] * temp - cFrac[9] + minT * ( c[11] * temp - 2*cFrac[10] + minT * ( c[12] * temp - 3*cFrac[11] + minT * -4*cFrac[12] )))) )  // else if out of bounds - low
+                        (                               c[ 6] + c[1] * temp + maxT * ( c[2] * temp + maxT * ( c[ 3] * temp - cFrac[2] + maxT * ( c[ 4] * temp - 2*cFrac[ 3] + maxT * ( c[ 5] * temp - 3*cFrac[ 4] + maxT * -4*cFrac[ 5] )))) ); // else out of bounds - high
 
 
           dE0dT <<= dE0dT + yi

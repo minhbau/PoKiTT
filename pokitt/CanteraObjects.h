@@ -30,66 +30,73 @@
 
 #include <boost/bimap.hpp>
 
+#include <cantera/kinetics/Reaction.h>
+
 //====================================================================
 
 namespace Cantera{
   class SpeciesThermo;
-  class ReactionData;
   class Transport;
-}
-namespace Cantera_CXX{
   class IdealGasMix;
 }
 
-  enum ThermoPoly
-  {
-    UNKNOWN_POLY = 0,
-    CONST_POLY,
-    NASA_POLY,
-    SHOMATE_POLY
-  };
+enum ThermoPoly
+{
+  UNKNOWN_POLY = 0,
+  CONST_POLY,
+  NASA_POLY,
+  SHOMATE_POLY
+};
 
-  struct ThermData
-  {
-    ThermData( const Cantera::SpeciesThermo& spThermo, const int i );
+struct ThermData
+{
+  ThermData( const Cantera::SpeciesThermo& spThermo, const int i );
+  int index;
+  double minTemp;
+  double maxTemp;
+  ThermoPoly type;
+  std::vector< double > coefficients;
+};
+
+enum ReactionType{
+  UNKNOWN_RXN = 0,
+  ELEMENTARY,
+  THIRD_BODY,
+  LINDEMANN,
+  TROE
+};
+
+struct RxnData
+{
+  RxnData( const Cantera::IdealGasMix& gas,
+           const Cantera::Reaction& rxn,
+           const std::vector<double>& MW );
+
+  struct SpeciesRxnData{
+    SpeciesRxnData( int index,
+                    int stoich,
+                    double mw,
+                    double thdBdyEff );
     int index;
-    double minTemp;
-    double maxTemp;
-    ThermoPoly type;
-    std::vector< double > coefficients;
+    int stoich;
+    double mw;
+    double invMW;
+    double thdBdyEff;
   };
 
-  enum ReactionType{
-    UNKNOWN_RXN = 0,
-    ELEMENTARY,
-    THIRD_BODY,
-    LINDEMANN,
-    TROE
-  };
-
-  struct RxnData
-  {
-    RxnData( const Cantera::ReactionData& cDat, const std::vector<double>& MW );
-    struct SpeciesRxnData{
-      SpeciesRxnData( int index, int stoich, double mw,  double thdBdyEff );
-      int index;
-      int stoich;
-      double mw;
-      double invMW;
-      double thdBdyEff;
-    };
-    std::vector< SpeciesRxnData > reactants;
-    std::vector< SpeciesRxnData > products;
-    std::vector< SpeciesRxnData > netSpecies;
-    std::vector< SpeciesRxnData > thdBdySpecies;
-    ReactionType type;
-    std::vector<double> kFwdCoefs;
-    std::vector<double> kPressureCoefs;
-    double thdBdyDefault;
-    std::vector<double> troeParams;
-    bool reversible;
-    int netOrder;
-  };
+  const bool reversible;
+  std::vector< SpeciesRxnData > reactants;
+  std::vector< SpeciesRxnData > products;
+  std::vector< SpeciesRxnData > netSpecies;
+  std::vector< SpeciesRxnData > thdBdySpecies;
+  double kFwdCoefs[3];
+  double kPressureCoefs[3];
+  double troeParams[4];
+  double thdBdyDefault;
+  std::map<std::string,double> tbeff;
+  int netOrder;
+  ReactionType type;
+};
 
 
 class CanteraObjects
@@ -107,11 +114,11 @@ public:
 	   const std::string inputGroup = "" );
   };
 
-  static Cantera_CXX::IdealGasMix* get_gasmix();
+  static Cantera::IdealGasMix* get_gasmix();
   static Cantera::Transport* get_transport();
 
   static void restore_transport( Cantera::Transport* const trans );
-  static void restore_gasmix( Cantera_CXX::IdealGasMix* const gas );
+  static void restore_gasmix( Cantera::IdealGasMix* const gas );
 
 
   static void setup_cantera( const Setup& options,
@@ -136,8 +143,8 @@ private:
 
   static CanteraObjects& self();
 
-  typedef Cantera_CXX::IdealGasMix    IdealGas;
-  typedef Cantera::Transport          Trans;
+  typedef Cantera::IdealGasMix IdealGas;
+  typedef Cantera::Transport   Trans;
   typedef boost::bimap< IdealGas*, Trans* >  GasTransMap;
 
   std::queue< std::pair<IdealGas*,Trans*> >  available_;

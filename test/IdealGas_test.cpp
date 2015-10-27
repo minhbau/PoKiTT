@@ -108,7 +108,7 @@ CellFieldPtrT
 get_cantera_result( const bool timings,
                     const size_t canteraReps,
                     const GasQuantity gasQuantity,
-                    Cantera_CXX::IdealGasMix& gasMix,
+                    Cantera::IdealGasMix& gasMix,
                     Expr::FieldManagerList& fml,
                     const Expr::TagList& yiTags,
                     const Expr::Tag& tTag,
@@ -166,7 +166,7 @@ bool driver( const bool timings,
              const GasQuantity gasQuantity )
 {
   TestHelper status( !timings );
-  Cantera_CXX::IdealGasMix* const gasMix = CanteraObjects::get_gasmix();
+  Cantera::IdealGasMix* const gasMix = CanteraObjects::get_gasmix();
   const int nSpec = gasMix->nSpecies();
 
   const Expr::Tag xTag( "XCoord",      Expr::STATE_NONE );

@@ -273,8 +273,8 @@ evaluate()
         e <<= e + yi * ( c[1] + c[3] * (temp - c[0]) );
         break;
       case NASA_POLY:
-        e <<= e + yi * cond( temp <= c[0] , c[ 6] + temp * ( c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * ( c[ 4] + temp * c[ 5] )))) )  // if low temp
-                           (                c[13] + temp * ( c[8] + temp * ( c[9] + temp * ( c[10] + temp * ( c[11] + temp * c[12] )))) );  // else if high temp
+        e <<= e + yi * cond( temp <= c[0] , c[13] + temp * ( c[8] + temp * ( c[9] + temp * ( c[10] + temp * ( c[11] + temp * c[12] )))) )  // if low temp
+                           (                c[ 6] + temp * ( c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * ( c[ 4] + temp * c[ 5] )))) );  // else if high temp
         break;
       case SHOMATE_POLY:
         e <<= e + yi * cond( temp <= c[0] , c[ 6] + temp * ( c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * c[ 4] ))) - c[ 5] * *recipT ) // if low temp
@@ -298,10 +298,10 @@ evaluate()
         e <<= e + yi * ( c[1] + c[3] * (temp - c[0]) );
         break;
       case NASA_POLY:
-        e <<= e + yi * cond( temp <= c[0] && temp >= minT, c[ 6] + temp * ( c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * ( c[ 4] + temp * c[ 5] )))) )  // if low temp
-                           ( temp >  c[0] && temp <= maxT, c[13] + temp * ( c[8] + temp * ( c[9] + temp * ( c[10] + temp * ( c[11] + temp * c[12] )))) )  // else if high temp
-                           ( temp < minT,                  c[ 6] + c[1] * temp + minT * ( 2*c[2] * temp + minT * ( 3*c[ 3] * temp - c[2] + minT * ( 4*c[ 4] * temp - 2*c[ 3] + minT * ( 5*c[ 5] * temp - 3*c[ 4] + minT * -4*c[ 5] )))) )  // else if out of bounds - low
-                           (                               c[13] + c[8] * temp + maxT * ( 2*c[9] * temp + maxT * ( 3*c[10] * temp - c[9] + maxT * ( 4*c[11] * temp - 2*c[10] + maxT * ( 5*c[12] * temp - 3*c[11] + maxT * -4*c[12] )))) ); // else out of bounds - high
+        e <<= e + yi * cond( temp <= c[0] && temp >= minT, c[13] + temp * ( c[8] + temp * ( c[9] + temp * ( c[10] + temp * ( c[11] + temp * c[12] )))) )  // if low temp
+                           ( temp >  c[0] && temp <= maxT, c[ 6] + temp * ( c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * ( c[ 4] + temp * c[ 5] )))) )  // else if high temp
+                           ( temp < minT,                  c[13] + c[8] * temp + minT * ( 2*c[9] * temp + minT * ( 3*c[10] * temp - c[9] + minT * ( 4*c[11] * temp - 2*c[10] + minT * ( 5*c[12] * temp - 3*c[11] + minT * -4*c[12] )))) )  // else if out of bounds - low
+                           (                               c[ 6] + c[1] * temp + maxT * ( 2*c[2] * temp + maxT * ( 3*c[ 3] * temp - c[2] + maxT * ( 4*c[ 4] * temp - 2*c[ 3] + maxT * ( 5*c[ 5] * temp - 3*c[ 4] + maxT * -4*c[ 5] )))) ); // else out of bounds - high
         break;
       case SHOMATE_POLY:
         e <<= e + yi * cond( temp <= c[0] && temp >= minT, c[ 6] + temp * ( c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * c[ 4] ))) - c[ 5] * *recipT ) // if low temp
@@ -436,10 +436,10 @@ evaluate()
     e <<= c[1] + c[3] * (temp - c[0]);
     break;
   case NASA_POLY:
-    e <<= cond( temp <= c[0] && temp >= minT, c[ 6] + temp * ( c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * ( c[ 4] + temp * c[ 5] )))) )  // if low temp
-              ( temp >  c[0] && temp <= maxT, c[13] + temp * ( c[8] + temp * ( c[9] + temp * ( c[10] + temp * ( c[11] + temp * c[12] )))) )  // else if high temp
-              ( temp < minT,                  c[ 6] + c[1] * temp + minT * ( 2*c[2] * temp + minT * ( 3*c[ 3] * temp - c[2] + minT * ( 4*c[ 4] * temp - 2*c[ 3] + minT * ( 5*c[ 5] * temp - 3*c[ 4] + minT * -4*c[ 5] )))) )  // else if out of bounds - low
-              (                               c[13] + c[8] * temp + maxT * ( 2*c[9] * temp + maxT * ( 3*c[10] * temp - c[9] + maxT * ( 4*c[11] * temp - 2*c[10] + maxT * ( 5*c[12] * temp - 3*c[11] + maxT * -4*c[12] )))) ); // else out of bounds - high
+    e <<= cond( temp <= c[0] && temp >= minT, c[13] + temp * ( c[8] + temp * ( c[9] + temp * ( c[10] + temp * ( c[11] + temp * c[12] )))) )  // if low temp
+              ( temp >  c[0] && temp <= maxT, c[ 6] + temp * ( c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * ( c[ 4] + temp * c[ 5] )))) )  // else if high temp
+              ( temp < minT,                  c[13] + c[8] * temp + minT * ( 2*c[9] * temp + minT * ( 3*c[10] * temp - c[9] + minT * ( 4*c[11] * temp - 2*c[10] + minT * ( 5*c[12] * temp - 3*c[11] + minT * -4*c[12] )))) )  // else if out of bounds - low
+              (                               c[ 6] + c[1] * temp + maxT * ( 2*c[2] * temp + maxT * ( 3*c[ 3] * temp - c[2] + maxT * ( 4*c[ 4] * temp - 2*c[ 3] + maxT * ( 5*c[ 5] * temp - 3*c[ 4] + maxT * -4*c[ 5] )))) ); // else out of bounds - high
     break;
   case SHOMATE_POLY:
     e <<= cond( temp <= c[0] && temp >= minT, c[ 6] + temp * ( c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * c[ 4] ))) - c[ 5] / temp ) // if low temp

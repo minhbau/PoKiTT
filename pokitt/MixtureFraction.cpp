@@ -1,7 +1,6 @@
 #include "MixtureFraction.h"
 #include "CanteraObjects.h"
 
-#include <cantera/Cantera.h>
 #include <cantera/IdealGasMix.h>
 
 #include <cassert>
@@ -60,14 +59,14 @@ MixtureFraction::MixtureFraction( const vector<double> & oxidFrac,
                                   const vector<double> & fuelFrac,
                                   const bool inputMassFrac )
 {
-  Cantera_CXX::IdealGasMix* gas = CanteraObjects::get_gasmix();
+  Cantera::IdealGasMix* gas = CanteraObjects::get_gasmix();
   initialize( *gas, oxidFrac, fuelFrac, inputMassFrac );
   CanteraObjects::restore_gasmix( gas );
 }
 
 //--------------------------------------------------------------------
 
-MixtureFraction::MixtureFraction( Cantera_CXX::IdealGasMix& gas,
+MixtureFraction::MixtureFraction( Cantera::IdealGasMix& gas,
                                   const vector<double> & oxidFrac,
                                   const vector<double> & fuelFrac,
                                   const bool inputMassFrac )
@@ -83,7 +82,7 @@ MixtureFraction::~MixtureFraction()
 //--------------------------------------------------------------------
 
 void
-MixtureFraction::initialize( Cantera_CXX::IdealGasMix& gas,
+MixtureFraction::initialize( Cantera::IdealGasMix& gas,
                              const vector<double> & oxid,
                              const vector<double> & fuel,
                              const bool massFrac )
@@ -212,7 +211,7 @@ MixtureFraction::compute_stoich_mixfrac() const
 //--------------------------------------------------------------------
 
 void
-MixtureFraction::set_gammas( const Cantera_CXX::IdealGasMix& gas )
+MixtureFraction::set_gammas( const Cantera::IdealGasMix& gas )
 {
   // set the element name vector
   const vector<string> elemName = gas.elementNames();
@@ -322,7 +321,7 @@ MixtureFraction::estimate_product_comp( const double mixFrac,
 //--------------------------------------------------------------------
 
 void
-MixtureFraction::set_stoichiometry( const Cantera_CXX::IdealGasMix& gas )
+MixtureFraction::set_stoichiometry( const Cantera::IdealGasMix& gas )
 {
   // set stoichiometric coefficients assuming that the products are
   //    CO2  H2O  N2  AR

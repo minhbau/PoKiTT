@@ -36,9 +36,6 @@ class LinearMassFracs
 {
   DECLARE_FIELD( FieldT, xCoord_ )
   const int nSpec_;
-
-  /* declare any operators associated with this expression here */
-  
   LinearMassFracs( const Expr::Tag& xCoordTag,
                    const int nSpec );
 
@@ -54,9 +51,15 @@ public:
      */
     Builder( const Expr::TagList& resultTags,
              const Expr::Tag& xCoordTag,
-             const int nghost = DEFAULT_NUMBER_OF_GHOSTS );
+             const int nghost = DEFAULT_NUMBER_OF_GHOSTS )
+  : ExpressionBuilder( resultTags, nghost ),
+    xCoordTag_( xCoordTag ),
+    nSpec_( resultTags.size() )
+  {}
 
-    Expr::ExpressionBase* build() const;
+    Expr::ExpressionBase* build() const{
+      return new LinearMassFracs<FieldT>( xCoordTag_, nSpec_ );
+    }
 
   private:
     const Expr::Tag xCoordTag_;
@@ -100,7 +103,7 @@ evaluate()
   const FieldT& xCoord = xCoord_->field_ref();
   SpatialOps::SpatFldPtr<FieldT> sum = SpatialOps::SpatialFieldStore::get<FieldT>(xCoord);
 
-  *sum<<=0.0;
+  *sum <<= 0.0;
   for( size_t n=0; n<nSpec_; ++n ){
     FieldT& yi = *massFracs[n];
     yi <<= n + 1 + xCoord;
@@ -110,30 +113,8 @@ evaluate()
     FieldT& yi = *massFracs[n];
     yi <<= yi / *sum;
   }
-
 }
 
 //--------------------------------------------------------------------
-
-template< typename FieldT >
-LinearMassFracs<FieldT>::
-Builder::Builder( const Expr::TagList& resultTags,
-                  const Expr::Tag& xCoordTag,
-                  const int nghost )
-  : ExpressionBuilder( resultTags, nghost ),
-    xCoordTag_( xCoordTag ),
-    nSpec_( resultTags.size() )
-{}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-Expr::ExpressionBase*
-LinearMassFracs<FieldT>::
-Builder::build() const
-{
-  return new LinearMassFracs<FieldT>( xCoordTag_, nSpec_ );
-}
-
 
 #endif // LinearMassFracs_Expr_h

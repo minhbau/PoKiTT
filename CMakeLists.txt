@@ -149,9 +149,15 @@ set( TPL_LIBRARIES ${TPL_LIBRARIES} exprlib )
 #----------------------------------- Cantera -----------------------------------
 #-------------------------------------------------------------------------------
 
-find_package( Cantera )
-set( TPL_LIBRARIES ${TPL_LIBRARIES} ${Cantera_LIBRARIES}   )
-set( TPL_INCLUDES  ${TPL_INCLUDES}  ${Cantera_INCLUDE_DIR} )
+set( Cantera_BIN_DIR ${Cantera_DIR}/bin )
+set( Cantera_INCLUDE_DIR ${Cantera_DIR}/include )
+set( Cantera_LIBRARY ${Cantera_DIR}/lib )
+set( Cantera_LIBRARIES ${Cantera_LIBRARY}/libcantera.a )
+find_package( BLAS REQUIRED )
+message( STATUS "Cantera libraries at " ${Cantera_LIBRARY} )
+message( STATUS "Cantera includes  at " ${Cantera_INCLUDE_DIR} )
+set( TPL_LIBRARIES ${TPL_LIBRARIES} ${Cantera_LIBRARIES}  ${BLAS_LIBRARIES} )
+set( TPL_INCLUDES ${TPL_INCLUDES} ${Cantera_INCLUDE_DIR} )
 
 
 #-------------------------------------------------------------------------------

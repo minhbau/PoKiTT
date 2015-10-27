@@ -1,6 +1,7 @@
 #include <pokitt/MixtureFraction.h>
 
 #include <cantera/IdealGasMix.h>
+#include <cantera/thermo/ConstCpPoly.h>
 
 #include <iostream>
 
@@ -12,29 +13,51 @@ bool test_mixfrac()
 {
   cout << "  mixture fraction object...";
   try{
-
-    Cantera_CXX::IdealGasMix gas;
+    Cantera::IdealGasMix gas;
 
     // hard-wire some stuff for testing.  DO NOT CHANGE.
     gas.addElement("C",12.0112);
     gas.addElement("H",1.00797);
     gas.addElement("O",15.9994);
     gas.addElement("N",14.0067);
-    gas.freezeElements();
 
-    double ch4[] = {1,4,0,0};  gas.addSpecies("CH4", ch4 );
-    double o2 [] = {0,0,2,0};  gas.addSpecies("O2",  o2  );
-    double n2 [] = {0,0,0,2};  gas.addSpecies("N2",  n2  );
-    double h2 [] = {0,2,0,0};  gas.addSpecies("H2",  h2  );
-    double co2[] = {1,0,2,0};  gas.addSpecies("CO2", co2 );
-    double h2o[] = {0,2,1,0};  gas.addSpecies("H2O", h2o );
-    gas.freezeSpecies();
+    // junk values to allow us to create thermo objects on species.
+    const double tlow  = 298;
+    const double thigh = 300;
+    const double pref  = 101325;
+    const double coefs[4] = {1,1,1,1};
+    Cantera::shared_ptr<Cantera::ConstCpPoly> thermo( new Cantera::ConstCpPoly(tlow,thigh,pref,coefs) );
+
+    typedef Cantera::Species Spec;
+    typedef Cantera::shared_ptr<Spec> SpecPtr;
+    Cantera::Composition comp;
+
+    comp.clear(); comp["C"]=1; comp["H"]=4; SpecPtr ch4( new Spec("CH4", comp) );
+    comp.clear(); comp["O"]=2;              SpecPtr  o2( new Spec("O2",  comp) );
+    comp.clear(); comp["N"]=2;              SpecPtr  n2( new Spec("N2",  comp) );
+    comp.clear(); comp["H"]=2;              SpecPtr  h2( new Spec("H2",  comp) );
+    comp.clear(); comp["C"]=1; comp["O"]=2; SpecPtr co2( new Spec("CO2", comp) );
+    comp.clear(); comp["H"]=2; comp["O"]=1; SpecPtr h2o( new Spec("H2O", comp) );
+
+    ch4->thermo = thermo;
+    o2 ->thermo = thermo;
+    n2 ->thermo = thermo;
+    h2 ->thermo = thermo;
+    co2->thermo = thermo;
+    h2o->thermo = thermo;
+
+    gas.addSpecies( ch4 );
+    gas.addSpecies(  o2 );
+    gas.addSpecies(  n2 );
+    gas.addSpecies(  h2 );
+    gas.addSpecies( co2 );
+    gas.addSpecies( h2o );
 
     // now we have set up the cantera things that are required.
     // so initialize a mixture of gases...
     const int nspec = gas.nSpecies();
-    vector<double> oxid(nspec);
-    vector<double> fuel(nspec);
+    vector<double> oxid(nspec,0.0);
+    vector<double> fuel(nspec,0.0);
 
     // mole fractions
     oxid[ gas.speciesIndex("O2") ] = 0.21;
@@ -97,6 +120,14 @@ bool test_mixfrac()
   }
   catch (Cantera::CanteraError) {
     Cantera::showErrors(cout);
+    return false;
+  }
+  catch( std::exception& err ){
+    std::cout << err.what() << std::endl;
+    return false;
+  }
+  catch(...){
+    std::cout << "Unhandled exception!\n";
     return false;
   }
   // should not get here.

@@ -25,6 +25,8 @@
 #ifndef ReactionRates_Expr_h
 #define ReactionRates_Expr_h
 
+#include <cmath>
+
 #include <expression/Expression.h>
 
 #include <pokitt/CanteraObjects.h> // include cantera wrapper
@@ -275,26 +277,28 @@ ReactionInfo::ReactionInfo( const RxnData& dat )
   else kForm = ARRHENIUS;
 
   // now we check which terms of the troe function are negligible
-  const std::vector<double>& troe = dat.troeParams;
+  const double* troe = dat.troeParams;
   switch( dat.type ){
   case ELEMENTARY: troeForm = NONE; break;
   case THIRD_BODY: troeForm = NONE; break;
   case LINDEMANN:  troeForm = NONE; break;
   case TROE:
-    switch( dat.troeParams.size() ){ // Troe3 vs Troe4
-    case 3:
-      if(      fabs( troe[1] ) < 1e-8 && fabs( troe[2] ) < 1e-8 ) troeForm = NONE;
-      else if( fabs( troe[1] ) < 1e-8                           ) troeForm = T2;
-      else if( fabs( troe[2] ) < 1e-8                           ) troeForm = T1;
-      else troeForm = T12;
-      break;
-    case 4:
-      if(      fabs( troe[1] ) < 1e-8 && fabs( troe[2] ) < 1e-8 ) troeForm = T3;
-      else if( fabs( troe[1] ) < 1e-8                           ) troeForm = T23;
-      else if( fabs( troe[2] ) < 1e-8                           ) troeForm = T13;
-      else troeForm = T123;
-      break;
-    } // Troe3 vs Troe4
+    troeForm = NONE;
+    if( std::abs(troe[1]) > 1e-8 ){  // 1 is present
+      if( std::abs(troe[2]) > 1e-8 ){ // 1 and 2 are present
+        if( std::abs(troe[3]) > 1e-8 )    troeForm = T123;
+        else                              troeForm = T12;
+      }
+      else if( std::abs(troe[3]) > 1e-8 ) troeForm = T13;
+      else                                troeForm = T1;
+    }
+    else{ // 1 is not present
+      if( std::abs(troe[2]) > 1e-8 ){ // 1 not present, 2 is present
+        if( std::abs(troe[3]) > 1e-8 )    troeForm = T23;
+        else                              troeForm = T2;
+      }
+      else if( std::abs(troe[3]) > 1e-8 ) troeForm = T3;
+    }
     break;
   default: {
     std::ostringstream msg;
@@ -404,12 +408,12 @@ evaluate()
   std::vector< SpatFldPtr<FieldT> > specG; // gibbs energy for each species
   for( int n=0; n<nSpec_; ++n ){
     specG.push_back( SpatialFieldStore::get<FieldT>(t) );
-    const ThermoPoly polyType = specThermVec_[n].type;
+    const ThermoPoly& polyType = specThermVec_[n].type;
     const std::vector<double>& c = specThermVec_[n].coefficients;
     switch ( polyType ){
     case NASA_POLY:
-      *specG[n] <<= cond( t <= c[0], c[ 6] + t * ( c[1] - c[ 7] - c[1] * logT - t * ( c[2] + t * ( c[ 3] + t * ( c[ 4] + t * c[ 5] )))) )  // if low temp
-                        (            c[13] + t * ( c[8] - c[14] - c[8] * logT - t * ( c[9] + t * ( c[10] + t * ( c[11] + t * c[12] )))) );  // else if high temp
+      *specG[n] <<= cond( t <= c[0], c[13] + t * ( c[8] - c[14] - c[8] * logT - t * ( c[9] + t * ( c[10] + t * ( c[11] + t * c[12] )))) )  // if low temp
+                        (            c[ 6] + t * ( c[1] - c[ 7] - c[1] * logT - t * ( c[2] + t * ( c[ 3] + t * ( c[ 4] + t * c[ 5] )))) ); // else if high temp
       break;
     case CONST_POLY:
       *specG[n] <<=       c[1] + c[3] * ( t    - c[0]        ) // H
@@ -455,14 +459,14 @@ evaluate()
 
   for( int r=0; r<nRxns_; ++r ){
     const ReactionInfo& rxnInfo = rxnInfoVec_[r];
-    const RxnData& rxnDat  = rxnDataVec_[r];
+    const RxnData& rxnDat = rxnDataVec_[r];
     const SpecDataVecT& thdBodies  = rxnDat.thdBdySpecies;
     const SpecDataVecT& reactants  = rxnDat.reactants;
     const SpecDataVecT& products   = rxnDat.products;
     const SpecDataVecT& netSpecies = rxnDat.netSpecies;
 
 
-    const std::vector<double>& kCoefs = rxnDat.kFwdCoefs;
+    const double* kCoefs = rxnDat.kFwdCoefs;
     switch( rxnInfo.kForm ){
     case CONSTANT:   k <<= kCoefs[0];          break;
     case LINEAR:     k <<= kCoefs[0] * t;      break;
@@ -471,101 +475,101 @@ evaluate()
     case ARRHENIUS:  k <<= ARRHENIUS( kCoefs ); break;
     }
 
-    const double baseEff = rxnDat.thdBdyDefault;
-    const std::vector<double>& kPCoefs = rxnDat.kPressureCoefs;
-    const std::vector<double>& troe = rxnDat.troeParams;
+    const double baseEff  = rxnDat.thdBdyDefault;
+    const double* kPCoefs = rxnDat.kPressureCoefs;
+    const double* troe    = rxnDat.troeParams;
     switch( rxnDat.type ){
-    case ELEMENTARY: break;
-    case THIRD_BODY:
-      switch( thdBodies.size() ){
-      case 0: k <<= k *   baseEff * conc;                                       break;
-      case 1: k <<= k * ( baseEff * conc + rho * (            THD_BDY(0) ) );   break;
-      case 2: k <<= k * ( baseEff * conc + rho * ( POKITT_SUM2( THD_BDY  ) ) ); break;
-      case 3: k <<= k * ( baseEff * conc + rho * ( POKITT_SUM3( THD_BDY  ) ) ); break;
-      case 4: k <<= k * ( baseEff * conc + rho * ( POKITT_SUM4( THD_BDY  ) ) ); break;
-      case 5: k <<= k * ( baseEff * conc + rho * ( POKITT_SUM5( THD_BDY  ) ) ); break;
-      case 6: k <<= k * ( baseEff * conc + rho * ( POKITT_SUM6( THD_BDY  ) ) ); break;
-      case 7: k <<= k * ( baseEff * conc + rho * ( POKITT_SUM7( THD_BDY  ) ) ); break;
-      case 8: k <<= k * ( baseEff * conc + rho * ( POKITT_SUM8( THD_BDY  ) ) ); break;
-      default:
-        m <<= baseEff * conc + rho * ( POKITT_SUM8( THD_BDY  ) );
-        for( int i = 8; i != thdBodies.size(); ++i ) // if we have 9 or more third bodies
-          m <<= m + rho * THD_BDY(i);
-        k <<= k * m;
-        break;
-      }
-      break;
-    case LINDEMANN:
-      switch( thdBodies.size() ){
-      case 0: k <<= k / ( 1 + k / ( ARRHENIUS( kPCoefs ) * ( baseEff * conc                                 ) ) );     break;
-      case 1: k <<= k / ( 1 + k / ( ARRHENIUS( kPCoefs ) * ( baseEff * conc + rho * (            THD_BDY(0) ) ) ) );   break;
-      case 2: k <<= k / ( 1 + k / ( ARRHENIUS( kPCoefs ) * ( baseEff * conc + rho * ( POKITT_SUM2( THD_BDY  ) ) ) ) ); break;
-      case 3: k <<= k / ( 1 + k / ( ARRHENIUS( kPCoefs ) * ( baseEff * conc + rho * ( POKITT_SUM3( THD_BDY  ) ) ) ) ); break;
-      case 4: k <<= k / ( 1 + k / ( ARRHENIUS( kPCoefs ) * ( baseEff * conc + rho * ( POKITT_SUM4( THD_BDY  ) ) ) ) ); break;
-      case 5: k <<= k / ( 1 + k / ( ARRHENIUS( kPCoefs ) * ( baseEff * conc + rho * ( POKITT_SUM5( THD_BDY  ) ) ) ) ); break;
-      case 6: k <<= k / ( 1 + k / ( ARRHENIUS( kPCoefs ) * ( baseEff * conc + rho * ( POKITT_SUM6( THD_BDY  ) ) ) ) ); break;
-      case 7: k <<= k / ( 1 + k / ( ARRHENIUS( kPCoefs ) * ( baseEff * conc + rho * ( POKITT_SUM7( THD_BDY  ) ) ) ) ); break;
-      case 8: k <<= k / ( 1 + k / ( ARRHENIUS( kPCoefs ) * ( baseEff * conc + rho * ( POKITT_SUM8( THD_BDY  ) ) ) ) ); break;
-      default:
-        m <<= baseEff * conc + rho * ( POKITT_SUM8( THD_BDY ) );
-        for( int i = 8; i != thdBodies.size(); ++i )
-          m <<= m + rho * THD_BDY(i);
-        k <<= k / ( 1 + k / ( ARRHENIUS( kPCoefs ) * m ) );
-        break;
-      } // thd bodies
-      break;
-    case TROE:
-      switch( thdBodies.size() ){
-      case 0: pr <<= ARRHENIUS( kPCoefs ) / k * ( baseEff * conc                                    ); break;
-      case 1: pr <<= ARRHENIUS( kPCoefs ) / k * ( baseEff * conc + rho * (            THD_BDY(0)  ) ); break;
-      case 2: pr <<= ARRHENIUS( kPCoefs ) / k * ( baseEff * conc + rho * ( POKITT_SUM2( THD_BDY ) ) ); break;
-      case 3: pr <<= ARRHENIUS( kPCoefs ) / k * ( baseEff * conc + rho * ( POKITT_SUM3( THD_BDY ) ) ); break;
-      case 4: pr <<= ARRHENIUS( kPCoefs ) / k * ( baseEff * conc + rho * ( POKITT_SUM4( THD_BDY ) ) ); break;
-      case 5: pr <<= ARRHENIUS( kPCoefs ) / k * ( baseEff * conc + rho * ( POKITT_SUM5( THD_BDY ) ) ); break;
-      case 6: pr <<= ARRHENIUS( kPCoefs ) / k * ( baseEff * conc + rho * ( POKITT_SUM6( THD_BDY ) ) ); break;
-      case 7: pr <<= ARRHENIUS( kPCoefs ) / k * ( baseEff * conc + rho * ( POKITT_SUM7( THD_BDY ) ) ); break;
-      case 8: pr <<= ARRHENIUS( kPCoefs ) / k * ( baseEff * conc + rho * ( POKITT_SUM8( THD_BDY ) ) ); break;
-      default:
-        m <<= baseEff * conc + rho * ( POKITT_SUM8( THD_BDY ) );
-        for( int i = 8; i != thdBodies.size(); ++i )
-          m <<= m + rho * THD_BDY(i);
-        pr <<= ARRHENIUS( kPCoefs ) / k * m;
-        break;
-      } //thd bodies
-
-      switch( rxnInfo.troeForm ){
-      case T123: logFCent <<= log10( (1-troe[0]) * exp(-t/troe[1]) + troe[0] * exp(-t/troe[2]) + exp(-tRecip * troe[3]) ); break;
-      case T12:  logFCent <<= log10( (1-troe[0]) * exp(-t/troe[1]) + troe[0] * exp(-t/troe[2]) + 0.0                    ); break;
-      case T1:   logFCent <<= log10( (1-troe[0]) * exp(-t/troe[1]) +        0.0                + 0.0                    ); break;
-      case T23:  logFCent <<= log10(            0.0                + troe[0] * exp(-t/troe[2]) + exp(-tRecip * troe[3]) ); break;
-      case T2:   logFCent <<= log10(            0.0                + troe[0] * exp(-t/troe[2]) + 0.0                    ); break;
-      case T13:  logFCent <<= log10( (1-troe[0]) * exp(-t/troe[1]) +        0.0                + exp(-tRecip * troe[3]) ); break;
-      case T3:   logFCent <<= log10(            0.0                +        0.0                + exp(-tRecip * troe[3]) ); break;
-      case NONE:
-      default:{
-        std::ostringstream msg;
-        msg << "Error in " << __FILE__ << " : " << __LINE__ << std::endl
-            <<" Falloff type is TROE, but no terms are flagged for evaluation " << std::endl
-            <<" Reaction # "<< r << std::endl;
-        throw std::runtime_error( msg.str() );
+      case ELEMENTARY: break;
+      case THIRD_BODY:
+        switch( thdBodies.size() ){
+          case 0: k <<= k *   baseEff * conc;                                       break;
+          case 1: k <<= k * ( baseEff * conc + rho * (            THD_BDY(0) ) );   break;
+          case 2: k <<= k * ( baseEff * conc + rho * ( POKITT_SUM2( THD_BDY  ) ) ); break;
+          case 3: k <<= k * ( baseEff * conc + rho * ( POKITT_SUM3( THD_BDY  ) ) ); break;
+          case 4: k <<= k * ( baseEff * conc + rho * ( POKITT_SUM4( THD_BDY  ) ) ); break;
+          case 5: k <<= k * ( baseEff * conc + rho * ( POKITT_SUM5( THD_BDY  ) ) ); break;
+          case 6: k <<= k * ( baseEff * conc + rho * ( POKITT_SUM6( THD_BDY  ) ) ); break;
+          case 7: k <<= k * ( baseEff * conc + rho * ( POKITT_SUM7( THD_BDY  ) ) ); break;
+          case 8: k <<= k * ( baseEff * conc + rho * ( POKITT_SUM8( THD_BDY  ) ) ); break;
+          default:
+            m <<= baseEff * conc + rho * ( POKITT_SUM8( THD_BDY  ) );
+            for( int i = 8; i != thdBodies.size(); ++i ) // if we have 9 or more third bodies
+              m <<= m + rho * THD_BDY(i);
+            k <<= k * m;
+            break;
         }
-      }
+        break;
+     case LINDEMANN:
+       switch( thdBodies.size() ){
+         case 0: k <<= k / ( 1 + k / ( ARRHENIUS( kPCoefs ) * ( baseEff * conc                                 ) ) );     break;
+         case 1: k <<= k / ( 1 + k / ( ARRHENIUS( kPCoefs ) * ( baseEff * conc + rho * (            THD_BDY(0) ) ) ) );   break;
+         case 2: k <<= k / ( 1 + k / ( ARRHENIUS( kPCoefs ) * ( baseEff * conc + rho * ( POKITT_SUM2( THD_BDY  ) ) ) ) ); break;
+         case 3: k <<= k / ( 1 + k / ( ARRHENIUS( kPCoefs ) * ( baseEff * conc + rho * ( POKITT_SUM3( THD_BDY  ) ) ) ) ); break;
+         case 4: k <<= k / ( 1 + k / ( ARRHENIUS( kPCoefs ) * ( baseEff * conc + rho * ( POKITT_SUM4( THD_BDY  ) ) ) ) ); break;
+         case 5: k <<= k / ( 1 + k / ( ARRHENIUS( kPCoefs ) * ( baseEff * conc + rho * ( POKITT_SUM5( THD_BDY  ) ) ) ) ); break;
+         case 6: k <<= k / ( 1 + k / ( ARRHENIUS( kPCoefs ) * ( baseEff * conc + rho * ( POKITT_SUM6( THD_BDY  ) ) ) ) ); break;
+         case 7: k <<= k / ( 1 + k / ( ARRHENIUS( kPCoefs ) * ( baseEff * conc + rho * ( POKITT_SUM7( THD_BDY  ) ) ) ) ); break;
+         case 8: k <<= k / ( 1 + k / ( ARRHENIUS( kPCoefs ) * ( baseEff * conc + rho * ( POKITT_SUM8( THD_BDY  ) ) ) ) ); break;
+         default:
+           m <<= baseEff * conc + rho * ( POKITT_SUM8( THD_BDY ) );
+           for( int i = 8; i != thdBodies.size(); ++i )
+             m <<= m + rho * THD_BDY(i);
+           k <<= k / ( 1 + k / ( ARRHENIUS( kPCoefs ) * m ) );
+           break;
+       } // thd bodies
+       break;
+       case TROE:
+         switch( thdBodies.size() ){
+           case 0: pr <<= ARRHENIUS( kPCoefs ) / k * ( baseEff * conc                                    ); break;
+           case 1: pr <<= ARRHENIUS( kPCoefs ) / k * ( baseEff * conc + rho * (            THD_BDY(0)  ) ); break;
+           case 2: pr <<= ARRHENIUS( kPCoefs ) / k * ( baseEff * conc + rho * ( POKITT_SUM2( THD_BDY ) ) ); break;
+           case 3: pr <<= ARRHENIUS( kPCoefs ) / k * ( baseEff * conc + rho * ( POKITT_SUM3( THD_BDY ) ) ); break;
+           case 4: pr <<= ARRHENIUS( kPCoefs ) / k * ( baseEff * conc + rho * ( POKITT_SUM4( THD_BDY ) ) ); break;
+           case 5: pr <<= ARRHENIUS( kPCoefs ) / k * ( baseEff * conc + rho * ( POKITT_SUM5( THD_BDY ) ) ); break;
+           case 6: pr <<= ARRHENIUS( kPCoefs ) / k * ( baseEff * conc + rho * ( POKITT_SUM6( THD_BDY ) ) ); break;
+           case 7: pr <<= ARRHENIUS( kPCoefs ) / k * ( baseEff * conc + rho * ( POKITT_SUM7( THD_BDY ) ) ); break;
+           case 8: pr <<= ARRHENIUS( kPCoefs ) / k * ( baseEff * conc + rho * ( POKITT_SUM8( THD_BDY ) ) ); break;
+           default:
+             m <<= baseEff * conc + rho * ( POKITT_SUM8( THD_BDY ) );
+             for( int i = 8; i != thdBodies.size(); ++i )
+               m <<= m + rho * THD_BDY(i);
+             pr <<= ARRHENIUS( kPCoefs ) / k * m;
+             break;
+         } //thd bodies
 
-#     define CTROE ( -0.4 - 0.67 * logFCent ) // macros to make f1 evaluation easier to read
-#     define NTROE ( 0.75 - 1.27 * logFCent ) // macros to make k evaluation easier to read
-#     define F1 ( logPrC / ( NTROE - 0.14 * logPrC ) )
+         switch( rxnInfo.troeForm ){
+           case T123: logFCent <<= log10( (1-troe[0]) * exp(-t/troe[1]) + troe[0] * exp(-t/troe[2]) + exp(-tRecip * troe[3]) ); break;
+           case T12:  logFCent <<= log10( (1-troe[0]) * exp(-t/troe[1]) + troe[0] * exp(-t/troe[2]) + 0.0                    ); break;
+           case T1:   logFCent <<= log10( (1-troe[0]) * exp(-t/troe[1]) +        0.0                + 0.0                    ); break;
+           case T23:  logFCent <<= log10(            0.0                + troe[0] * exp(-t/troe[2]) + exp(-tRecip * troe[3]) ); break;
+           case T2:   logFCent <<= log10(            0.0                + troe[0] * exp(-t/troe[2]) + 0.0                    ); break;
+           case T13:  logFCent <<= log10( (1-troe[0]) * exp(-t/troe[1]) +        0.0                + exp(-tRecip * troe[3]) ); break;
+           case T3:   logFCent <<= log10(            0.0                +        0.0                + exp(-tRecip * troe[3]) ); break;
+           case NONE:
+           default:{
+             std::ostringstream msg;
+             msg << "Error in " << __FILE__ << " : " << __LINE__ << std::endl
+                 <<" Falloff type is TROE, but no terms are flagged for evaluation " << std::endl
+                 <<" Reaction # "<< r << std::endl;
+             throw std::runtime_error( msg.str() );
+           }
+         }
 
-      logPrC <<= log10( pr ) + CTROE;
-      k <<= k * pow(10, logFCent / (1 + square( F1 ) ) ) * pr / (1+pr);
-      break;
-    default: {
-      std::ostringstream msg;
-      msg << __FILE__ << " : " << __LINE__
-          << "\n Unidentified reaction type for reaction r = " << r << " somehow evaded detection\n"
-          << "This should have been caught during construction of CanteraObjects\n"
-          << "Check your xml input file to ensure it is not corrupted\n";
-      throw std::runtime_error( msg.str() );
-      }
+#        define CTROE ( -0.4 - 0.67 * logFCent ) // macros to make f1 evaluation easier to read
+#        define NTROE ( 0.75 - 1.27 * logFCent ) // macros to make k evaluation easier to read
+#        define F1 ( logPrC / ( NTROE - 0.14 * logPrC ) )
+
+         logPrC <<= log10( pr ) + CTROE;
+         k <<= k * pow(10, logFCent / (1 + square( F1 ) ) ) * pr / (1+pr);
+         break;
+       default: {
+         std::ostringstream msg;
+         msg << __FILE__ << " : " << __LINE__
+             << "\n Unidentified reaction type for reaction r = " << r << " somehow evaded detection\n"
+             << "This should have been caught during construction of CanteraObjects\n"
+             << "Check your xml input file to ensure it is not corrupted\n";
+         throw std::runtime_error( msg.str() );
+       }
     } //  switch( rxnDat.type )
 
     if( rxnDat.reversible ){
@@ -578,8 +582,8 @@ evaluate()
       }
     }
 
-#   define C_R(i) ( yi_[reactants[(i)].index]->field_ref() * rho * reactants[(i)].invMW ) // concentration of the reactants
-#   define C_P(i) ( yi_[products [(i)].index]->field_ref() * rho * products [(i)].invMW ) // concentration of products
+#   define C_R(i) ( yi_[reactants[i].index]->field_ref() * rho * reactants[i].invMW ) // concentration of the reactants
+#   define C_P(i) ( yi_[products [i].index]->field_ref() * rho * products [i].invMW ) // concentration of products
     switch( rxnInfo.forwardOrder ){
     case ONE:         k <<= k  *         C_R(0);                              break;
     case TWO:         k <<= k  * square( C_R(0) );                            break;

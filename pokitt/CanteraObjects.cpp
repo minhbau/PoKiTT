@@ -27,13 +27,14 @@
 
 #include "CanteraObjects.h"
 
-#include <cantera/Cantera.h>
 #include <cantera/transport.h>
 #include <cantera/IdealGasMix.h>
 
-#include <cantera/kernel/ct_defs.h> // contains value of gas constant
-#include <cantera/kernel/speciesThermoTypes.h> // contains definitions for which polynomial is being used
-#include <cantera/kernel/reaction_defs.h> // reaction type definitions
+#include <cantera/base/ct_defs.h>              // value of gas constant
+#include <cantera/thermo/speciesThermoTypes.h> // definitions for which polynomial is being used
+#include <cantera/kinetics/reaction_defs.h>    // reaction type definitions
+
+#include <boost/foreach.hpp>
 
 #ifdef EXPRESSION_THREADS
 
@@ -59,75 +60,165 @@ struct CanteraMutex{
 
 #endif  // EXPRESSION_THREADS
 
-ThermData::ThermData( const Cantera::SpeciesThermo& spThermo, const int i ) : index( i ) {
-    double refPressure; int cType;
-    coefficients.resize( 15 );
-    spThermo.reportParams(i, cType, &(coefficients[0]), minTemp, maxTemp, refPressure);
-    switch( cType ){
-    case SIMPLE:   type = CONST_POLY;   break;
-    case NASA2:    type = NASA_POLY;    break;
-    case SHOMATE2: type = SHOMATE_POLY; break;
+ThermData::ThermData( const Cantera::SpeciesThermo& spThermo, const int i )
+  : index( i )
+{
+  double refPressure; int cType;
+  coefficients.resize( 15 );
+  spThermo.reportParams(i, cType, &(coefficients[0]), minTemp, maxTemp, refPressure);
+  switch( cType ){
+    case SIMPLE     :
+    case CONSTANT_CP: type = CONST_POLY;   break;
+    case NASA2      : type = NASA_POLY;    break;
+    case SHOMATE2   : type = SHOMATE_POLY; break;
     default:{
       std::ostringstream msg;
       msg << __FILE__ << " : " << __LINE__
-          << "\nThermo type not supported,\n Type = " << type
-          << ", species # " << i << std::endl
-          << "See speciesThermoTypes.h in Cantera\n";
+          << "\nThermo type not currently supported,\n Type = " << cType
+          << ", species # " << i
+          << "\nSee speciesThermoTypes.h in Cantera\n\n";
       throw std::runtime_error( msg.str() );
-      }
     }
+  }
 }
 
-RxnData::SpeciesRxnData::SpeciesRxnData( const int index, const int stoich, const double mw,  const double thdBdyEff )
-        : index( index ), stoich( stoich ), mw( mw ), invMW( 1/mw ), thdBdyEff( thdBdyEff ) {}
+RxnData::SpeciesRxnData::
+SpeciesRxnData( int index,
+                int stoich,
+                double mw,
+                double thdBdyEff )
+  : index( index ),
+    stoich( stoich ),
+    mw( mw ),
+    invMW( 1/mw ),
+    thdBdyEff( thdBdyEff )
+{}
 
-RxnData::RxnData( const Cantera::ReactionData& cDat, const std::vector<double>& MW )  {
-  kFwdCoefs      = cDat.rateCoeffParameters;
-  kPressureCoefs = cDat.auxRateCoeffParameters;
-  thdBdyDefault  = cDat.default_3b_eff;
-  troeParams     = cDat.falloffParameters;
-  reversible     = cDat.reversible;
+RxnData::RxnData( const Cantera::IdealGasMix& gas,
+                  const Cantera::Reaction& rxn,
+                  const std::vector<double>& MW )
+  : reversible( rxn.reversible )
+{
+  const int rxnType = rxn.reaction_type;
+
+  for( int i=0; i<3; ++i ){
+    kFwdCoefs     [i] = 0.0;
+    kPressureCoefs[i] = 0.0;
+  }
+  for( int i=0; i<4; ++i ) troeParams[i]=0;
+
+  // ensure that the type of each reaction is supported by PoKiTT.
+  if( rxnType != Cantera::ELEMENTARY_RXN &&
+      rxnType != Cantera::THREE_BODY_RXN &&
+      rxnType != Cantera::FALLOFF_RXN )
+  {
+    std::ostringstream msg;
+    msg << __FILE__ << " : " << __LINE__
+        << "\nUnsupported reaction type encountered for \n"
+        << "\t" << rxn.equation() << "\n\t(Rxn type: " << rxnType << ")\n";
+    throw std::runtime_error( msg.str() );
+  }
+
+  switch( rxnType ){
+    case Cantera::ELEMENTARY_RXN:{
+      const Cantera::ElementaryReaction& elemRxn = dynamic_cast<const Cantera::ElementaryReaction&>(rxn);
+      kFwdCoefs[0] = elemRxn.rate.preExponentialFactor();
+      kFwdCoefs[1] = elemRxn.rate.temperatureExponent();
+      kFwdCoefs[2] = elemRxn.rate.activationEnergy_R();
+      type = ELEMENTARY;
+      break;
+    }
+    case Cantera::FALLOFF_RXN:{
+      const Cantera::FalloffReaction& fallRxn = dynamic_cast<const Cantera::FalloffReaction&>(rxn);
+      kFwdCoefs     [0] = fallRxn.high_rate.preExponentialFactor();
+      kFwdCoefs     [1] = fallRxn.high_rate.temperatureExponent();
+      kFwdCoefs     [2] = fallRxn.high_rate.activationEnergy_R();
+      kPressureCoefs[0] = fallRxn.low_rate.preExponentialFactor();
+      kPressureCoefs[1] = fallRxn.low_rate.temperatureExponent();
+      kPressureCoefs[2] = fallRxn.low_rate.activationEnergy_R();
+      fallRxn.falloff->getParameters( troeParams );
+      thdBdyDefault = fallRxn.third_body.default_efficiency;
+      BOOST_FOREACH( const Cantera::Composition::value_type& vt, fallRxn.third_body.efficiencies ){
+        const int spIx = gas.speciesIndex(vt.first);
+        thdBdySpecies.push_back( SpeciesRxnData( spIx, 0, MW[spIx], vt.second ) );
+      }
+
+      switch( fallRxn.falloff->getType() ){
+        case Cantera::SIMPLE_FALLOFF: type = LINDEMANN; break;
+        case Cantera::TROE_FALLOFF  : type = TROE;      break;
+        case Cantera::SRI_FALLOFF   : type = TROE;      break;
+        default:{
+          std::ostringstream msg;
+          msg << __FILE__ << " : " << __LINE__
+              << "\nFalloff type not supported,\n Type = " << fallRxn.falloff->getType()
+              << "\nSee reaction_defs.h in Cantera\n";
+          throw std::runtime_error( msg.str() );
+          break;
+        }
+      }
+      break;
+    }
+    case Cantera::THREE_BODY_RXN:{
+      const Cantera::ThreeBodyReaction& tbRxn = dynamic_cast<const Cantera::ThreeBodyReaction&>(rxn);
+      kFwdCoefs[0]      = tbRxn.rate.preExponentialFactor();
+      kFwdCoefs[1]      = tbRxn.rate.temperatureExponent();
+      kFwdCoefs[2]      = tbRxn.rate.activationEnergy_R();
+      thdBdyDefault     = tbRxn.third_body.default_efficiency;
+      type              = THIRD_BODY;
+      BOOST_FOREACH( const Cantera::Composition::value_type& vt, tbRxn.third_body.efficiencies ){
+        const int spIx = gas.speciesIndex(vt.first);
+        thdBdySpecies.push_back( SpeciesRxnData( spIx, 0, MW[spIx], vt.second ) );
+      }
+      break;
+    }
+  }
 
   /* Here we are reading Cantera's product and reactant stoichiometric coefficients and storing them as ints
    * This helps performance because we only support elementary reaction mechanisms
    * We also check if stoichiometry is consistent with elementary reactions
    */
-  std::vector< double >::const_iterator iSto;
-  std::vector< int >::const_iterator iInd = cDat.reactants.begin();
-  for( iSto = cDat.rstoich.begin(); iSto!=cDat.rstoich.end(); ++iSto, ++iInd ){
-    if(      fabs( *iSto - 1 ) < 1e-2 ) reactants.push_back( SpeciesRxnData( *iInd, 1, MW[*iInd], thdBdyDefault ) );
-    else if( fabs( *iSto - 2 ) < 1e-2 ) reactants.push_back( SpeciesRxnData( *iInd, 2, MW[*iInd], thdBdyDefault ) );
-    else if( fabs( *iSto - 3 ) < 1e-2 ) reactants.push_back( SpeciesRxnData( *iInd, 3, MW[*iInd], thdBdyDefault ) );
+  BOOST_FOREACH( const Cantera::Composition::value_type& reactant, rxn.reactants ){
+    const std::string& spNam = reactant.first;
+    const size_t spIx = gas.speciesIndex(spNam);
+    const double stoich = reactant.second;
+    const int istoich = int(stoich);
+    if(      fabs( stoich - 1 ) < 1e-10 ) reactants.push_back( SpeciesRxnData( spIx, 1, MW[spIx], thdBdyDefault ) );
+    else if( fabs( stoich - 2 ) < 1e-10 ) reactants.push_back( SpeciesRxnData( spIx, 2, MW[spIx], thdBdyDefault ) );
+    else if( fabs( stoich - 3 ) < 1e-10 ) reactants.push_back( SpeciesRxnData( spIx, 3, MW[spIx], thdBdyDefault ) );
     else{
       std::ostringstream msg;
       msg << "Error in " __FILE__ << " : " << __LINE__ << std::endl
-          <<" Non-integer reactant stoichiometric coefficient" << std::endl
-          <<" Stoichiometric coefficient = " << *iSto << std::endl;
+          <<" Non-integer reactant stoichiometric coefficient (" << stoich << ") on species " << spNam<< std::endl
+          <<" in reaction: " << rxn.equation()  << "\n\n";
       throw std::runtime_error( msg.str() );
     }
   }
   if( reactants.size() < 1 || reactants.size() > 3 ){
     std::ostringstream msg;
     msg << "Error in " __FILE__ << " : " << __LINE__ << std::endl
+        << "In reaction: " << rxn.equation() << std::endl
         <<" Number of reactants must be 1 <= n <= 3 " << std::endl
-        <<" Number of reactants n = " << reactants.size() << std::endl;
+        <<" Number of reactants n = " << reactants.size() << std::endl << std::endl;
     throw std::runtime_error( msg.str() );
   }
 
-  iInd = cDat.products.begin();
-  for( iSto = cDat.pstoich.begin(); iSto!=cDat.pstoich.end(); ++iSto, ++iInd ){
-    if(      fabs( *iSto - 1 ) < 1e-2 ) products.push_back( SpeciesRxnData( *iInd, -1, MW[*iInd], thdBdyDefault ) );
-    else if( fabs( *iSto - 2 ) < 1e-2 ) products.push_back( SpeciesRxnData( *iInd, -2, MW[*iInd], thdBdyDefault ) );
-    else if( fabs( *iSto - 3 ) < 1e-2 ) products.push_back( SpeciesRxnData( *iInd, -3, MW[*iInd], thdBdyDefault ) );
+  BOOST_FOREACH( const Cantera::Composition::value_type& prod, rxn.products ){
+    const std::string& spNam = prod.first;
+    const size_t spIx = gas.speciesIndex(spNam);
+    const double stoich = prod.second;
+    const int istoich = int(stoich);
+    if(      fabs( stoich - 1 ) < 1e-10 ) products.push_back( SpeciesRxnData( spIx, -1, MW[spIx], thdBdyDefault ) );
+    else if( fabs( stoich - 2 ) < 1e-10 ) products.push_back( SpeciesRxnData( spIx, -2, MW[spIx], thdBdyDefault ) );
+    else if( fabs( stoich - 3 ) < 1e-10 ) products.push_back( SpeciesRxnData( spIx, -3, MW[spIx], thdBdyDefault ) );
     else{
       std::ostringstream msg;
       msg << "Error in " __FILE__ << " : " << __LINE__ << std::endl
           <<" Non-integer product stoichiometric coefficient" << std::endl
-          <<" Stoichiometric coefficient = " << *iSto << std::endl;
+          <<" Stoichiometric coefficient = " << istoich << std::endl;
       throw std::runtime_error( msg.str() );
     }
   }
-  if( products.size() < 1 || products.size() > 3 ){
+  if( rxn.products.size() < 1 || rxn.products.size() > 3 ){
     std::ostringstream msg;
     msg << "Error in " __FILE__ << " : " << __LINE__ << std::endl
         <<" Number of products must be 1 <= n <= 3 " << std::endl
@@ -136,70 +227,37 @@ RxnData::RxnData( const Cantera::ReactionData& cDat, const std::vector<double>& 
   }
 
   netOrder = 0; // difference of forward and reverse rxn orders, used for equilibrium K
-   std::map< int, SpeciesRxnData > netMap; // maps to find duplicates, we will extract non-0 entries to a vector later
-   std::vector< SpeciesRxnData >::const_iterator iR = reactants.begin();
-   for(  ; iR != reactants.end(); ++iR ){
-     netOrder += iR->stoich;
-     netMap.insert( std::pair< int, SpeciesRxnData>(iR->index, *iR) );
-   }
-   for(iR = products.begin(); iR != products.end(); ++iR ){
-     netOrder += iR->stoich;
-     if( netMap.find( iR->index ) == netMap.end() ){
-       netMap.insert( std::pair< int, SpeciesRxnData>(iR->index, *iR) );
-     }
-     else{
-       SpeciesRxnData oldData = netMap.find( iR->index )->second;
-       netMap.erase( iR->index );
-       if( iR->stoich - oldData.stoich != 0 )
-         netMap.insert( std::pair< int, SpeciesRxnData > ( iR->index, SpeciesRxnData( iR->index, iR->stoich + oldData.stoich, iR->mw, iR->thdBdyEff) ));
-     }
-   }
-
-   std::map< int, SpeciesRxnData >::iterator iNet; // now we keep the net species
-   for( iNet = netMap.begin(); iNet != netMap.end(); ++iNet ){
-     netSpecies.push_back( iNet->second );
-   }
-
-   if( netSpecies.size() < 2 || netSpecies.size() > 5 ){
-     std::ostringstream msg;
-     msg << "Error in " __FILE__ << " : " << __LINE__ << std::endl
-         <<" The number of reacting species must be 2 <= n <= 5 " << std::endl
-         <<" Number of active species n = " << netSpecies.size() << std::endl;
-     throw std::runtime_error( msg.str() );
-   }
-
-   std::map< int, double >::const_iterator iMap;
-   for( iMap = cDat.thirdBodyEfficiencies.begin(); iMap != cDat.thirdBodyEfficiencies.end(); ++iMap )
-     thdBdySpecies.push_back( SpeciesRxnData( iMap->first, 0, MW[iMap->first], iMap->second ) );
-
-   // check if pressure dependant reaction or not
-  switch( cDat.reactionType ){
-  case Cantera::ELEMENTARY_RXN: type = ELEMENTARY; break;
-  case Cantera::THREE_BODY_RXN: type = THIRD_BODY; break;
-  case Cantera::FALLOFF_RXN:{
-    switch( cDat.falloffType ){
-    case Cantera::SIMPLE_FALLOFF: type = LINDEMANN; break;
-    case Cantera::TROE3_FALLOFF:  type = TROE; break;
-    case Cantera::TROE4_FALLOFF:  type = TROE; break;
-    default:{
-      std::ostringstream msg;
-      msg << __FILE__ << " : " << __LINE__
-          << "\nFalloff type not supported,\n Type = " << cDat.falloffType
-          << "See reaction_defs.h in Cantera\n";
-      throw std::runtime_error( msg.str() );
-      break;
-    }
-    }
-    break;
+  std::map< int, SpeciesRxnData > netMap; // maps to find duplicates, we will extract non-0 entries to a vector later
+  BOOST_FOREACH( const SpeciesRxnData& srd, reactants ){
+    netOrder += srd.stoich;
+    netMap.insert( std::pair<int,SpeciesRxnData>(srd.index, srd) );
   }
-    default:{
-      std::ostringstream msg;
-      msg << __FILE__ << " : " << __LINE__
-          << "\nKinetics type not supported,\n Type = " << cDat.reactionType
-          << "See reaction_defs.h in Cantera\n";
-      throw std::runtime_error( msg.str() );
+  BOOST_FOREACH( const SpeciesRxnData& srd, products ){
+    netOrder += srd.stoich;
+    if( netMap.find( srd.index ) == netMap.end() ){
+      netMap.insert( std::pair<int,SpeciesRxnData>(srd.index, srd) );
+    }
+    else{
+      const SpeciesRxnData& oldData = netMap.find( srd.index )->second;
+      netMap.erase( srd.index );
+      if( srd.stoich - oldData.stoich != 0 )
+        netMap.insert( std::pair<int,SpeciesRxnData > ( srd.index, SpeciesRxnData( srd.index, srd.stoich + oldData.stoich, srd.mw, srd.thdBdyEff) ));
     }
   }
+
+  std::map< int, SpeciesRxnData >::iterator iNet; // now we keep the net species
+  for( iNet = netMap.begin(); iNet != netMap.end(); ++iNet ){
+    netSpecies.push_back( iNet->second );
+  }
+
+  if( netSpecies.size() < 2 || netSpecies.size() > 5 ){
+    std::ostringstream msg;
+    msg << "Error in " __FILE__ << " : " << __LINE__ << std::endl
+        <<" The number of reacting species must be 2 <= n <= 5 " << std::endl
+        <<" Number of active species n = " << netSpecies.size() << std::endl;
+    throw std::runtime_error( msg.str() );
+  }
+
 }
 
 //====================================================================
@@ -266,10 +324,10 @@ CanteraObjects::setup_cantera( const Setup& options,
 void
 CanteraObjects::build_new()
 {
-  Cantera_CXX::IdealGasMix * gas   = NULL;
+  Cantera::IdealGasMix * gas   = NULL;
   Cantera::Transport       * trans = NULL;
   try{
-    gas = new Cantera_CXX::IdealGasMix( options_.inputFile, options_.inputGroup ) ;
+    gas = new Cantera::IdealGasMix( options_.inputFile, options_.inputGroup ) ;
     trans = Cantera::TransportFactory::factory()->newTransport( options_.transportName, gas );
   }
   catch( Cantera::CanteraError& ){
@@ -305,17 +363,17 @@ CanteraObjects::extract_kinetics_data()
   assert( !hasBeenSetup_ );
   IdealGas* gas = available_.front().first;
 
-  const std::vector<Cantera::ReactionData>& canteraDataVec = gas->getReactionData(); // contains kinetics data for each reaction
-  numRxns_ = canteraDataVec.size();
+  const std::vector< Cantera::shared_ptr<Cantera::Reaction> >& rxnVec = gas->getReactionData(); // contains kinetics data for each reaction
+  numRxns_ = rxnVec.size();
   for( size_t r=0; r<numRxns_; ++r){
-    const Cantera::ReactionData& canteraData = canteraDataVec[r]; // ReactionData for reaction r
     try{
-      rxnDataMap_.insert( std::pair< int, RxnData >( r, RxnData( canteraData, molecularWeights_) ) );
+      rxnDataMap_.insert( std::pair< int, RxnData >( r, RxnData( *gas, *rxnVec[r], molecularWeights_) ) );
     }
     catch( std::runtime_error& err ){
       std::ostringstream msg;
       msg << __FILE__ << " : " << __LINE__
-          << " \n Error occured when parsing data for reaction " << r << std::endl
+          << " \n\nError occured when parsing data for reaction:\n\t "
+          << rxnVec[r]->equation() << "\n\n"
           << err.what() << std::endl;
       throw std::runtime_error( msg.str() );
     }
@@ -346,7 +404,7 @@ CanteraObjects::extract_mix_transport_data()
 
 //--------------------------------------------------------------------
 
-Cantera_CXX::IdealGasMix*
+Cantera::IdealGasMix*
 CanteraObjects::get_gasmix()
 {
   CanteraMutex lock;
@@ -534,7 +592,7 @@ CanteraObjects::restore_transport( Cantera::Transport* const trans )
 //--------------------------------------------------------------------
 
 void
-CanteraObjects::restore_gasmix( Cantera_CXX::IdealGasMix* const gas )
+CanteraObjects::restore_gasmix( Cantera::IdealGasMix* const gas )
 {
   CanteraMutex lock;
   CanteraObjects& co = CanteraObjects::self();

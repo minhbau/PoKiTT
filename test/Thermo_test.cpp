@@ -174,7 +174,7 @@ get_cantera_results( const bool mix,
                      const bool timings,
                      const size_t canteraReps,
                      const ThermoQuantity thermoQuantity,
-                     Cantera_CXX::IdealGasMix& gasMix,
+                     Cantera::IdealGasMix& gasMix,
                      Expr::FieldManagerList& fml,
                      const Expr::Tag& tTag,
                      const Expr::TagList& yiTags )
@@ -265,7 +265,7 @@ bool driver( const bool timings,
              const ThermoQuantity thermoQuantity )
 {
   TestHelper status( !timings );
-  Cantera_CXX::IdealGasMix* const gasMix = CanteraObjects::get_gasmix();
+  Cantera::IdealGasMix* const gasMix = CanteraObjects::get_gasmix();
   const int nSpec=gasMix->nSpecies();
 
   const Expr::Tag xTag( "XCoord", Expr::STATE_NONE );
@@ -391,11 +391,12 @@ bool driver( const bool timings,
 
     std::vector< CellFieldPtrT >::const_iterator iCantera = canteraResults.begin();
     BOOST_FOREACH( const Expr::Tag& thermoTag, thermoTags ){
-      CellField& thermo = fml.field_ref< CellField >( thermoTag );
+      const CellField& thermo = fml.field_ref< CellField >( thermoTag );
       switch( thermoQuantity ){
         case CP  :
         case CV  : {
           status( field_equal( thermo, **iCantera, 1e-14 ) || field_equal_abs( thermo, **iCantera, 1e-11 ), thermoTag.name() );
+          std::cout << thermo[0] << "  " << (**iCantera)[0] << std::endl;
           break;
         }
         case E   :
