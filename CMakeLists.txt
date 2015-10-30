@@ -154,10 +154,23 @@ set( Cantera_INCLUDE_DIR ${Cantera_DIR}/include )
 set( Cantera_LIBRARY ${Cantera_DIR}/lib )
 set( Cantera_LIBRARIES ${Cantera_LIBRARY}/libcantera.a )
 find_package( BLAS REQUIRED )
+find_package( BOOST REQUIRED )
 message( STATUS "Cantera libraries at " ${Cantera_LIBRARY} )
 message( STATUS "Cantera includes  at " ${Cantera_INCLUDE_DIR} )
 set( TPL_LIBRARIES ${TPL_LIBRARIES} ${Cantera_LIBRARIES}  ${BLAS_LIBRARIES} )
 set( TPL_INCLUDES ${TPL_INCLUDES} ${Cantera_INCLUDE_DIR} )
+
+# Cantera requires boost::thread
+set(BOOST_MIN_VERSION "1.49.0" )
+set(Boost_USE_MULTITHREAD ON)
+set( boost_comps "thread;system" )
+find_package( Boost ${BOOST_MIN_VERSION} REQUIRED COMPONENTS ${boost_comps} )
+message( STATUS "Boost header installation found at: " ${Boost_INCLUDE_DIR} )
+message( STATUS "      library installation found at: " ${Boost_LIBRARY_DIRS} )
+message( STATUS "      version: " ${Boost_MAJOR_VERSION}.${Boost_MINOR_VERSION}.${Boost_SUBMINOR_VERSION} )
+message( STATUS " found boost libs: '${Boost_LIBRARIES}'" )
+set( TPL_LIBRARIES ${TPL_LIBRARIES} ${Boost_LIBRARIES} )
+
 
 
 #-------------------------------------------------------------------------------
