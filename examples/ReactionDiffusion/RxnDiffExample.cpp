@@ -52,8 +52,8 @@
 #include <boost/foreach.hpp>
 #include <boost/program_options.hpp>
 
-#include <cantera/kernel/global.h>
-#include <cantera/kernel/ctexceptions.h>
+#include <cantera/base/global.h>
+#include <cantera/base/ctexceptions.h>
 
 namespace SO = SpatialOps;
 typedef SO::SVolField  CellField;
