@@ -161,8 +161,8 @@ class ReactionRates
      ReactionOrder reverseOrder;
    };
 
-  std::vector< ReactionInfo > rxnInfoVec_; // one for each reaction
-  std::vector< RxnData >      rxnDataVec_; // kinetics data extracted form Cantera
+  std::vector< ReactionInfo  > rxnInfoVec_; // one for each reaction
+  std::vector< const RxnData*> rxnDataVec_; // kinetics data extracted form Cantera
 
   const int nSpec_; // number of species in the mechanism
   const int nRxns_; // number of reactions in the mechanism
@@ -330,11 +330,8 @@ ReactionRates( const Expr::Tag& tTag,
   this->template create_field_vector_request<FieldT>( yiTags, yi_ );
 
   for( int r=0; r<nRxns_; ++r){
-    RxnData rxnDat = CanteraObjects::rxn_data( r );
-    SpecDataVecT::iterator iThd = rxnDat.thdBdySpecies.begin();
-    for( ; iThd != rxnDat.thdBdySpecies.end(); ++iThd) // we evaluate M assuming everything is default, this corrects for non-default species
-      iThd->thdBdyEff = iThd->invMW * ( iThd->thdBdyEff - rxnDat.thdBdyDefault );
-    rxnDataVec_.push_back( rxnDat );
+    const RxnData& rxnDat = CanteraObjects::rxn_data( r );
+    rxnDataVec_.push_back( &rxnDat );
     try{
       rxnInfoVec_.push_back( ReactionInfo( rxnDat ) );
     }
@@ -459,7 +456,7 @@ evaluate()
 
   for( int r=0; r<nRxns_; ++r ){
     const ReactionInfo& rxnInfo = rxnInfoVec_[r];
-    const RxnData& rxnDat = rxnDataVec_[r];
+    const RxnData& rxnDat = *rxnDataVec_[r];
     const SpecDataVecT& thdBodies  = rxnDat.thdBdySpecies;
     const SpecDataVecT& reactants  = rxnDat.reactants;
     const SpecDataVecT& products   = rxnDat.products;

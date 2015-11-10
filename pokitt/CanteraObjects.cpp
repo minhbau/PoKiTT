@@ -366,8 +366,12 @@ CanteraObjects::extract_kinetics_data()
   const std::vector< Cantera::shared_ptr<Cantera::Reaction> >& rxnVec = gas->getReactionData(); // contains kinetics data for each reaction
   numRxns_ = rxnVec.size();
   for( size_t r=0; r<numRxns_; ++r){
+    RxnData rxnDat( *gas, *rxnVec[r], molecularWeights_);
     try{
-      rxnDataMap_.insert( std::pair< int, RxnData >( r, RxnData( *gas, *rxnVec[r], molecularWeights_) ) );
+      std::vector<RxnData::SpeciesRxnData>::iterator iThd = rxnDat.thdBdySpecies.begin();
+      for( ; iThd != rxnDat.thdBdySpecies.end(); ++iThd) // we evaluate M assuming everything is default, this corrects for non-default species
+        iThd->thdBdyEff = iThd->invMW * ( iThd->thdBdyEff - rxnDat.thdBdyDefault );
+      rxnDataMap_.insert( std::pair< int, RxnData >( r, rxnDat ) );
     }
     catch( std::runtime_error& err ){
       std::ostringstream msg;
