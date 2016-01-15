@@ -253,8 +253,8 @@ evaluate()
     *recipT <<= 1 / temp;
   }
 # ifndef ENABLE_CUDA
-  const double maxTval = nebo_max(temp);
-  const double minTval = nebo_min(temp);
+  const double maxTval = field_max_interior(temp);
+  const double minTval = field_min_interior(temp);
 # endif
 
   e <<= 0.0;

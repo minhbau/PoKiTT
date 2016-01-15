@@ -340,8 +340,8 @@ evaluate()
       *recipRecipT <<= *recipT * *recipT;
     }
 #   ifndef ENABLE_CUDA
-    const double maxTval = nebo_max(temp);
-    const double minTval = nebo_min(temp);
+    const double maxTval = field_max_interior(temp);
+    const double minTval = field_min_interior(temp);
     if( maxTval >= maxTemp_ ){
       std::ostringstream msg;
         msg << std::endl
@@ -471,7 +471,7 @@ evaluate()
 #   ifdef ENABLE_CUDA
     res.set_device_as_active(CPU_INDEX);
 #   endif
-    const double err = nebo_max( abs(res) );
+    const double err = field_max_interior( abs(res) );
 #   ifdef ENABLE_CUDA
     res.set_device_as_active(GPU_INDEX);
 #   endif
@@ -706,8 +706,8 @@ evaluate()
       *recipRecipT <<= *recipT * *recipT;
     }
 #   ifndef ENABLE_CUDA
-    const double maxTval = nebo_max(temp);
-    const double minTval = nebo_min(temp);
+    const double maxTval = field_max_interior(temp);
+    const double minTval = field_min_interior(temp);
     if( maxTval >= maxTemp_ ){
       std::ostringstream msg;
       msg << std::endl
@@ -839,7 +839,7 @@ evaluate()
 #   ifdef ENABLE_CUDA
     res.set_device_as_active(CPU_INDEX);
 #   endif
-    const double err = nebo_max( abs(res) );
+    const double err = field_max_interior( abs(res) );
 #   ifdef ENABLE_CUDA
     res.set_device_as_active(GPU_INDEX);
 #   endif
