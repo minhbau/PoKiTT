@@ -258,8 +258,8 @@ evaluate()
     *recipRecipT <<= 1 / ( temp * temp );
   }
 # ifndef ENABLE_CUDA
-  const double maxTval = nebo_max(temp);
-  const double minTval = nebo_min(temp);
+  const double maxTval = field_max_interior(temp);
+  const double minTval = field_min_interior(temp);
 # endif
 
   cv <<= 0.0; // set cv to 0 before starting summation
