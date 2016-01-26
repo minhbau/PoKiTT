@@ -291,7 +291,7 @@ Temperature( const Expr::TagList& massFracTags,
       break;
     default: {
       std::ostringstream msg;
-      msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_;
+      msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_.str();
       throw std::runtime_error( msg.str() );
       }
     }
@@ -414,7 +414,7 @@ evaluate()
           break;
         default: {
           std::ostringstream msg;
-          msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_;
+          msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_.str();
           throw std::runtime_error( msg.str() );
           }
         } // switch( type )
@@ -459,7 +459,7 @@ evaluate()
           break;
         default: {
           std::ostringstream msg;
-          msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_;
+          msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_.str();
           throw std::runtime_error( msg.str() );
           }
         } // switch( type )
@@ -654,7 +654,7 @@ TemperatureFromE0( const Expr::TagList& massFracTags,
       break;
     default: {
       std::ostringstream msg;
-      msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_;
+      msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_.str();
       throw std::runtime_error( msg.str() );
       }
     }
@@ -780,7 +780,7 @@ evaluate()
           break;
         default: {
           std::ostringstream msg;
-          msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_;
+          msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_.str();
           throw std::runtime_error( msg.str() );
           }
         } // switch( polyType )
@@ -827,7 +827,7 @@ evaluate()
           break;
         default: {
           std::ostringstream msg;
-          msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_;
+          msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_.str();
           throw std::runtime_error( msg.str() );
           }
         } // switch( polyType )

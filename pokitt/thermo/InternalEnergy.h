@@ -227,7 +227,7 @@ InternalEnergy( const Expr::Tag& tTag,
       break;
     default: {
       std::ostringstream msg;
-      msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_;
+      msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_.str();
       throw std::runtime_error( msg.str() );
       }
     }
@@ -282,7 +282,7 @@ evaluate()
         break;
       default: {
         std::ostringstream msg;
-        msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_;
+        msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_.str();
         throw std::runtime_error( msg.str() );
         }
       }
@@ -311,7 +311,7 @@ evaluate()
         break;
       default: {
         std::ostringstream msg;
-        msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_;
+        msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_.str();
         throw std::runtime_error( msg.str() );
         }
       }
@@ -407,7 +407,7 @@ SpeciesInternalEnergy( const Expr::Tag& tTag,
     break;
   default: {
     std::ostringstream msg;
-    msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n_ << exceptionMsg_;
+    msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n_ << exceptionMsg_.str();
     throw std::runtime_error( msg.str() );
     }
   }
@@ -449,7 +449,7 @@ evaluate()
     break;
   default: {
     std::ostringstream msg;
-    msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n_ << exceptionMsg_;
+    msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n_ << exceptionMsg_.str();
     throw std::runtime_error( msg.str() );
     }
   }
