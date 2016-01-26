@@ -271,8 +271,8 @@ evaluate()
   }
 
 # ifndef ENABLE_CUDA
-  const double maxTval = nebo_max(t);
-  const double minTval = nebo_min(t);
+  const double maxTval = field_max_interior(t);
+  const double minTval = field_min_interior(t);
 # endif
 
   cp <<= 0.0; // set cp to 0 before starting summation
