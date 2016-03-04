@@ -386,6 +386,20 @@ CanteraObjects::gas_constant()
 
 //--------------------------------------------------------------------
 
+double
+CanteraObjects::reference_pressure()
+{
+  CanteraMutex lock;
+  CanteraObjects& co = CanteraObjects::self();
+  assert( co.hasBeenSetup_ );
+  if( co.available_.size() == 0 ) co.build_new();
+  IdealGas* ig = co.available_.front().first;
+  co.available_.pop();
+  return ig->refPressure();
+}
+
+//--------------------------------------------------------------------
+
 int
 CanteraObjects::number_species()
 {
