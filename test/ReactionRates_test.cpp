@@ -140,7 +140,8 @@ get_cantera_results( const bool timings,
 
 bool driver( const bool timings,
              const size_t pokittReps,
-             const size_t canteraReps )
+             const size_t canteraReps,
+             const double pressure = 101325 )
 {
   TestHelper status( !timings );
   Cantera_CXX::IdealGasMix* const gasMix = CanteraObjects::get_gasmix();
@@ -175,7 +176,7 @@ bool driver( const bool timings,
 
     initFactory.register_expression(       new XCoord       ( xTag )                     );
     yID = initFactory.register_expression( new MassFracs    ( yiTags, xTag )             );
-    initFactory.register_expression(       new Pressure     ( pTag, gasMix->pressure() ) );
+    initFactory.register_expression(       new Pressure     ( pTag, pressure )           );
     mID = initFactory.register_expression( new MixMolWeight ( mmwTag, yiTags )           );
     tID = initFactory.register_expression( new Temperature  ( tTag ,xTag, 2000, 500 )    );
     pID = initFactory.register_expression( new Density      ( rhoTag, tTag, pTag, mmwTag ) );
@@ -305,6 +306,7 @@ int main( int iarg, char* carg[] )
   bool timings = false;
   size_t pokittReps = 1;
   size_t canteraReps = 1;
+  double pressure = 101325;
 
   // parse the command line options input describing the problem
   try {
@@ -315,7 +317,8 @@ int main( int iarg, char* carg[] )
            ( "phase", po::value<std::string>(&inpGroup), "name of phase in Cantera xml input file" )
            ( "timings", "Generate comparison timings between Cantera and PoKiTT across several problem sizes" )
            ( "pokitt-reps", po::value<size_t>(&pokittReps), "Repeat the PoKiTT tests and report the average execution time")
-           ( "cantera-reps", po::value<size_t>(&canteraReps), "Repeat the Cantera tests and report the average execution time");
+           ( "cantera-reps", po::value<size_t>(&canteraReps), "Repeat the Cantera tests and report the average execution time")
+           ( "pressure", po::value<double>(&pressure), "System pressure");
 
     po::variables_map args;
     po::store( po::parse_command_line(iarg,carg,desc), args );
@@ -339,7 +342,7 @@ int main( int iarg, char* carg[] )
     CanteraObjects::setup_cantera( setup );
 
     TestHelper status( !timings );
-    status( driver( timings, pokittReps, canteraReps ), "Reaction Rates" );
+    status( driver( timings, pokittReps, canteraReps, pressure ), "Reaction Rates" );
 
     if( status.ok() ){
       std::cout << "\nPASS\n";
