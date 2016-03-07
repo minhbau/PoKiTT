@@ -389,13 +389,10 @@ CanteraObjects::gas_constant()
 double
 CanteraObjects::reference_pressure()
 {
-  CanteraMutex lock;
-  CanteraObjects& co = CanteraObjects::self();
-  assert( co.hasBeenSetup_ );
-  if( co.available_.size() == 0 ) co.build_new();
-  IdealGas* ig = co.available_.front().first;
-  co.available_.pop();
-  return ig->refPressure();
+  Cantera_CXX::IdealGasMix* thermo = CanteraObjects::get_gasmix();
+  const double rp = thermo->refPressure();
+  CanteraObjects::restore_gasmix(thermo);
+  return rp;
 }
 
 //--------------------------------------------------------------------
