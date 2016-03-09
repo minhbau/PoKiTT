@@ -448,6 +448,17 @@ CanteraObjects::gas_constant()
 
 //--------------------------------------------------------------------
 
+double
+CanteraObjects::reference_pressure()
+{
+  Cantera_CXX::IdealGasMix* thermo = CanteraObjects::get_gasmix();
+  const double rp = thermo->refPressure();
+  CanteraObjects::restore_gasmix(thermo);
+  return rp;
+}
+
+//--------------------------------------------------------------------
+
 int
 CanteraObjects::number_species()
 {

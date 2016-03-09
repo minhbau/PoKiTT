@@ -125,6 +125,7 @@ public:
                              const int ncopies = 1 );
 
   static const std::string& phase_name();
+  static double reference_pressure();
   static double gas_constant();
   static int number_species();
   static int number_rxns();

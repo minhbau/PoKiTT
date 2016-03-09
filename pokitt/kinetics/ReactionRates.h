@@ -170,6 +170,8 @@ class ReactionRates
 
   std::vector< ThermData > specThermVec_;
 
+  const double standardStatePressure_;
+
   ReactionRates( const Expr::Tag& tTag,
                  const Expr::Tag& rhoTag,
                  const Expr::TagList& yiTags,
@@ -320,7 +322,8 @@ ReactionRates( const Expr::Tag& tTag,
   : Expr::Expression<FieldT>(),
     nSpec_( CanteraObjects::number_species() ),
     nRxns_( CanteraObjects::number_rxns() ),
-    invGasConstant_( 1 / CanteraObjects::gas_constant() )
+    invGasConstant_( 1 / CanteraObjects::gas_constant() ),
+    standardStatePressure_( CanteraObjects::reference_pressure() )
 {
   this->set_gpu_runnable( true );
 
@@ -572,10 +575,10 @@ evaluate()
     if( rxnDat.reversible ){
       const int netOrder = rxnDat.netOrder;
       switch( netSpecies.size() ){
-      case 3: kr <<= k * exp( netOrder * logConc - tRecip * invGasConstant_ * ( POKITT_SUM3( GIBBS ) ) ); break;
-      case 2: kr <<= k * exp( netOrder * logConc - tRecip * invGasConstant_ * ( POKITT_SUM2( GIBBS ) ) ); break;
-      case 4: kr <<= k * exp( netOrder * logConc - tRecip * invGasConstant_ * ( POKITT_SUM4( GIBBS ) ) ); break;
-      case 5: kr <<= k * exp( netOrder * logConc - tRecip * invGasConstant_ * ( POKITT_SUM5( GIBBS ) ) ); break;
+      case 3: kr <<= k * exp( netOrder * log( standardStatePressure_ * tRecip * invGasConstant_ ) - tRecip * invGasConstant_ * ( POKITT_SUM3( GIBBS ) ) ); break;
+      case 2: kr <<= k * exp( netOrder * log( standardStatePressure_ * tRecip * invGasConstant_ ) - tRecip * invGasConstant_ * ( POKITT_SUM2( GIBBS ) ) ); break;
+      case 4: kr <<= k * exp( netOrder * log( standardStatePressure_ * tRecip * invGasConstant_ ) - tRecip * invGasConstant_ * ( POKITT_SUM4( GIBBS ) ) ); break;
+      case 5: kr <<= k * exp( netOrder * log( standardStatePressure_ * tRecip * invGasConstant_ ) - tRecip * invGasConstant_ * ( POKITT_SUM5( GIBBS ) ) ); break;
       }
     }
 
