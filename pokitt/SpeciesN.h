@@ -99,7 +99,8 @@ public:
     }
 
 #   ifndef ENABLE_CUDA
-    if( nebo_max( specN ) > 1.0 || nebo_min( specN ) < 0.0 ){
+    const double tol = 10*std::numeric_limits<double>::epsilon();
+    if( field_max_interior( specN ) > (1.0+tol) || field_min_interior( specN ) < (0.0-tol) ){
       std::ostringstream msg;
       msg << __FILE__ << " : " << __LINE__ << "\nSpecies fractions are out of bounds!\n";
       throw std::runtime_error( msg.str() );

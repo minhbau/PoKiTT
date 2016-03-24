@@ -291,7 +291,7 @@ Temperature( const Expr::TagList& massFracTags,
       break;
     default: {
       std::ostringstream msg;
-      msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_;
+      msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_.str();
       throw std::runtime_error( msg.str() );
       }
     }
@@ -340,8 +340,8 @@ evaluate()
       *recipRecipT <<= *recipT * *recipT;
     }
 #   ifndef ENABLE_CUDA
-    const double maxTval = nebo_max(temp);
-    const double minTval = nebo_min(temp);
+    const double maxTval = field_max_interior(temp);
+    const double minTval = field_min_interior(temp);
     if( maxTval >= maxTemp_ ){
       std::ostringstream msg;
         msg << std::endl
@@ -414,7 +414,7 @@ evaluate()
           break;
         default: {
           std::ostringstream msg;
-          msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_;
+          msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_.str();
           throw std::runtime_error( msg.str() );
           }
         } // switch( type )
@@ -459,7 +459,7 @@ evaluate()
           break;
         default: {
           std::ostringstream msg;
-          msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_;
+          msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_.str();
           throw std::runtime_error( msg.str() );
           }
         } // switch( type )
@@ -472,7 +472,7 @@ evaluate()
 #   ifdef ENABLE_CUDA
     res.set_device_as_active(CPU_INDEX);
 #   endif
-    const double err = nebo_max( abs(res) );
+    const double err = field_max_interior( abs(res) );
 #   ifdef ENABLE_CUDA
     res.set_device_as_active(GPU_INDEX);
 #   endif
@@ -654,7 +654,7 @@ TemperatureFromE0( const Expr::TagList& massFracTags,
       break;
     default: {
       std::ostringstream msg;
-      msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_;
+      msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_.str();
       throw std::runtime_error( msg.str() );
       }
     }
@@ -706,8 +706,8 @@ evaluate()
       *recipRecipT <<= *recipT * *recipT;
     }
 #   ifndef ENABLE_CUDA
-    const double maxTval = nebo_max(temp);
-    const double minTval = nebo_min(temp);
+    const double maxTval = field_max_interior(temp);
+    const double minTval = field_min_interior(temp);
     if( maxTval >= maxTemp_ ){
       std::ostringstream msg;
       msg << std::endl
@@ -780,7 +780,7 @@ evaluate()
           break;
         default: {
           std::ostringstream msg;
-          msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_;
+          msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_.str();
           throw std::runtime_error( msg.str() );
           }
         } // switch( polyType )
@@ -827,7 +827,7 @@ evaluate()
           break;
         default: {
           std::ostringstream msg;
-          msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_;
+          msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_.str();
           throw std::runtime_error( msg.str() );
           }
         } // switch( polyType )
@@ -839,7 +839,7 @@ evaluate()
 #   ifdef ENABLE_CUDA
     res.set_device_as_active(CPU_INDEX);
 #   endif
-    const double err = nebo_max( abs(res) );
+    const double err = field_max_interior( abs(res) );
 #   ifdef ENABLE_CUDA
     res.set_device_as_active(GPU_INDEX);
 #   endif

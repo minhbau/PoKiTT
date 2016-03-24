@@ -234,7 +234,7 @@ HeatCapacity_Cp( const Expr::Tag& tTag,
       break;
     default: {
       std::ostringstream msg;
-      msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_;
+      msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_.str();
       throw std::runtime_error( msg.str() );
       }
     }
@@ -271,8 +271,8 @@ evaluate()
   }
 
 # ifndef ENABLE_CUDA
-  const double maxTval = nebo_max(t);
-  const double minTval = nebo_min(t);
+  const double maxTval = field_max_interior(t);
+  const double minTval = field_min_interior(t);
 # endif
 
   cp <<= 0.0; // set cp to 0 before starting summation
@@ -303,7 +303,7 @@ evaluate()
         break;
       default: {
         std::ostringstream msg;
-        msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_;
+        msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_.str();
         throw std::runtime_error( msg.str() );
         }
       }
@@ -332,7 +332,7 @@ evaluate()
         break;
       default: {
         std::ostringstream msg;
-        msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_;
+        msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_.str();
         throw std::runtime_error( msg.str() );
         }
       }
@@ -409,7 +409,7 @@ SpeciesHeatCapacity_Cp( const Expr::Tag& tTag,
     break;
   default: {
     std::ostringstream msg;
-    msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n_ << exceptionMsg_;
+    msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n_ << exceptionMsg_.str();
     throw std::runtime_error( msg.str() );
     }
   }
@@ -458,7 +458,7 @@ evaluate()
     break;
   default: {
     std::ostringstream msg;
-    msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n_ << exceptionMsg_;
+    msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n_ << exceptionMsg_.str();
     throw std::runtime_error( msg.str() );
     }
   }
