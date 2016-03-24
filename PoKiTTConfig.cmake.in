@@ -15,8 +15,8 @@ set( PoKiTT_INCLUDE_DIR
      @CMAKE_INSTALL_PREFIX@/include
      @TPL_INCLUDES@ 
    )
+set( PoKiTT_LIBS pokitt @TPL_LIBRARIES@ )
 
 find_package( ExprLib PATHS @ExprLib_DIR@ )
-find_package( Cantera PATHS @Cantera_DIR@ )
 
 include( @CMAKE_INSTALL_PREFIX@/lib/pokitt/PoKiTT.cmake )
