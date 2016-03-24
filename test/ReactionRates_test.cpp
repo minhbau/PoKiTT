@@ -267,7 +267,7 @@ bool driver( const bool timings,
       std::sort( times.begin(), times.end() );
       const int chop = floor(pokittReps/4);
       const double avgTime = std::accumulate( times.begin() + chop, times.end()-chop, 0.0 )/(pokittReps-2*chop);
-      std::cout << "PoKiTT  reaction rate time " << avgTime << std::endl;
+      std::cout << "PoKiTT reaction rate time " << avgTime << std::endl;
     }
 
     const std::vector< CellFieldPtrT > canteraResults = get_cantera_results( timings,

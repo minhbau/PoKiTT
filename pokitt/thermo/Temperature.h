@@ -129,7 +129,11 @@ public:
       tol_( tol ),
       maxTemp_( maxTemp ),
       maxIterations_( maxIterations )
-    {}
+    {
+      if( resultTag == temperatureGuessTag ){
+        throw std::runtime_error( "Error! Do not provide temperature's tag as the guess tag! Use an empty tag to use T as the guess." );
+      }
+    }
 
     Expr::ExpressionBase* build() const{
       return new Temperature<FieldT>( massFracTags_, enthTag_, tempGuessTag_, tol_, maxTemp_, maxIterations_ );
@@ -241,7 +245,11 @@ public:
       tol_( tol ),
       maxTemp_( maxTemp ),
       maxIterations_( maxIterations )
-    {}
+  {
+    if( resultTag == temperatureGuessTag ){
+      throw std::runtime_error( "Error! Do not provide temperature's tag as the guess tag! Use an empty tag to use T as the guess." );
+    }
+  }
 
     Expr::ExpressionBase* build() const{
       return new TemperatureFromE0<FieldT>( massFracTags_, e0Tag_, keTag_, tempGuessTag_, tol_, maxTemp_, maxIterations_ );
@@ -251,6 +259,18 @@ public:
 
   ~TemperatureFromE0(){}
   void evaluate();
+
+  void sensitivity( const Expr::Tag& var )
+  {
+    FieldT& dfdv = this->sensitivity_result( var );
+    if( var == this->get_tag() ){
+      dfdv <<= 1.0;
+    }
+    else{
+      std::runtime_error( "Error! Temperature sensitivity to non-temperature field called! This shouldn't happen." );
+    }
+  }
+
   void find_bad_points( std::ostringstream& msg, const FieldT& badField, const double badValue, const bool checkBelow );
 };
 
@@ -745,8 +765,6 @@ evaluate()
                         ( temp >  c[0] && temp <= maxT, c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * ( c[ 4] + temp * c[ 5] ))) )  // else if high temp
                         ( temp < minT,                  c[8] + minT * ( c[9] + minT * ( c[10] + minT * ( c[11] + minT * c[12] ))) )  // else if out of bounds - low
                         (                               c[1] + maxT * ( c[2] + maxT * ( c[ 3] + maxT * ( c[ 4] + maxT * c[ 5] ))) ); // else out of bounds - high
-
-
           break;
         default: {
           std::ostringstream msg;
