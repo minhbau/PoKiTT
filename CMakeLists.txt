@@ -114,7 +114,7 @@ if( BUILD_UPSTREAM_LIBS )
                    -DENABLE_TESTS=OFF
                    -DENABLE_EXAMPLES=OFF
                    -DCMAKE_INSTALL_PREFIX=${TPL_DIR}
-                   -DBOOST_INCLUDEDIR=${BOOST_INCLUDEDIR}
+                   -DBOOST_INCLUDEDIR=${BOOST_INCLUDE}
                    ${TPL_DIR}/SpatialOps
                    WORKING_DIRECTORY ${TPL_DIR}/build/spatialops
                    RESULT_VARIABLE result  )
