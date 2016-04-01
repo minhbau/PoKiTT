@@ -80,7 +80,7 @@ std::string energy_name( const EnergyType e )
 //==============================================================================
 
 const std::vector< std::vector<double> >
-extract_mass_fracs( const Expr::TagList yiTags, const Expr::FieldManagerList& fml ){
+extract_mass_fracs( const Expr::TagList yiTags, Expr::FieldManagerList& fml ){
   const CellField& yi0 = fml.field_ref< CellField >(yiTags[0]);
   const size_t nPts = yi0.window_with_ghost().glob_npts();
   const int nSpec = yiTags.size();
@@ -91,7 +91,7 @@ extract_mass_fracs( const Expr::TagList yiTags, const Expr::FieldManagerList& fm
     massFracs.push_back(massFrac);
   }
   for( size_t n=0; n<nSpec; ++n ){
-    const CellField& yi = fml.field_ref< CellField >( yiTags[n] );
+    CellField& yi = fml.field_ref< CellField >( yiTags[n] );
 #   ifdef ENABLE_CUDA
     yi.set_device_as_active( CPU_INDEX );
 #   endif
@@ -110,7 +110,7 @@ get_cantera_result( const bool timings,
                     const size_t canteraReps,
                     const EnergyType energyType,
                     Cantera::IdealGasMix& gasMix,
-                    const Expr::FieldManagerList& fml,
+                    Expr::FieldManagerList& fml,
                     const Expr::Tag& tTag,
                     const Expr::TagList& yiTags,
                     const Expr::Tag& energyTag,
