@@ -119,10 +119,10 @@ get_cantera_result( const bool timings,
 {
   const std::vector< std::vector<double> > massFracs = extract_mass_fracs( yiTags, fml );
 
-  const CellField& temp   = fml.field_ref< CellField >( tTag );
-  const CellField& energy = fml.field_ref< CellField >( energyTag );
-  const CellField& press  = fml.field_ref< CellField >( pTag );
-  const CellField& volume = fml.field_ref< CellField >( nuTag );
+  CellField& temp   = fml.field_ref< CellField >( tTag );
+  CellField& energy = fml.field_ref< CellField >( energyTag );
+  CellField& press  = fml.field_ref< CellField >( pTag );
+  CellField& volume = fml.field_ref< CellField >( nuTag );
 
 # ifdef ENABLE_CUDA
   temp  .set_device_as_active( CPU_INDEX );

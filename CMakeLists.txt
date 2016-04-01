@@ -166,6 +166,10 @@ message( STATUS "Cantera includes  at " ${Cantera_INCLUDE_DIR} )
 set( TPL_LIBRARIES ${TPL_LIBRARIES} ${Cantera_LIBRARIES}  ${BLAS_LIBRARIES} )
 set( TPL_INCLUDES ${TPL_INCLUDES} ${Cantera_INCLUDE_DIR} )
 
+# jcs it appears that on linux, the cantera library requires linkage with thread libraries.
+find_package( Threads REQUIRED )
+set( TPL_LIBRARIES ${TPL_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} )
+
 
 #-------------------------------------------------------------------------------
 #------------------------------ Build Everything -------------------------------
