@@ -400,8 +400,8 @@ evaluate()
                        (               c[ 6] + temp * ( c[1] + temp * ( cFrac[2] + temp * ( cFrac[ 3] + temp * ( cFrac[ 4] + temp * cFrac[ 5] )))) );  // else if high temp
 
           dhdT <<= dhdT + yi
-                 * cond( temp <= c[0], c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * ( c[ 4] + temp * c[ 5] ))) )  // if low temp
-                       (               c[8] + temp * ( c[9] + temp * ( c[10] + temp * ( c[11] + temp * c[12] ))) );  // else if high temp
+                 * cond( temp <= c[0], c[8] + temp * ( c[9] + temp * ( c[10] + temp * ( c[11] + temp * c[12] ))) )  // if low temp
+                       (               c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * ( c[ 4] + temp * c[ 5] ))) );  // else if high temp
           break;
         case SHOMATE_POLY:
           delH <<= delH - yi
@@ -438,10 +438,10 @@ evaluate()
                        (                               c[ 6] + c[1] * temp + maxT * ( c[2] * temp + maxT * ( c[ 3] * temp - cFrac[2] + maxT * ( c[ 4] * temp - 2*cFrac[ 3] + maxT * ( c[ 5] * temp - 3*cFrac[ 4] + maxT * -4*cFrac[ 5] )))) ); // else out of bounds - high
 
           dhdT <<= dhdT + yi
-                 * cond( temp <= c[0] && temp >= minT, c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * ( c[ 4] + temp * c[ 5] ))) )  // if low temp
-                       ( temp >  c[0] && temp <= maxT, c[8] + temp * ( c[9] + temp * ( c[10] + temp * ( c[11] + temp * c[12] ))) )  // else if high temp
-                       ( temp < minT,                  c[1] + minT * ( c[2] + minT * ( c[ 3] + minT * ( c[ 4] + minT * c[ 5] ))) )  // else if out of bounds - low
-                       (                               c[8] + maxT * ( c[9] + maxT * ( c[10] + maxT * ( c[11] + maxT * c[12] ))) ); // else out of bounds - high
+                 * cond( temp <= c[0] && temp >= minT, c[8] + temp * ( c[9] + temp * ( c[10] + temp * ( c[11] + temp * c[12] ))) )  // if low temp
+                       ( temp >  c[0] && temp <= maxT, c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * ( c[ 4] + temp * c[ 5] ))) )  // else if high temp
+                       ( temp < minT,                  c[8] + minT * ( c[9] + minT * ( c[10] + minT * ( c[11] + minT * c[12] ))) )  // else if out of bounds - low
+                       (                               c[1] + maxT * ( c[2] + maxT * ( c[ 3] + maxT * ( c[ 4] + maxT * c[ 5] ))) ); // else out of bounds - high
 
           break;
         case SHOMATE_POLY:
@@ -766,8 +766,8 @@ evaluate()
                         (               c[ 6] + temp * ( c[1] + temp * ( cFrac[2] + temp * ( cFrac[ 3] + temp * ( cFrac[ 4] + temp * cFrac[ 5] )))) );  // else if high temp
 
           dE0dT <<= dE0dT + yi
-                  * cond( temp <= c[0], c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * ( c[ 4] + temp * c[ 5] ))) )  // if low temp
-                        (               c[8] + temp * ( c[9] + temp * ( c[10] + temp * ( c[11] + temp * c[12] ))) );  // else if high temp
+                  * cond( temp <= c[0], c[8] + temp * ( c[9] + temp * ( c[10] + temp * ( c[11] + temp * c[12] ))) )  // if low temp
+                        (               c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * ( c[ 4] + temp * c[ 5] ))) );  // else if high temp
           break;
         case SHOMATE_POLY:
           delE0 <<= delE0 - yi
@@ -805,10 +805,10 @@ evaluate()
 
 
           dE0dT <<= dE0dT + yi
-                  * cond( temp <= c[0] && temp >= minT, c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * ( c[ 4] + temp * c[ 5] ))) )  // if low temp
-                        ( temp >  c[0] && temp <= maxT, c[8] + temp * ( c[9] + temp * ( c[10] + temp * ( c[11] + temp * c[12] ))) )  // else if high temp
-                        ( temp < minT,                  c[1] + minT * ( c[2] + minT * ( c[ 3] + minT * ( c[ 4] + minT * c[ 5] ))) )  // else if out of bounds - low
-                        (                               c[8] + maxT * ( c[9] + maxT * ( c[10] + maxT * ( c[11] + maxT * c[12] ))) ); // else out of bounds - high
+                  * cond( temp <= c[0] && temp >= minT, c[8] + temp * ( c[9] + temp * ( c[10] + temp * ( c[11] + temp * c[12] ))) )  // if low temp
+                        ( temp >  c[0] && temp <= maxT, c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * ( c[ 4] + temp * c[ 5] ))) )  // else if high temp
+                        ( temp < minT,                  c[8] + minT * ( c[9] + minT * ( c[10] + minT * ( c[11] + minT * c[12] ))) )  // else if out of bounds - low
+                        (                               c[1] + maxT * ( c[2] + maxT * ( c[ 3] + maxT * ( c[ 4] + maxT * c[ 5] ))) ); // else out of bounds - high
 
 
           break;
