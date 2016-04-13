@@ -1,6 +1,14 @@
 cmake_minimum_required(VERSION 2.8)
 project( PoKiTT CXX C )
 
+# warn about building in source
+if( CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR )
+  message( WARNING "\nIt appears that you are building directly in the source directory.\n"
+    "This is strongly discouraged.\n"
+    "Suggestion:\n\tmkdir build; cd build\n"
+    "Then run cmake from the 'build' directory" ) 
+endif( CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR )
+
 if( CMAKE_VERSION VERSION_LESS 3.1.0 )
   message( WARNING "Cannot enable C++11 with the current version of CMake.\nPlease update to at least version 3.1.0\n" )
 endif( CMAKE_VERSION VERSION_LESS 3.1.0 )
