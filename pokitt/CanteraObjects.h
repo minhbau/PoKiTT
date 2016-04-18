@@ -44,8 +44,7 @@ enum ThermoPoly
 {
   UNKNOWN_POLY = 0,
   CONST_POLY,
-  NASA_POLY,
-  SHOMATE_POLY
+  NASA_POLY
 };
 
 struct ThermData

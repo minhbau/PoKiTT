@@ -36,8 +36,7 @@ namespace pokitt{
  *  \author Nate Yonkee
  *  \date July, 2014
  *
- *  \brief Calculates the enthalpy of a mixture
- *  using either NASA7 or Shomate polynomials with 2 temperature ranges.
+ *  \brief Calculates the enthalpy of a mixture using NASA7 polynomials with 2 temperature ranges.
  *  Units of J/kg
  *
  *  Five coefficients \f$(a_0,\dots,a_4)\f$ are used to represent
@@ -63,7 +62,6 @@ class Enthalpy
   DECLARE_VECTOR_OF_FIELDS( FieldT, massFracs_ )
 
   const int nSpec_; // number of species
-  bool shomateFlag_; // true if any polynomial is shomate
   std::vector< ThermData > specThermVec_;
   std::ostringstream exceptionMsg_; // generic exception to be thrown
 
@@ -100,7 +98,7 @@ public:
  *  \date July, 2014
  *
  *  \brief Calculates the enthalpy of each species
- *  using either NASA7 or Shomate polynomials with 2 temperature ranges.
+ *  using NASA7 polynomials with 2 temperature ranges.
  *  Units of J/kg
  *
  *  Five coefficients \f$(a_0,\dots,a_4)\f$ are used to represent
@@ -161,7 +159,6 @@ Enthalpy<FieldT>::
 Enthalpy( const Expr::Tag& tTag,
           const Expr::TagList& massFracTags )
   : Expr::Expression<FieldT>(),
-    shomateFlag_( false ),
     nSpec_( CanteraObjects::number_species() )
 {
   this->set_gpu_runnable( true );
@@ -197,28 +194,6 @@ Enthalpy( const Expr::Tag& tTag,
       c[11] /= 4;
       c[12] /= 5;
       break;
-    case SHOMATE_POLY:
-      shomateFlag_ = true;
-      for( std::vector<double>::iterator ic = c.begin() + 1; ic!=c.end(); ++ic ){
-        *ic *= 1e6 / molecularWeights[n]; // scale the coefficients to keep units consistent on mass basis
-      }
-      c[ 2] /= 2;
-      c[ 3] /= 3;
-      c[ 4] /= 4;
-      c[ 9] /= 2;
-      c[10] /= 3;
-      c[11] /= 4;
-      c[ 1] *= 1e-3;
-      c[ 8] *= 1e-3;
-      c[ 2] *= 1e-6;
-      c[ 9] *= 1e-6;
-      c[ 3] *= 1e-9;
-      c[10] *= 1e-9;
-      c[ 4] *= 1e-12;
-      c[11] *= 1e-12;
-      c[ 5] *= 1e3;
-      c[12] *= 1e3;
-      break;
     default: {
       std::ostringstream msg;
       msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_.str();
@@ -242,11 +217,6 @@ evaluate()
 
   const FieldT& temp = t_->field_ref();
 
-  SpatFldPtr<FieldT> recipT;      // may be used for Shomate polynomial
-  if( shomateFlag_ ) {
-    recipT = SpatialFieldStore::get<FieldT>(temp);
-    *recipT <<= 1 / temp;
-  }
 # ifndef ENABLE_CUDA
   const double maxTval = field_max_interior(temp);
   const double minTval = field_min_interior(temp);
@@ -274,10 +244,6 @@ evaluate()
         h <<= h + yi * cond( temp <= c[0] , c[13] + temp * ( c[8] + temp * ( c[9] + temp * ( c[10] + temp * ( c[11] + temp * c[12] )))) )  // if low temp
                            (                c[ 6] + temp * ( c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * ( c[ 4] + temp * c[ 5] )))) );  // else if high temp
         break;
-      case SHOMATE_POLY:
-        h <<= h + yi * cond( temp <= c[0] , c[ 6] + temp * ( c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * c[ 4] ))) - c[ 5] * *recipT ) // if low temp
-                           (                c[13] + temp * ( c[8] + temp * ( c[9] + temp * ( c[10] + temp * c[11] ))) - c[12] * *recipT );  // else if high range
-        break;
       default: {
         std::ostringstream msg;
         msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_.str();
@@ -300,12 +266,6 @@ evaluate()
                            ( temp >  c[0] && temp <= maxT, c[ 6] + temp * ( c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * ( c[ 4] + temp * c[ 5] )))) )  // else if high temp
                            ( temp < minT,                  c[13] + c[8] * temp + minT * ( 2*c[9] * temp + minT * ( 3*c[10] * temp - c[9] + minT * ( 4*c[11] * temp - 2*c[10] + minT * ( 5*c[12] * temp - 3*c[11] + minT * -4*c[12] )))) )  // else if out of bounds - low
                            (                               c[ 6] + c[1] * temp + maxT * ( 2*c[2] * temp + maxT * ( 3*c[ 3] * temp - c[2] + maxT * ( 4*c[ 4] * temp - 2*c[ 3] + maxT * ( 5*c[ 5] * temp - 3*c[ 4] + maxT * -4*c[ 5] )))) ); // else out of bounds - high
-        break;
-      case SHOMATE_POLY:
-        h <<= h + yi * cond( temp <= c[0] && temp >= minT, c[ 6] + temp * ( c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * c[ 4] ))) - c[ 5] * *recipT ) // if low temp
-                           ( temp >  c[0] && temp <= maxT, c[13] + temp * ( c[8] + temp * ( c[9] + temp * ( c[10] + temp * c[11] ))) - c[12] * *recipT )  // else if high range
-                           ( temp <  minT,                 c[ 6] + c[1] * temp + minT * ( 2*c[2] * temp + minT * ( 3*c[ 3] * temp - c[2] + minT * ( 4*c[ 4] * temp - 2*c[ 3] + minT * -3*c[ 4] ))) + ( c[ 5] * temp / minT - 2*c[ 5] ) / minT ) // else if out of bounds - low
-                           (                               c[13] + c[8] * temp + maxT * ( 2*c[9] * temp + maxT * ( 3*c[10] * temp - c[9] + maxT * ( 4*c[11] * temp - 2*c[10] + maxT * -3*c[11] ))) + ( c[12] * temp / maxT - 2*c[12] ) / maxT ); // else out of bounds - high
         break;
       default: {
         std::ostringstream msg;
@@ -377,27 +337,6 @@ SpeciesEnthalpy( const Expr::Tag& tTag,
     c[11] /= 4;
     c[12] /= 5;
     break;
-  case SHOMATE_POLY:
-    for( std::vector<double>::iterator ic = c.begin() + 1; ic!=c.end(); ++ic ){
-      *ic *= 1e6 / molecularWeight; // scale the coefficients to keep units consistent on mass basis
-    }
-    c[ 2] /= 2;
-    c[ 3] /= 3;
-    c[ 4] /= 4;
-    c[ 9] /= 2;
-    c[10] /= 3;
-    c[11] /= 4;
-    c[ 1] *= 1e-3;
-    c[ 8] *= 1e-3;
-    c[ 2] *= 1e-6;
-    c[ 9] *= 1e-6;
-    c[ 3] *= 1e-9;
-    c[10] *= 1e-9;
-    c[ 4] *= 1e-12;
-    c[11] *= 1e-12;
-    c[ 5] *= 1e3;
-    c[12] *= 1e3;
-    break;
   default: {
     std::ostringstream msg;
     msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n_ << exceptionMsg_.str();
@@ -434,12 +373,6 @@ evaluate()
               ( temp >  c[0] && temp <= maxT, c[ 6] + temp * ( c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * ( c[ 4] + temp * c[ 5] )))) )  // else if high temp
               ( temp < minT,                  c[13] + c[8] * temp + minT * ( 2*c[9] * temp + minT * ( 3*c[10] * temp - c[9] + minT * ( 4*c[11] * temp - 2*c[10] + minT * ( 5*c[12] * temp - 3*c[11] + minT * -4*c[12] )))) )  // else if out of bounds - low
               (                               c[ 6] + c[1] * temp + maxT * ( 2*c[2] * temp + maxT * ( 3*c[ 3] * temp - c[2] + maxT * ( 4*c[ 4] * temp - 2*c[ 3] + maxT * ( 5*c[ 5] * temp - 3*c[ 4] + maxT * -4*c[ 5] )))) ); // else out of bounds - high
-    break;
-  case SHOMATE_POLY:
-    h <<= cond( temp <= c[0] && temp >= minT, c[ 6] + temp * ( c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * c[ 4] ))) - c[ 5] / temp ) // if low temp
-              ( temp >  c[0] && temp <= maxT, c[13] + temp * ( c[8] + temp * ( c[9] + temp * ( c[10] + temp * c[11] ))) - c[12] / temp )  // else if high range
-              ( temp <  minT,                 c[ 6] + c[1] * temp + minT * ( 2*c[2] * temp + minT * ( 3*c[ 3] * temp - c[2] + minT * ( 4*c[ 4] * temp - 2*c[ 3] + minT * -3*c[ 4] ))) + ( c[ 5] * temp / minT - 2*c[ 5] ) / minT ) // else if out of bounds - low
-              (                               c[13] + c[8] * temp + maxT * ( 2*c[9] * temp + maxT * ( 3*c[10] * temp - c[9] + maxT * ( 4*c[11] * temp - 2*c[10] + maxT * -3*c[11] ))) + ( c[12] * temp / maxT - 2*c[12] ) / maxT ); // else out of bounds - high
     break;
   default: {
     std::ostringstream msg;

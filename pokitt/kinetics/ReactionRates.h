@@ -363,12 +363,6 @@ ReactionRates( const Expr::Tag& tTag,
       c[11] /= 12;
       c[12] /= 20;
       break;
-    case SHOMATE_POLY:{
-      std::ostringstream msg;
-      msg << "Error in " __FILE__ << " : " << __LINE__ << std::endl
-          <<" Shomate polynomials are not yet supported for calculating reaction rates" << std::endl;
-      throw std::runtime_error( msg.str() );
-      }
     default:{
       std::ostringstream msg;
       msg << "Error in " __FILE__ << " : " << __LINE__ << std::endl

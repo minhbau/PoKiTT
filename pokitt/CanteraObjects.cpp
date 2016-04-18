@@ -70,7 +70,6 @@ ThermData::ThermData( const Cantera::SpeciesThermo& spThermo, const int i )
     case SIMPLE     :
     case CONSTANT_CP: type = CONST_POLY;   break;
     case NASA2      : type = NASA_POLY;    break;
-    case SHOMATE2   : type = SHOMATE_POLY; break;
     default:{
       std::ostringstream msg;
       msg << __FILE__ << " : " << __LINE__

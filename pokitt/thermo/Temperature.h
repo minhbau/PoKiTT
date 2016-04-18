@@ -79,7 +79,6 @@ class Temperature
   std::vector< ThermData > specThermVec_;
   std::vector< std::vector<double> > cFracVec_; // vector of polynomial coefficients divided by integers carried from integration
   const int nSpec_; // number of species to iterate over
-  bool shomateFlag_; // flag if shomate polynomial is present
 
   const double tol_; // tolerance for Newton's method
   const double maxTemp_; //temperatures above this will throw an exception, default is 5000K
@@ -171,7 +170,6 @@ class TemperatureFromE0
   std::vector< ThermData > specThermVec_;
   std::vector< std::vector<double> > cFracVec_; // vector of polynomial coefficients divided by integers carried from integration
   const int nSpec_; // number of species to iterate over
-  bool shomateFlag_; // flag if Shomate polynomial is present
 
   const double tol_; // tolerance for Newton's method
   const double maxTemp_; //temperatures above this will throw an exception, default is 5000K
@@ -240,7 +238,6 @@ Temperature( const Expr::TagList& massFracTags,
     tol_( tol ),
     maxTemp_( maxTemp ),
     maxIterations_( maxIterations ),
-    shomateFlag_( false ),
     nSpec_( CanteraObjects::number_species() )
 {
   this->set_gpu_runnable( true );
@@ -277,18 +274,6 @@ Temperature( const Expr::TagList& massFracTags,
       cFrac[11] = c[11] / 4;
       cFrac[12] = c[12] / 5;
       break;
-    case SHOMATE_POLY:
-      shomateFlag_ = true;
-      for( std::vector<double>::iterator ic = c.begin() + 1; ic!=c.end(); ++ic ){
-        *ic *= 1e6 / molecularWeights[n]; // scale the coefficients to keep units consistent on mass basis
-      }
-      cFrac[ 2] = c[ 2] / 2;
-      cFrac[ 3] = c[ 3] / 3;
-      cFrac[ 4] = c[ 4] / 4;
-      cFrac[ 9] = c[ 9] / 2;
-      cFrac[10] = c[10] / 3;
-      cFrac[11] = c[11] / 4;
-      break;
     default: {
       std::ostringstream msg;
       msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_.str();
@@ -312,13 +297,6 @@ evaluate()
 
   const FieldT& enth = enth_->field_ref();
 
-  SpatFldPtr<FieldT> recipT;      // may be used for Shomate polynomial
-  SpatFldPtr<FieldT> recipRecipT; // may be used for Shomate polynomial
-  if( shomateFlag_ ) {
-    recipT      = SpatialFieldStore::get<FieldT>(temp);
-    recipRecipT = SpatialFieldStore::get<FieldT>(temp);
-  }
-
   SpatFldPtr<FieldT> delHPtr = SpatialFieldStore::get<FieldT>(temp); // difference between enthalpy field value and enthalpy evaluated at current temperature
   SpatFldPtr<FieldT> dhdTPtr = SpatialFieldStore::get<FieldT>(temp); // dhdT for Newton's method
   SpatFldPtr<FieldT> resPtr  = SpatialFieldStore::get<FieldT>(temp); // change in temperature for new Newton's iteration
@@ -334,11 +312,6 @@ evaluate()
   while( !isConverged ){
     delH <<= enth;
     dhdT <<= 0.0;
-    // pre-compute powers of temperature used in polynomial evaluations
-    if( shomateFlag_ == true ){
-      *recipT      <<= 1/ temp;
-      *recipRecipT <<= *recipT * *recipT;
-    }
 #   ifndef ENABLE_CUDA
     const double maxTval = field_max_interior(temp);
     const double minTval = field_min_interior(temp);
@@ -403,15 +376,6 @@ evaluate()
                  * cond( temp <= c[0], c[8] + temp * ( c[9] + temp * ( c[10] + temp * ( c[11] + temp * c[12] ))) )  // if low temp
                        (               c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * ( c[ 4] + temp * c[ 5] ))) );  // else if high temp
           break;
-        case SHOMATE_POLY:
-          delH <<= delH - yi
-                 * cond( temp <= c[0], c[ 6] + temp*1e-3 * ( c[1] + temp*1e-3 * ( cFrac[2] + temp*1e-3 * ( cFrac[ 3] + temp*1e-3 * cFrac[ 4] ))) - c[ 5] * *recipT*1e3 ) // if low temp
-                       (               c[13] + temp*1e-3 * ( c[8] + temp*1e-3 * ( cFrac[9] + temp*1e-3 * ( cFrac[10] + temp*1e-3 * cFrac[11] ))) - c[12] * *recipT*1e3 );  // else if high range
-
-          dhdT <<= dhdT + yi * 1e-3 // 1e-3 is a factor for units conversion
-                 * cond( temp <= c[0], c[1] + temp*1e-3 * ( c[2] + temp*1e-3 * ( c[ 3] + temp*1e-3 * c[ 4] )) + c[ 5] * *recipRecipT*1e6 )  // if low temp
-                       (               c[8] + temp*1e-3 * ( c[9] + temp*1e-3 * ( c[10] + temp*1e-3 * c[11] )) + c[12] * *recipRecipT*1e6 );  // else if high temp
-          break;
         default: {
           std::ostringstream msg;
           msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_.str();
@@ -443,19 +407,6 @@ evaluate()
                        ( temp < minT,                  c[8] + minT * ( c[9] + minT * ( c[10] + minT * ( c[11] + minT * c[12] ))) )  // else if out of bounds - low
                        (                               c[1] + maxT * ( c[2] + maxT * ( c[ 3] + maxT * ( c[ 4] + maxT * c[ 5] ))) ); // else out of bounds - high
 
-          break;
-        case SHOMATE_POLY:
-          delH <<= delH - yi
-                 * cond( temp <= c[0] && temp >= minT, c[ 6] + temp*1e-3 * ( c[1] + temp*1e-3 * ( cFrac[2] + temp*1e-3 * ( cFrac[ 3] + temp*1e-3 * cFrac[ 4] ))) - c[ 5] * *recipT*1e3 ) // if low temp
-                       ( temp >  c[0] && temp <= maxT, c[13] + temp*1e-3 * ( c[8] + temp*1e-3 * ( cFrac[9] + temp*1e-3 * ( cFrac[10] + temp*1e-3 * cFrac[11] ))) - c[12] * *recipT*1e3 )  // else if high range
-                       ( temp <  minT,                 c[ 6] + c[1] * temp*1e-3 + minT*1e-3 * ( c[2] * temp*1e-3 + minT*1e-3 * ( c[ 3] * temp*1e-3 - cFrac[2] + minT*1e-3 * ( c[ 4] * temp*1e-3 - 2*cFrac[ 3] + minT*1e-3 * -3*cFrac[ 4] ))) + ( c[ 5] * temp / minT - 2*c[ 5] ) / (minT*1e-3) ) // else if out of bounds - low
-                       (                               c[13] + c[8] * temp*1e-3 + maxT*1e-3 * ( c[9] * temp*1e-3 + maxT*1e-3 * ( c[10] * temp*1e-3 - cFrac[9] + maxT*1e-3 * ( c[11] * temp*1e-3 - 2*cFrac[10] + maxT*1e-3 * -3*cFrac[11] ))) + ( c[12] * temp / maxT - 2*c[12] ) / (maxT*1e-3) ); // else out of bounds - high
-
-          dhdT <<= dhdT + yi * 1e-3 // 1e-3 is a factor for units conversion
-                 * cond( temp <= c[0] && temp >= minT, c[1] + temp*1e-3 * ( c[2] + temp*1e-3 * ( c[ 3] + temp*1e-3 * c[ 4] )) + c[ 5] * *recipRecipT*1e6  )  // if low temp
-                       ( temp >  c[0] && temp <= maxT, c[8] + temp*1e-3 * ( c[9] + temp*1e-3 * ( c[10] + temp*1e-3 * c[11] )) + c[12] * *recipRecipT*1e6  )  // else if high temp
-                       ( temp < minT,                  c[1] + minT*1e-3 * ( c[2] + minT*1e-3 * ( c[ 3] + minT*1e-3 * c[ 4] )) + c[ 5] / (minT*minT*1e-6) )  // else if out of bounds - low
-                       (                               c[8] + maxT*1e-3 * ( c[9] + maxT*1e-3 * ( c[10] + maxT*1e-3 * c[11] )) + c[12] / (maxT*maxT*1e-6) ); // else out of bounds - high
           break;
         default: {
           std::ostringstream msg;
@@ -594,7 +545,6 @@ TemperatureFromE0( const Expr::TagList& massFracTags,
                    const int maxIterations )
   : Expr::Expression<FieldT>(),
     tol_( tol ),
-    shomateFlag_ ( false ),
     maxTemp_( maxTemp ),
     maxIterations_( maxIterations ),
     nSpec_( CanteraObjects::number_species() )
@@ -638,20 +588,6 @@ TemperatureFromE0( const Expr::TagList& massFracTags,
       cFrac[11] = c[11] / 4;
       cFrac[12] = c[12] / 5;
       break;
-    case SHOMATE_POLY:
-      shomateFlag_ = true;
-      c[1] -= gasConstant * 1e-3; //change coefficients from isobaric to isometric
-      c[8] -= gasConstant * 1e-3;
-      for( std::vector<double>::iterator ic = c.begin() + 1; ic!=c.end(); ++ic ){
-        *ic *= 1e6 / molecularWeights[n]; // scale the coefficients to keep units consistent on mass basis
-      }
-      cFrac[ 2] = c[ 2] / 2;
-      cFrac[ 3] = c[ 3] / 3;
-      cFrac[ 4] = c[ 4] / 4;
-      cFrac[ 9] = c[ 9] / 2;
-      cFrac[10] = c[10] / 3;
-      cFrac[11] = c[11] / 4;
-      break;
     default: {
       std::ostringstream msg;
       msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_.str();
@@ -677,13 +613,6 @@ evaluate()
   const FieldT& e0 = e0_->field_ref();
   const FieldT& ke = ke_->field_ref();
 
-  SpatFldPtr<FieldT> recipT;      // may be used for Shomate polynomial
-  SpatFldPtr<FieldT> recipRecipT; // may be used for Shomate polynomial
-  if( shomateFlag_ ) {
-    recipT      = SpatialFieldStore::get<FieldT>(temp);
-    recipRecipT = SpatialFieldStore::get<FieldT>(temp);
-  }
-
   SpatFldPtr<FieldT> delE0Ptr = SpatialFieldStore::get<FieldT>(temp); // difference between internal energy field value and internal energy at current temperature
   SpatFldPtr<FieldT> dE0dTPtr = SpatialFieldStore::get<FieldT>(temp); // dE0dT for Newton's method
   SpatFldPtr<FieldT> resPtr   = SpatialFieldStore::get<FieldT>(temp); // change in temperature for new Newton's iteration
@@ -700,11 +629,6 @@ evaluate()
   while( !isConverged ){
     delE0 <<= e0 - ke;
     dE0dT <<= 0.0;
-    // pre-compute powers of temperature used in polynomial evaluations
-    if( shomateFlag_ == true ){
-      *recipT      <<= 1/ temp;
-      *recipRecipT <<= *recipT * *recipT;
-    }
 #   ifndef ENABLE_CUDA
     const double maxTval = field_max_interior(temp);
     const double minTval = field_min_interior(temp);
@@ -763,20 +687,11 @@ evaluate()
         case NASA_POLY:
           delE0 <<= delE0 - yi
                   * cond( temp <= c[0], c[13] + temp * ( c[8] + temp * ( cFrac[9] + temp * ( cFrac[10] + temp * ( cFrac[11] + temp * cFrac[12] )))) )  // if low temp
-                        (               c[ 6] + temp * ( c[1] + temp * ( cFrac[2] + temp * ( cFrac[ 3] + temp * ( cFrac[ 4] + temp * cFrac[ 5] )))) );  // else if high temp
+                        (               c[ 6] + temp * ( c[1] + temp * ( cFrac[2] + temp * ( cFrac[ 3] + temp * ( cFrac[ 4] + temp * cFrac[ 5] )))) ); // else if high temp
 
           dE0dT <<= dE0dT + yi
                   * cond( temp <= c[0], c[8] + temp * ( c[9] + temp * ( c[10] + temp * ( c[11] + temp * c[12] ))) )  // if low temp
-                        (               c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * ( c[ 4] + temp * c[ 5] ))) );  // else if high temp
-          break;
-        case SHOMATE_POLY:
-          delE0 <<= delE0 - yi
-                  * cond( temp <= c[0], c[ 6] + temp*1e-3 * ( c[1] + temp*1e-3 * ( cFrac[2] + temp*1e-3 * ( cFrac[ 3] + temp*1e-3 * cFrac[ 4] ))) - c[ 5] * *recipT*1e3 ) // if low temp
-                        (               c[13] + temp*1e-3 * ( c[8] + temp*1e-3 * ( cFrac[9] + temp*1e-3 * ( cFrac[10] + temp*1e-3 * cFrac[11] ))) - c[12] * *recipT*1e3 );  // else if high range
-
-          dE0dT <<= dE0dT + yi * 1e-3 // 1e-3 is a factor for units conversion
-                  * cond( temp <= c[0], c[1] + temp*1e-3 * ( c[2] + temp*1e-3 * ( c[ 3] + temp*1e-3 * c[ 4])) + c[ 5] * *recipRecipT*1e6  )  // if low temp
-                        (               c[8] + temp*1e-3 * ( c[9] + temp*1e-3 * ( c[10] + temp*1e-3 * c[11])) + c[12] * *recipRecipT*1e6  );  // else if high temp
+                        (               c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * ( c[ 4] + temp * c[ 5] ))) ); // else if high temp
           break;
         default: {
           std::ostringstream msg;
@@ -811,19 +726,6 @@ evaluate()
                         (                               c[1] + maxT * ( c[2] + maxT * ( c[ 3] + maxT * ( c[ 4] + maxT * c[ 5] ))) ); // else out of bounds - high
 
 
-          break;
-        case SHOMATE_POLY:
-          delE0 <<= delE0 - yi
-                  * cond( temp <= c[0] && temp >= minT, c[ 6] + temp*1e-3 * ( c[1] + temp*1e-3 * ( cFrac[2] + temp*1e-3 * ( cFrac[ 3] + temp*1e-3 * cFrac[ 4] ))) - c[ 5] * *recipT*1e3 ) // if low temp
-                        ( temp >  c[0] && temp <= maxT, c[13] + temp*1e-3 * ( c[8] + temp*1e-3 * ( cFrac[9] + temp*1e-3 * ( cFrac[10] + temp*1e-3 * cFrac[11] ))) - c[12] * *recipT*1e3 )  // else if high range
-                        ( temp <  minT,                 c[ 6] + c[1] * temp*1e-3 + minT*1e-3 * ( c[2] * temp*1e-3 + minT*1e-3 * ( c[ 3] * temp*1e-3 - cFrac[2] + minT*1e-3 * ( c[ 4] * temp*1e-3 - 2*cFrac[ 3] + minT*1e-3 * -3*cFrac[ 4] ))) + ( c[ 5] * temp / minT - 2*c[ 5] ) / (minT*1e-3) ) // else if out of bounds - low
-                        (                               c[13] + c[8] * temp*1e-3 + maxT*1e-3 * ( c[9] * temp*1e-3 + maxT*1e-3 * ( c[10] * temp*1e-3 - cFrac[9] + maxT*1e-3 * ( c[11] * temp*1e-3 - 2*cFrac[10] + maxT*1e-3 * -3*cFrac[11] ))) + ( c[12] * temp / maxT - 2*c[12] ) / (maxT*1e-3) ); // else out of bounds - high
-
-          dE0dT <<= dE0dT + yi * 1e-3 // 1e-3 is a factor for units conversion
-                  * cond( temp <= c[0] && temp >= minT, c[1] + temp*1e-3 * ( c[2] + temp*1e-3 * ( c[ 3] + temp*1e-3 * c[ 4])) + c[ 5] * *recipRecipT*1e6  )  // if low temp
-                        ( temp >  c[0] && temp <= maxT, c[8] + temp*1e-3 * ( c[9] + temp*1e-3 * ( c[10] + temp*1e-3 * c[11])) + c[12] * *recipRecipT*1e6  )  // else if high temp
-                        ( temp < minT,                  c[1] + minT*1e-3 * ( c[2] + minT*1e-3 * ( c[ 3] + minT*1e-3 * c[ 4])) + c[ 5] / (minT*minT*1e-6) )  // else if out of bounds - low
-                        (                               c[8] + maxT*1e-3 * ( c[9] + maxT*1e-3 * ( c[10] + maxT*1e-3 * c[11])) + c[12] / (maxT*maxT*1e-6) ); // else out of bounds - high
           break;
         default: {
           std::ostringstream msg;

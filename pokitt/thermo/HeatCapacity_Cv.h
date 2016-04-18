@@ -37,7 +37,7 @@ namespace pokitt{
  *  \date May, 2014
  *
  *  \brief Calculates the constant volume heat capacity of each species
- *  using either NASA7 or Shomate polynomials with 2 temperature ranges.
+ *  using NASA7 polynomials with 2 temperature ranges.
  *  Units of J/kg/K
  *
  *  Five coefficients \f$(a_0,\dots,a_4)\f$ are used to represent
@@ -48,14 +48,6 @@ namespace pokitt{
  * \f[
  * \frac{c_v(T)}{R} = -1 + a_0 + a_1 T + a_2 T^2 + a_3 T^3 + a_4 T^4
  * \f]
- *
- * Shomate:
- *
- * \f[
- * \frac{c_v(T)}{1000} = \frac{-R}{1000} + a_0 + a_1 t + a_2 t^2 + a_3 t^3 + \frac{a_4}{t^2}
- * \f]
- *
- * Where \f[ t = T (K)/1000 \f]
  *
  * The heat capacity is a weighted average of the pure species \f$ c_v^0(T)\f$,
  *
@@ -73,7 +65,6 @@ class HeatCapacity_Cv
   DECLARE_VECTOR_OF_FIELDS( FieldT, massFracs_ )
 
   const int nSpec_; // number of species
-  bool shomateFlag_; // true if any polynomial is shomate
   std::vector< ThermData > specThermVec_;
 
   std::ostringstream exceptionMsg_; // generic exception to be thrown
@@ -112,7 +103,7 @@ public:
  *  \date May, 2014
  *
  *  \brief Calculates the constant volume heat capacity of a single species
- *  using either NASA7 or Shomate polynomials with 2 temperature ranges.
+ *  using NASA7 polynomials with 2 temperature ranges.
  *  Units of J/kg/K
  *
  *  Five coefficients \f$(a_0,\dots,a_4)\f$ are used to represent
@@ -123,15 +114,6 @@ public:
  * \f[
  * \frac{c_v(T)}{R} = a_0 + a_1 T + a_2 T^2 + a_3 T^3 + a_4 T^4
  * \f]
- *
- * Shomate:
- *
- * \f[
- * \frac{c_v(T)}{1000} = a_0 + a_1 t + a_2 t^2 + a_3 t^3 + \frac{a_4}{t^2}
- * \f]
- *
- * Where \f[ t = T (K)/1000 \f]
- *
  */
 
 template< typename FieldT >
@@ -183,7 +165,6 @@ HeatCapacity_Cv<FieldT>::
 HeatCapacity_Cv( const Expr::Tag& tTag,
                  const Expr::TagList& massFracTags )
   : Expr::Expression<FieldT>(),
-    shomateFlag_( false ),
     nSpec_( CanteraObjects::number_species() )
 {
   this->set_gpu_runnable( true );
@@ -212,23 +193,6 @@ HeatCapacity_Cv( const Expr::Tag& tTag,
       for( std::vector<double>::iterator ic = c.begin() + 1; ic!=c.end(); ++ic)
         *ic *= gasConstant / molecularWeights[n]; // dimensionalize the coefficients to mass basis
       break;
-    case SHOMATE_POLY:
-      shomateFlag_ = true;
-      c[1] -= gasConstant * 1e-3; //change coefficients from isobaric to isometric
-      c[8] -= gasConstant * 1e-3;
-      for( std::vector<double>::iterator ic = c.begin() + 1; ic!=c.end(); ++ic ){
-        *ic *= 1e3 / molecularWeights[n]; // scale the coefficients to keep units consistent on mass basis
-      }
-      //Shomate polynomial uses T/1000 so we multiply coefficients by 1e-3 to avoid division
-      c[ 2] *= 1e-3;
-      c[ 9] *= 1e-3;
-      c[ 3] *= 1e-6;
-      c[10] *= 1e-6;
-      c[ 4] *= 1e-9;
-      c[11] *= 1e-9;
-      c[ 5] *= 1e6;
-      c[12] *= 1e6;
-      break;
     default: {
       std::ostringstream msg;
       msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_.str();
@@ -252,11 +216,6 @@ evaluate()
 
   const FieldT& temp = t_->field_ref();
 
-  SpatFldPtr<FieldT> recipRecipT;      // may be used for Shomate polynomial
-  if( shomateFlag_ ) {
-    recipRecipT = SpatialFieldStore::get<FieldT>(temp);
-    *recipRecipT <<= 1 / ( temp * temp );
-  }
 # ifndef ENABLE_CUDA
   const double maxTval = field_max_interior(temp);
   const double minTval = field_min_interior(temp);
@@ -282,11 +241,7 @@ evaluate()
          * If the temperature is out of range, the value is set to the value at the min or max temp
          */
         cv <<= cv + yi * cond( temp <= c[0] , c[8] + temp * ( c[9] + temp * ( c[10] + temp * ( c[11] + temp * c[12] ))) )  // if low temp
-                             (                c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * ( c[ 4] + temp * c[ 5] ))) );  // else if high temp
-        break;
-      case SHOMATE_POLY:
-        cv <<= cv + yi * cond( temp <= c[0] , c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * c[ 4])) + c[ 5] * *recipRecipT )  // if low temp
-                             (                c[8] + temp * ( c[9] + temp * ( c[10] + temp * c[11])) + c[12] * *recipRecipT );  // else if high temp
+                             (                c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * ( c[ 4] + temp * c[ 5] ))) ); // else if high temp
         break;
       default: {
         std::ostringstream msg;
@@ -310,12 +265,6 @@ evaluate()
                              ( temp >  c[0] && temp <= maxT, c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * ( c[ 4] + temp * c[ 5] ))) )  // else if high temp
                              ( temp < minT,                  c[8] + minT * ( c[9] + minT * ( c[10] + minT * ( c[11] + minT * c[12] ))) )  // else if out of bounds - low
                              (                               c[1] + maxT * ( c[2] + maxT * ( c[ 3] + maxT * ( c[ 4] + maxT * c[ 5] ))) ); // else out of bounds - high
-        break;
-      case SHOMATE_POLY:
-        cv <<= cv + yi * cond( temp <= c[0] && temp >= minT, c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * c[ 4])) + c[ 5] * *recipRecipT )  // if low temp
-                             ( temp >  c[0] && temp <= maxT, c[8] + temp * ( c[9] + temp * ( c[10] + temp * c[11])) + c[12] * *recipRecipT )  // else if high temp
-                             ( temp < minT,                  c[1] + minT * ( c[2] + minT * ( c[ 3] + minT * c[ 4])) + c[ 5] / (minT*minT)  )  // else if out of bounds - low
-                             (                               c[8] + maxT * ( c[9] + maxT * ( c[10] + maxT * c[11])) + c[12] / (maxT*maxT)  ); // else out of bounds - high
         break;
       default: {
         std::ostringstream msg;
@@ -370,6 +319,7 @@ SpeciesHeatCapacity_Cv( const Expr::Tag& tTag,
   const double molecularWeight = molecularWeights[n];
   const double gasConstant = CanteraObjects::gas_constant();
   std::vector<double>& c = specTherm_.coefficients;
+  BOOST_FOREACH( const double x, c ) std::cout << x << std::endl;
   switch ( specTherm_.type ) {
   case CONST_POLY:
     c[3] -= gasConstant; // change coefficients from isobaric to isometric
@@ -381,22 +331,6 @@ SpeciesHeatCapacity_Cv( const Expr::Tag& tTag,
     for( std::vector<double>::iterator ic = c.begin() + 1; ic!=c.end(); ++ic){
       *ic *= gasConstant / molecularWeight; // dimensionalize the coefficients to mass basis
     }
-    break;
-  case SHOMATE_POLY:
-    c[1] -= gasConstant * 1e-3; // change coefficients from isobaric to isometric
-    c[8] -= gasConstant * 1e-3;
-    for( std::vector<double>::iterator ic = c.begin() + 1; ic!=c.end(); ++ic ){
-      *ic *= 1e3 / molecularWeight; // scale the coefficients to keep units consistent on mass basis
-    }
-    //Shomate polynomial uses T/1000 so we multiply coefficients by 1e-3 to avoid division
-    c[ 2] *= 1e-3;
-    c[ 9] *= 1e-3;
-    c[ 3] *= 1e-6;
-    c[10] *= 1e-6;
-    c[ 4] *= 1e-9;
-    c[11] *= 1e-9;
-    c[ 5] *= 1e6;
-    c[12] *= 1e6;
     break;
   default: {
     std::ostringstream msg;
@@ -434,12 +368,6 @@ evaluate()
                ( temp >  c[0] && temp <= maxT, c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * ( c[ 4] + temp * c[ 5] ))) )  // else if high temp
                ( temp < minT,                  c[8] + minT * ( c[9] + minT * ( c[10] + minT * ( c[11] + minT * c[12] ))) )  // else if out of bounds - low
                (                               c[1] + maxT * ( c[2] + maxT * ( c[ 3] + maxT * ( c[ 4] + maxT * c[ 5] ))) ); // else out of bounds - high
-    break;
-  case SHOMATE_POLY:
-    cv <<= cond( temp <= c[0] && temp >= minT, c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * c[ 4])) + c[ 5] / ( temp * temp ) )  // if low temp
-               ( temp >  c[0] && temp <= maxT, c[8] + temp * ( c[9] + temp * ( c[10] + temp * c[11])) + c[12] / ( temp * temp ) )  // else if high temp
-               ( temp < minT,                  c[1] + minT * ( c[2] + minT * ( c[ 3] + minT * c[ 4])) + c[ 5] / ( minT * minT ) )  // else if out of bounds - low
-               (                               c[8] + maxT * ( c[9] + maxT * ( c[10] + maxT * c[11])) + c[12] / ( maxT * maxT ) ); // else out of bounds - high
     break;
   default: {
     std::ostringstream msg;

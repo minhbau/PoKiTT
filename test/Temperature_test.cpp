@@ -206,7 +206,7 @@ bool driver( const bool timings,
     initFactory.register_expression(        new MassFracs    ( yiTags, xTag )                   );
     initFactory.register_expression(        new Pressure     ( pTag, gasMix->pressure() )       );
     initFactory.register_expression(        new MixMolWeight ( mmwTag, yiTags )                 );
-    initFactory.register_expression(        new Temperature  ( tInputTag ,xTag, 1000, 500 )     );
+    initFactory.register_expression(        new Temperature  ( tInputTag ,xTag, 1500, 1000 )    );
     vID = initFactory.register_expression(  new SpecVol      ( nuTag, tInputTag, pTag, mmwTag ) );
     tID = initFactory.register_expression(  new TPerturbation( tTag, tInputTag, 1.1, -50 )      );
     switch( energyType ){

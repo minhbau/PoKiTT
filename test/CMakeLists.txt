@@ -29,15 +29,9 @@ target_link_libraries( mixfrac_test pokitt )
 
 add_test( NAME thermo_test_const         COMMAND thermo_test       --xml-input-file=poly_tester.xml --phase=const         )
 add_test( NAME thermo_test_nasa          COMMAND thermo_test       --xml-input-file=poly_tester.xml --phase=nasa          )
-add_test( NAME thermo_test_shomate       COMMAND thermo_test       --xml-input-file=poly_tester.xml --phase=shomate       )
-
-add_test( NAME thermo_test_mix_nas_sho   COMMAND thermo_test --mix --xml-input-file=poly_tester.xml --phase=nasa_shomate  )
 add_test( NAME thermo_test_mix_nas_con   COMMAND thermo_test --mix --xml-input-file=poly_tester.xml --phase=nasa_const    )
-add_test( NAME thermo_test_mix_sho_con   COMMAND thermo_test --mix --xml-input-file=poly_tester.xml --phase=shomate_const )
 
-add_test( NAME temperature_test_nas_sho  COMMAND temperature_test  --xml-input-file=poly_tester.xml --phase=nasa_shomate  )
 add_test( NAME temperature_test_nas_con  COMMAND temperature_test  --xml-input-file=poly_tester.xml --phase=nasa_const    )
-add_test( NAME temperature_test_sho_con  COMMAND temperature_test  --xml-input-file=poly_tester.xml --phase=shomate_const )
 
 add_test( NAME idealgas_test_h2          COMMAND idealgas_test     --xml-input-file=h2o2.xml     )
 add_test( NAME rxn_test_h2_1atm          COMMAND rxn_test          --xml-input-file=h2o2.xml --pressure=101325 )

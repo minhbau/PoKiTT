@@ -294,7 +294,7 @@ bool driver( const bool timings,
 
     initFactory.register_expression(       new XCoord       ( xTag )                  );
     yID = initFactory.register_expression( new MassFracs    ( yiTags, xTag )          );
-    tID = initFactory.register_expression( new Temperature  ( tTag ,xTag, 1000, 500 ) );
+    tID = initFactory.register_expression( new Temperature  ( tTag ,xTag, 1500, 1000 ) );
     initIDs.insert( tID );
     initIDs.insert( yID );
   }
@@ -464,14 +464,10 @@ int main( int iarg, char* carg[] )
     CanteraObjects::setup_cantera( setup );
 
     TestHelper status( !timings );
-    if( args.count( "disable-cp" ) < 1 )
-      status( driver(  timings, pokittReps, canteraReps, mix, CP   ), thermo_name(CP  ) );
-    if( args.count( "disable-cv" ) < 1 )
-      status( driver(  timings, pokittReps, canteraReps, mix, CV   ), thermo_name(CV  ) );
-    if( args.count( "disable-h" ) < 1 )
-      status( driver(  timings, pokittReps, canteraReps, mix, ENTH ), thermo_name(ENTH) );
-    if( args.count( "disable-e" ) < 1 )
-      status( driver(  timings, pokittReps, canteraReps, mix, E    ), thermo_name(E   ) );
+    if( args.count( "disable-cp" ) < 1 )  status( driver(  timings, pokittReps, canteraReps, mix, CP   ), thermo_name(CP  ) );
+    if( args.count( "disable-cv" ) < 1 )  status( driver(  timings, pokittReps, canteraReps, mix, CV   ), thermo_name(CV  ) );
+    if( args.count( "disable-h"  ) < 1 )  status( driver(  timings, pokittReps, canteraReps, mix, ENTH ), thermo_name(ENTH) );
+    if( args.count( "disable-e"  ) < 1 )  status( driver(  timings, pokittReps, canteraReps, mix, E    ), thermo_name(E   ) );
 
     if( status.ok() ){
       std::cout << "\nPASS\n";
