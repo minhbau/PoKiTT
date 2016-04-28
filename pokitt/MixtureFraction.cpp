@@ -14,9 +14,9 @@ namespace PoKiTT{
 
 //====================================================================
 
-void mole_to_mass( const vector<double> & molWt,
-                   vector<double> & moleFrac,
-                   vector<double> & massFrac )
+void mole_to_mass( const std::vector<double> & molWt,
+                   std::vector<double> & moleFrac,
+                   std::vector<double> & massFrac )
 {
   const int ns = (int)moleFrac.size();
         
@@ -31,9 +31,9 @@ void mole_to_mass( const vector<double> & molWt,
     massFrac[n] = moleFrac[n] * molWt[n] / mixMW;
 }
 //--------------------------------------------------------------------
-void mass_to_mole( const vector<double> & molWt,
-                   vector<double> & massFrac,
-                   vector<double> & moleFrac )
+void mass_to_mole( const std::vector<double> & molWt,
+                   std::vector<double> & massFrac,
+                   std::vector<double> & moleFrac )
 {
   const int ns = (int)moleFrac.size();
         
@@ -55,8 +55,8 @@ void mass_to_mole( const vector<double> & molWt,
 //====================================================================
 //====================================================================
 
-MixtureFraction::MixtureFraction( const vector<double> & oxidFrac,
-                                  const vector<double> & fuelFrac,
+MixtureFraction::MixtureFraction( const std::vector<double> & oxidFrac,
+                                  const std::vector<double> & fuelFrac,
                                   const bool inputMassFrac )
 {
   Cantera::IdealGasMix* gas = CanteraObjects::get_gasmix();
@@ -67,8 +67,8 @@ MixtureFraction::MixtureFraction( const vector<double> & oxidFrac,
 //--------------------------------------------------------------------
 
 MixtureFraction::MixtureFraction( Cantera::IdealGasMix& gas,
-                                  const vector<double> & oxidFrac,
-                                  const vector<double> & fuelFrac,
+                                  const std::vector<double> & oxidFrac,
+                                  const std::vector<double> & fuelFrac,
                                   const bool inputMassFrac )
 {
   initialize( gas, oxidFrac, fuelFrac, inputMassFrac );
@@ -83,8 +83,8 @@ MixtureFraction::~MixtureFraction()
 
 void
 MixtureFraction::initialize( Cantera::IdealGasMix& gas,
-                             const vector<double> & oxid,
-                             const vector<double> & fuel,
+                             const std::vector<double> & oxid,
+                             const std::vector<double> & fuel,
                              const bool massFrac )
 {
   nelem_ = gas.nElements();
@@ -163,7 +163,7 @@ MixtureFraction::initialize( Cantera::IdealGasMix& gas,
 //--------------------------------------------------------------------
 
 void
-MixtureFraction::species_to_mixfrac( const vector<double> & species,
+MixtureFraction::species_to_mixfrac( const std::vector<double> & species,
                                      double & mixFrac )
 {
   assert( ready_ );
@@ -183,7 +183,7 @@ MixtureFraction::species_to_mixfrac( const vector<double> & species,
 
 void
 MixtureFraction::mixfrac_to_species( const double mixFrac,
-                                     vector<double> & species ) const
+                                     std::vector<double> & species ) const
 {
   assert( ready_ );
   //  if( mixFrac < 0.0 || mixFrac > 1.0 ) cout << mixFrac << endl;
@@ -237,7 +237,7 @@ MixtureFraction::set_gammas( const Cantera::IdealGasMix& gas )
 //--------------------------------------------------------------------
 
 double
-MixtureFraction::compute_beta( const vector<double> & massFrac )
+MixtureFraction::compute_beta( const std::vector<double> & massFrac )
 {
   compute_elem_mass_frac( massFrac, elemMassFr_ );
   double beta = 0.0;
@@ -291,7 +291,7 @@ MixtureFraction::equiv_ratio_to_mixfrac( const double eqrat ) const
 
 void
 MixtureFraction::estimate_product_comp( const double mixFrac,
-                                        vector<double> & massFrac,
+                                        std::vector<double> & massFrac,
                                         const bool calcMassFrac ) const
 {
   if( mixFrac > stoichMixfrac_ ){  // fuel in excess

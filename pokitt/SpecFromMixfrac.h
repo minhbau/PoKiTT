@@ -56,7 +56,9 @@ public:
   public:
     /**
      *  @brief Build a SpecFromMixfrac expression
-     *  @param resultTag the tag for the value that this expression computes
+     *  @param resultTag the tag for the species that this expression computes
+     *  @param mixfrTag the tag for the mixture fraction
+     *  @param nghost the number of ghost cells present
      */
     Builder( const Expr::Tag& resultTag,
              const Expr::Tag& mixfrTag,

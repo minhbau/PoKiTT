@@ -102,6 +102,8 @@ public:
      *  @param massFracTags tag for the mass fraction of each species, ordering is consistent with Cantera input file
      *  @param enthTag tag for the enthalpy of the mixture
      *  @param tol     tolerance for the non-linear solve
+     *  @param maxTemp the maximum allowable temperature
+     *  @param maxIterations the maximum iteration count
      *  @param nghost number of ghost cells
      */
     Builder( const Expr::Tag& resultTag,
@@ -195,6 +197,8 @@ public:
      *  @param e0Tag tag for the total energy of the mixture
      *  @param keTag tag for kinetic energy of the mixture
      *  @param tol   tolerance for the non-linear solve
+     *  @param maxTemp the maximum allowable temperature
+     *  @param maxIterations the maximum iteration count
      *  @param nghost number of ghost cells
      */
     Builder( const Expr::Tag& resultTag,

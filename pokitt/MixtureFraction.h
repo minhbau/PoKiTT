@@ -74,9 +74,6 @@ public:
   /** Constructor
    *  @brief Construct a mixture fraction object
    *
-   *  @param specProps : Cantera object which provides information such as
-   *                     molecular and elemental weights, species atomic
-   *                     composition, etc.
    *  @param oxidFrac  : vector of oxidizer mass or mole fractions
    *  @param fuelFrac  : vector of   fuel   mass or mole fractions
    *  @param inputMassFrac : flag set to true if MASS fractions are provided.
@@ -85,6 +82,16 @@ public:
                    const std::vector<double> & fuelFrac,
                    const bool inputMassFrac );
 
+  /** Constructor
+   *  @brief Construct a mixture fraction object
+   *
+   *  @param gas       : Cantera object which provides information such as
+   *                     molecular and elemental weights, species atomic
+   *                     composition, etc.
+   *  @param oxidFrac  : vector of oxidizer mass or mole fractions
+   *  @param fuelFrac  : vector of   fuel   mass or mole fractions
+   *  @param inputMassFrac : flag set to true if MASS fractions are provided.
+   */
   MixtureFraction( Cantera::IdealGasMix& gas,
                    const std::vector<double> & oxidFrac,
                    const std::vector<double> & fuelFrac,
@@ -111,6 +118,9 @@ public:
                 
   /**
    *  @brief Initialize everything.
+   *  @param gas  : Cantera object which provides information such as
+   *                molecular and elemental weights, species atomic
+   *                composition, etc.
    *  @param oxid : Oxidizer composition vector
    *  @param fuel : Fuel composition vector
    *  @param massFrac : true if composition is in mass fractions,
@@ -222,6 +232,7 @@ public:
   /**
    *  @brief Compute equivalence ratio from mixture fraction - vectorized version
    *  @param mixFrac : The mixture fraction
+   *  @param eqRat   : The equivalence ratio
    */
   template<typename T1, typename T2>
   inline void mixfrac_to_equiv_ratio( const T1& mixFrac, T2& eqRat ) const
