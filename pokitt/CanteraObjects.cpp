@@ -351,6 +351,7 @@ CanteraObjects::extract_thermo_data()
   for( int i = 0; i != numSpecies_; ++i ){
     thermDataMap_.insert( std::pair< int, ThermData >( i, ThermData( spThermo, i ) ) );
     speciesNames_.insert( std::pair< int, std::string>( i, gas->speciesName(i) ) );
+    speciesIndices_.insert( std::pair< std::string, int>( gas->speciesName(i), i ) );
   }
 }
 
@@ -504,6 +505,25 @@ CanteraObjects::species_name( const int i )
     msg << "Error in " __FILE__ << " : " << __LINE__ << std::endl
         <<" species_name called for a species that doesn't exist " << std::endl
         <<" Species # "<< i << std::endl;
+    throw std::runtime_error( msg.str() );
+  }
+}
+
+//--------------------------------------------------------------------
+
+const int
+CanteraObjects::species_index( const std::string& name )
+{
+  CanteraMutex lock;
+  CanteraObjects& co = CanteraObjects::self();
+  assert( co.hasBeenSetup_ );
+  if( co.speciesIndices_.find(name) != co.speciesIndices_.end() )
+    return co.speciesIndices_.find(name)->second;
+  else{
+    std::ostringstream msg;
+    msg << "Error in " __FILE__ << " : " << __LINE__ << std::endl
+        <<" species_index called for a species that doesn't exist " << std::endl
+        <<" Species name "<< name << std::endl;
     throw std::runtime_error( msg.str() );
   }
 }

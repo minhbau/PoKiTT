@@ -131,6 +131,7 @@ public:
   static const std::vector< double >& molecular_weights();
 
   static const std::string& species_name( const int i );
+  static const int species_index( const std::string& name );
   static const ThermData& species_thermo( const int i );
   static const RxnData& rxn_data( const int r );
 
@@ -157,6 +158,7 @@ private:
   std::vector< double > molecularWeights_;
 
   std::map< int, std::string > speciesNames_;
+  std::map< std::string, int > speciesIndices_;
   std::map< int, ThermData > thermDataMap_;
   std::map< int, RxnData > rxnDataMap_;
   TransportCoefsT diffusionCoefs_;
