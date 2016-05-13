@@ -130,8 +130,8 @@ public:
   static int number_rxns();
   static const std::vector< double >& molecular_weights();
 
-  static const std::string& species_name( const int i );
-  static const int species_index( const std::string& name );
+  static std::string species_name( const int i );
+  static int species_index( const std::string& name );
   static const ThermData& species_thermo( const int i );
   static const RxnData& rxn_data( const int r );
 
