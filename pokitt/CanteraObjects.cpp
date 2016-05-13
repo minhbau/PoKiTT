@@ -351,6 +351,7 @@ CanteraObjects::extract_thermo_data()
   for( int i = 0; i != numSpecies_; ++i ){
     thermDataMap_.insert( std::pair< int, ThermData >( i, ThermData( spThermo, i ) ) );
     speciesNames_.insert( std::pair< int, std::string>( i, gas->speciesName(i) ) );
+    speciesIndices_.insert( std::pair< std::string, int>( gas->speciesName(i), i ) );
   }
 }
 
@@ -439,8 +440,7 @@ CanteraObjects::get_transport()
 double
 CanteraObjects::gas_constant()
 {
-  CanteraMutex lock;
-  CanteraObjects& co = CanteraObjects::self();
+  const CanteraObjects& co = CanteraObjects::self();
   assert( co.hasBeenSetup_ );
   return co.gasConstant_;
 }
@@ -450,6 +450,7 @@ CanteraObjects::gas_constant()
 double
 CanteraObjects::reference_pressure()
 {
+  CanteraMutex lock;
   Cantera::IdealGasMix* thermo = CanteraObjects::get_gasmix();
   const double rp = thermo->refPressure();
   CanteraObjects::restore_gasmix(thermo);
@@ -461,8 +462,7 @@ CanteraObjects::reference_pressure()
 int
 CanteraObjects::number_species()
 {
-  CanteraMutex lock;
-  CanteraObjects& co = CanteraObjects::self();
+  const CanteraObjects& co = CanteraObjects::self();
   assert( co.hasBeenSetup_ );
   return co.numSpecies_;
 }
@@ -472,8 +472,7 @@ CanteraObjects::number_species()
 int
 CanteraObjects::number_rxns()
 {
-  CanteraMutex lock;
-  CanteraObjects& co = CanteraObjects::self();
+  const CanteraObjects& co = CanteraObjects::self();
   assert( co.hasBeenSetup_ );
   return co.numRxns_;
 }
@@ -483,27 +482,43 @@ CanteraObjects::number_rxns()
 const std::vector<double>&
 CanteraObjects::molecular_weights()
 {
-  CanteraMutex lock;
-  CanteraObjects& co = CanteraObjects::self();
+  const CanteraObjects& co = CanteraObjects::self();
   assert( co.hasBeenSetup_ );
   return co.molecularWeights_;
 }
 
 //--------------------------------------------------------------------
 
-const std::string&
+std::string
 CanteraObjects::species_name( const int i )
 {
-  CanteraMutex lock;
-  CanteraObjects& co = CanteraObjects::self();
+  const CanteraObjects& co = CanteraObjects::self();
   assert( co.hasBeenSetup_ );
   if( co.speciesNames_.find(i) != co.speciesNames_.end() )
     return co.speciesNames_.find(i)->second;
   else{
     std::ostringstream msg;
     msg << "Error in " __FILE__ << " : " << __LINE__ << std::endl
-        <<" species_name called for a species that doesn't exist " << std::endl
-        <<" Species # "<< i << std::endl;
+        << " species_name called for a species that doesn't exist " << std::endl
+        << " Species # "<< i << std::endl;
+    throw std::runtime_error( msg.str() );
+  }
+}
+
+//--------------------------------------------------------------------
+
+int
+CanteraObjects::species_index( const std::string& name )
+{
+  const CanteraObjects& co = CanteraObjects::self();
+  assert( co.hasBeenSetup_ );
+  if( co.speciesIndices_.find(name) != co.speciesIndices_.end() )
+    return co.speciesIndices_.find(name)->second;
+  else{
+    std::ostringstream msg;
+    msg << "Error in " __FILE__ << " : " << __LINE__ << std::endl
+        << " species_index called for a species that doesn't exist " << std::endl
+        << " Species name "<< name << std::endl;
     throw std::runtime_error( msg.str() );
   }
 }
@@ -513,8 +528,7 @@ CanteraObjects::species_name( const int i )
 const ThermData&
 CanteraObjects::species_thermo( const int i )
 {
-  CanteraMutex lock;
-  CanteraObjects& co = CanteraObjects::self();
+  const CanteraObjects& co = CanteraObjects::self();
   assert( co.hasBeenSetup_ );
   if( co.thermDataMap_.find(i) != co.thermDataMap_.end() )
     return co.thermDataMap_.find(i)->second;
@@ -532,8 +546,7 @@ CanteraObjects::species_thermo( const int i )
 const RxnData&
 CanteraObjects::rxn_data( const int r )
 {
-  CanteraMutex lock;
-  CanteraObjects& co = CanteraObjects::self();
+  const CanteraObjects& co = CanteraObjects::self();
   assert( co.hasBeenSetup_ );
   if( co.rxnDataMap_.find(r) != co.rxnDataMap_.end() )
     return co.rxnDataMap_.find(r)->second;
@@ -551,8 +564,7 @@ CanteraObjects::rxn_data( const int r )
 const std::vector< std::vector< double > >&
 CanteraObjects::diffusion_coefs()
 {
-  CanteraMutex lock;
-  CanteraObjects& co = CanteraObjects::self();
+  const CanteraObjects& co = CanteraObjects::self();
   assert( co.hasBeenSetup_ );
   return co.diffusionCoefs_;
 }
@@ -562,8 +574,7 @@ CanteraObjects::diffusion_coefs()
 const std::vector< std::vector< double > >&
 CanteraObjects::viscosity_coefs()
 {
-  CanteraMutex lock;
-  CanteraObjects& co = CanteraObjects::self();
+  const CanteraObjects& co = CanteraObjects::self();
   assert( co.hasBeenSetup_ );
   return co.viscosityCoefs_;
 }
@@ -573,8 +584,7 @@ CanteraObjects::viscosity_coefs()
 const std::vector< std::vector< double > >&
 CanteraObjects::thermal_cond_coefs()
 {
-  CanteraMutex lock;
-  CanteraObjects& co = CanteraObjects::self();
+  const CanteraObjects& co = CanteraObjects::self();
   assert( co.hasBeenSetup_ );
   return co.thermalCondCoefs_;
 }
@@ -584,8 +594,7 @@ CanteraObjects::thermal_cond_coefs()
 const std::string&
 CanteraObjects::phase_name()
 {
-  CanteraMutex lock;
-  CanteraObjects& co = CanteraObjects::self();
+  const CanteraObjects& co = CanteraObjects::self();
   assert( co.hasBeenSetup_ );
   return co.phaseName_;
 }
