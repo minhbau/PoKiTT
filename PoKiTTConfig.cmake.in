@@ -20,3 +20,7 @@ set( PoKiTT_LIBS pokitt @TPL_LIBRARIES@ )
 find_package( ExprLib PATHS @ExprLib_DIR@ )
 
 include( @CMAKE_INSTALL_PREFIX@/lib/pokitt/PoKiTT.cmake )
+
+# Information for downstream builds that need specific locations for cantera
+set( Cantera_INCLUDE_DIR @Cantera_INCLUDE_DIR@ )
+set( Cantera_LIBRARIES @Cantera_LIBRARIES@ )
