@@ -28,7 +28,7 @@
 #include "TagManager.h"
 #include "MassFractions.h"
 #include "SpeciesRHS.h"
-#include "SpeciesDiffusion.h"
+#include <pokitt/transport/SpeciesDiffusion.h>
 #include <pokitt/thermo/Pressure.h>
 #include <pokitt/thermo/Density.h>
 #include <pokitt/MixtureMolWeight.h>
