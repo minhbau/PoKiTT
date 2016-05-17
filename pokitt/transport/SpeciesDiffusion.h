@@ -28,6 +28,7 @@
 #include <expression/Expression.h>
 #include <spatialops/OperatorDatabase.h>
 
+namespace pokitt{
 
 /**
  *  \class  SpeciesDiffFlux
@@ -216,5 +217,7 @@ SpeciesDiffFlux<FluxT>::Builder::build() const
 {
   return new SpeciesDiffFlux<FluxT>( yiTags_, densTag_, mmwTag_, diffCoeffTags_ );
 }
+
+} // namespace pokitt
 
 #endif
