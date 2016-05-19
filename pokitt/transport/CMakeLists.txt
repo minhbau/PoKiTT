@@ -1,5 +1,6 @@
 install( FILES
   DiffusionCoeffMix.h
+  HeatFlux.h
   SpeciesDiffusion.h
   ThermalCondMix.h
   ViscosityMix.h

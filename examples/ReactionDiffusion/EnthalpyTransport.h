@@ -27,7 +27,7 @@
 
 #include "TagManager.h"
 #include "EnthalpyRHS.h"
-#include "HeatFlux.h"
+#include <pokitt/transport/HeatFlux.h>
 #include <pokitt/transport/ThermalCondMix.h>
 #include <pokitt/thermo/Enthalpy.h>
 #include <pokitt/thermo/Temperature.h>
@@ -92,10 +92,10 @@ EnthalpyTransport( Expr::ExpressionFactory& execFactory,
   typedef typename HeatFlux           <YFluxT>::Builder HeatFluxY;
   typedef typename EnthalpyRHS        <FieldT>::Builder EnthalpyRHS;
 
-  execFactory.register_expression( new Temperature    ( tagMgr_[T],   tagMgr_[YI_N], tagMgr_[H]                              ) );
-  execFactory.register_expression( new ThermCond      ( tagMgr_[LAM], tagMgr_[T],    tagMgr_[YI_N], tagMgr_[MMW]               ) );
-  execFactory.register_expression( new HeatFluxX      ( tagMgr_[QX],  tagMgr_[T],    tagMgr_[LAM],  tagMgr_[H_N], tagMgr_[JX_N] ) );
-  execFactory.register_expression( new HeatFluxY      ( tagMgr_[QY],  tagMgr_[T],    tagMgr_[LAM],  tagMgr_[H_N], tagMgr_[JY_N] ) );
+  execFactory.register_expression( new Temperature( tagMgr_[T],   tagMgr_[YI_N], tagMgr_[H]                                 ) );
+  execFactory.register_expression( new ThermCond  ( tagMgr_[LAM], tagMgr_[T],    tagMgr_[YI_N], tagMgr_[MMW]                ) );
+  execFactory.register_expression( new HeatFluxX  ( tagMgr_[QX],  tagMgr_[T],    tagMgr_[LAM],  tagMgr_[H_N], tagMgr_[JX_N] ) );
+  execFactory.register_expression( new HeatFluxY  ( tagMgr_[QY],  tagMgr_[T],    tagMgr_[LAM],  tagMgr_[H_N], tagMgr_[JY_N] ) );
   for( size_t n = 0; n < tagMgr_[H_N].size(); ++n ){
     execFactory.register_expression( new SpecEnthalpy ( tagMgr_[H_N][n], tagMgr_[T], n ) );
   }
