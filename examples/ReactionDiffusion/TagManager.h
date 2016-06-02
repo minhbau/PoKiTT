@@ -99,26 +99,25 @@ public:
               const Expr::Tag& j,
               const Expr::Tag& q,
               const Expr::Tag& x,
-              const Expr::Tag& y ):
-                rhoYi_(rhoYi),
-                h_(h),
-                yi_(yi),
-                t_(t),
-                p_(p),
-                rho_(rho),
-                mmw_(mmw),
-                r_(r),
-                lam_(lam),
-                d_(d),
-                j_(j),
-                q_(q),
-                x_(x),
-                y_(y),
-                qx_( Expr::Tag( q, "x" ) ),
-                qy_( Expr::Tag( q, "y" ) ),
-                empty_( Expr::Tag() ),
-                emptyList_( Expr::tag_list( Expr::Tag() ) )
-
+              const Expr::Tag& y )
+  : rhoYi_(rhoYi),
+    h_(h),
+    yi_(yi),
+    t_(t),
+    p_(p),
+    rho_(rho),
+    mmw_(mmw),
+    r_(r),
+    lam_(lam),
+    d_(d),
+    j_(j),
+    q_(q),
+    x_(x),
+    y_(y),
+    qx_( Expr::Tag( q, "x" ) ),
+    qy_( Expr::Tag( q, "y" ) ),
+    empty_( Expr::Tag() ),
+    emptyList_( Expr::tag_list( Expr::Tag() ) )
   {
     using Expr::Tag;
     for( size_t n=0; n<nSpec; ++n ){

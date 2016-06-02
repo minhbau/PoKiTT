@@ -152,12 +152,12 @@ bool driver( const bool timings,
       Tag( "temp",      Expr::STATE_NONE ), // T
       Tag( "pressure",  Expr::STATE_NONE ), // P
       Tag( "density",   Expr::STATE_NONE ), // RHO
-      Tag( "mixMW ",   Expr::STATE_NONE ), // MMW
+      Tag( "mixMW ",    Expr::STATE_NONE ), // MMW
       Tag( "r",         Expr::STATE_NONE ), // R
       Tag( "lambda",    Expr::STATE_NONE ), // LAM
       Tag( "D",         Expr::STATE_NONE ), // D
       Tag( "J",         Expr::STATE_NONE ), // J
-      Tag( "heatFlux", Expr::STATE_NONE ), // Q
+      Tag( "heatFlux",  Expr::STATE_NONE ), // Q
       Tag( "XCoord",    Expr::STATE_NONE ), // XCOORD
       Tag( "YCoord",    Expr::STATE_NONE ) // YCOORD
   );

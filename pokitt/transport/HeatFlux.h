@@ -28,6 +28,8 @@
 #include <expression/Expression.h>
 #include <spatialops/OperatorDatabase.h>
 
+namespace pokitt{
+
 /**
  *  @class HeatFlux
  *  @brief Calculates (one component of) the heat flux,
@@ -176,5 +178,7 @@ HeatFlux<FluxT>::evaluate()
 }
 
 //====================================================================
+
+} // namespace pokitt
 
 #endif
