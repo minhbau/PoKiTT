@@ -82,6 +82,7 @@ public:
      *  @param densTag mass density
      *  @param mmwTag mixture molecular weight
      *  @param diffCoeffTags diffusion coefficients
+     *  @param nghost [optional] the number of ghost cells to compute on
      */
     Builder( const Expr::TagList& fluxes,
              const Expr::TagList& massFracs,

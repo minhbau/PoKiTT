@@ -59,6 +59,7 @@ public:
      *  @param tCondTag thermal conductivity
      *  @param hTags species enthalpies
      *  @param massFluxTags mass flux of each species
+     *  @param nghost [optional] the number of ghost cells to compute on
      *
      *  Note: this can also be used without species transport by simply
      *  passing in empty TagList for hTags and massFluxTags.

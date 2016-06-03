@@ -132,6 +132,7 @@ namespace pokitt{
        *  @param resultTag tag for the mixture internal energy
        *  @param tTag tag for temperature
        *  @param massFracTags tags for the mass fractions: must be consistent with Cantera
+       *  @param velTags tags for the velocity components
        */
       Builder( const Expr::Tag& resultTag,
                const Expr::Tag& tTag,
@@ -141,7 +142,9 @@ namespace pokitt{
         tTag_( tTag ),
         massFracTags_( massFracTags ),
         velTags_( velTags )
-      {}
+      {
+        assert( velTags.size() <= 3 );
+      }
       Expr::ExpressionBase* build() const{
         return new TotalInternalEnergy<FieldT>( tTag_, massFracTags_, velTags_ );
       }
