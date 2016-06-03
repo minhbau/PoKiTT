@@ -288,9 +288,9 @@ bool driver( const bool timings,
   Expr::ExpressionID tID; // perturbed temperature
   Expr::ExpressionID yID; // mass fractions
   {
-    typedef Expr::PlaceHolder     <CellField>::Builder XCoord;
-    typedef       LinearMassFracs <CellField>::Builder MassFracs;
-    typedef Expr::LinearFunction  <CellField>::Builder Temperature;
+    typedef Expr::PlaceHolder    <CellField>::Builder XCoord;
+    typedef       LinearMassFracs<CellField>::Builder MassFracs;
+    typedef Expr::LinearFunction <CellField>::Builder Temperature;
 
     initFactory.register_expression(       new XCoord       ( xTag )                  );
     yID = initFactory.register_expression( new MassFracs    ( yiTags, xTag )          );
@@ -302,8 +302,8 @@ bool driver( const bool timings,
   Expr::ExpressionFactory execFactory;
   std::set<Expr::ExpressionID> execIDs;
   {
-    typedef Expr::PlaceHolder      <CellField>::Builder MassFracs;
-    typedef Expr::PlaceHolder      <CellField>::Builder Temperature;
+    typedef Expr::PlaceHolder<CellField>::Builder MassFracs;
+    typedef Expr::PlaceHolder<CellField>::Builder Temperature;
 
     execFactory.register_expression( new MassFracs   ( yiTags ) );
     execFactory.register_expression( new Temperature ( tTag   ) );

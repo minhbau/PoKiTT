@@ -31,67 +31,141 @@
 
 namespace pokitt{
 
-/**
- *  \class  InternalEnergy
- *  \author Nathan Yonkee
- *  \date February, 2015
- *
- *  \brief Calculates the internal energy of a mixture
- *  using NASA7 polynomials with 2 temperature ranges.
- *  Units of J/kg
- *
- *  Five coefficients \f$(a_0,\dots,a_4)\f$ are used to represent
- * \f$ e^0(T)\f$ as a polynomial in \f$ T \f$ e.g. NASA7:
- *
- * \f[
- * \frac{e^0(T)}{R} = a_0 T + (a_1-1) T^2/2 + a_2 T^3/3 + a_3 T^4/4 + a_4 T^5/5 + a_5
- * \f]
- *
- * The InternalEnergy is a weighted average of the pure species \f$ e^0(T)\f$,
- *
- * \f[
- * e(T) = \sum_{n=0}^{nSpec} y_n e^0_n
- * \f]
- */
+  /**
+   *  \class  InternalEnergy
+   *  \author Nathan Yonkee
+   *  \date February, 2015
+   *
+   *  \brief Calculates the internal energy of a mixture
+   *  using NASA7 polynomials with 2 temperature ranges.
+   *  Units of J/kg
+   *
+   *  Five coefficients \f$(a_0,\dots,a_4)\f$ are used to represent
+   * \f$ e^0(T)\f$ as a polynomial in \f$ T \f$ e.g. NASA7:
+   *
+   * \f[
+   * \frac{e^0(T)}{R} = a_0 T + (a_1-1) T^2/2 + a_2 T^3/3 + a_3 T^4/4 + a_4 T^5/5 + a_5
+   * \f]
+   *
+   * The InternalEnergy is a weighted average of the pure species \f$ e^0(T)\f$,
+   *
+   * \f[
+   * e(T) = \sum_{n=0}^{nSpec} y_n e^0_n
+   * \f]
+   */
 
-template< typename FieldT >
-class InternalEnergy
-    : public Expr::Expression<FieldT>
-{
-  DECLARE_FIELD( FieldT, t_ )
-  DECLARE_VECTOR_OF_FIELDS( FieldT, massFracs_ )
-
-  const int nSpec_; // number of species
-  std::vector< ThermData > specThermVec_;
-
-  std::ostringstream exceptionMsg_; // generic exception to be thrown
-
-  InternalEnergy( const Expr::Tag& tTag,
-                  const Expr::TagList& massFracTags );
-public:
-  class Builder : public Expr::ExpressionBuilder
+  template< typename FieldT >
+  class InternalEnergy : public Expr::Expression<FieldT>
   {
+  protected:
+    DECLARE_FIELD( FieldT, t_ )
+    DECLARE_VECTOR_OF_FIELDS( FieldT, massFracs_ )
+
+    const int nSpec_; // number of species
+    std::vector< ThermData > specThermVec_;
+
+    std::ostringstream exceptionMsg_; // generic exception to be thrown
+
+    InternalEnergy( const Expr::Tag& tTag,
+                    const Expr::TagList& massFracTags );
   public:
-    /**
-     *  @brief Build a InternalEnergy expression
-     *  @param resultTag tag for the mixture internal energy
-     *  @param tTag tag for temperature
-     *  @param massFracTags tags for the mass fractions: must be consistent with Cantera
-     */
-    Builder( const Expr::Tag& resultTag,
-             const Expr::Tag& tTag,
-             const Expr::TagList& massFracTags );
+    class Builder : public Expr::ExpressionBuilder
+    {
+      const Expr::Tag tTag_;
+      const Expr::TagList massFracTags_;
+    public:
+      /**
+       *  @brief Build a InternalEnergy expression
+       *  @param resultTag tag for the mixture internal energy
+       *  @param tTag tag for temperature
+       *  @param massFracTags tags for the mass fractions: must be consistent with Cantera
+       */
+      Builder( const Expr::Tag& resultTag,
+               const Expr::Tag& tTag,
+               const Expr::TagList& massFracTags )
+      : ExpressionBuilder( resultTag ),
+        tTag_( tTag ),
+        massFracTags_( massFracTags )
+      {}
 
-    Expr::ExpressionBase* build() const;
+      Expr::ExpressionBase* build() const{
+        return new InternalEnergy<FieldT>( tTag_, massFracTags_ );
+      }
+    };
 
-  private:
-    const Expr::Tag tTag_;
-    const Expr::TagList massFracTags_;
+    virtual ~InternalEnergy(){}
+    void evaluate();
   };
 
-  ~InternalEnergy(){}
-  void evaluate();
-};
+  /**
+   *  \class  TotalInternalEnergy
+   *  \author James Sutherland
+   *  \date June, 2016
+   *
+   *  \brief Calculates the total internal energy of a mixture, units of J/kg
+   *
+   * The total internal energy is:
+   * \f[
+   *   e_0 = \frac{\mathbf{u}\cdot\mathbf{u}}{2} + e = \frac{\mathbf{u}\cdot\mathbf{u}}{2} - \frac{p}{\rho} + h.
+   * \f]
+   */
+  template< typename FieldT >
+  class TotalInternalEnergy : public InternalEnergy<FieldT>
+  {
+    DECLARE_VECTOR_OF_FIELDS( FieldT, velocity_ )
+
+    TotalInternalEnergy( const Expr::Tag& tTag,
+                         const Expr::TagList& massFracTags,
+                         const Expr::TagList& velTags )
+    : InternalEnergy<FieldT>( tTag, massFracTags )
+    {
+      this->template create_field_vector_request<FieldT>( velTags, velocity_ );
+    }
+  public:
+    class Builder : public Expr::ExpressionBuilder
+    {
+      const Expr::Tag tTag_;
+      const Expr::TagList massFracTags_, velTags_;
+    public:
+      /**
+       *  @brief Build a InternalEnergy expression
+       *  @param resultTag tag for the mixture internal energy
+       *  @param tTag tag for temperature
+       *  @param massFracTags tags for the mass fractions: must be consistent with Cantera
+       */
+      Builder( const Expr::Tag& resultTag,
+               const Expr::Tag& tTag,
+               const Expr::TagList& massFracTags,
+               const Expr::TagList& velTags )
+      : ExpressionBuilder( resultTag ),
+        tTag_( tTag ),
+        massFracTags_( massFracTags ),
+        velTags_( velTags )
+      {}
+      Expr::ExpressionBase* build() const{
+        return new TotalInternalEnergy<FieldT>( tTag_, massFracTags_, velTags_ );
+      }
+    };
+
+    ~TotalInternalEnergy(){}
+    void evaluate()
+    {
+      InternalEnergy<FieldT>::evaluate();
+      FieldT& e0 = this->value();
+      if( velocity_.size() == 3 ){
+        const FieldT& u = velocity_[0]->field_ref();
+        const FieldT& v = velocity_[1]->field_ref();
+        const FieldT& w = velocity_[2]->field_ref();
+        e0 <<= e0 + 0.5*( u*u + v*v + w*w );
+      }
+      else{
+        for( size_t i=0; i<velocity_.size(); ++i ){
+          const FieldT& vel = velocity_[i]->field_ref();
+          e0 <<= e0 + 0.5*vel*vel;
+        }
+      }
+    }
+  };
 
 /**
  *  \class  SpeciesInternalEnergy
@@ -126,6 +200,8 @@ class SpeciesInternalEnergy
 public:
   class Builder : public Expr::ExpressionBuilder
   {
+    const Expr::Tag tTag_;
+    const int n_;
   public:
     /**
      *  @brief Build a SpeciesInternalEnergy expression
@@ -135,15 +211,16 @@ public:
      */
     Builder( const Expr::Tag& resultTag,
              const Expr::Tag& tTag,
-             const int n);
+             const int n )
+    : ExpressionBuilder( resultTag ),
+      tTag_( tTag ),
+      n_( n )
+    {}
 
-    Expr::ExpressionBase* build() const;
-
-  private:
-    const Expr::Tag tTag_;
-    const int n_;
+    Expr::ExpressionBase* build() const{
+      return new SpeciesInternalEnergy<FieldT>( tTag_, n_ );
+    }
   };
-
   ~SpeciesInternalEnergy(){}
   void evaluate();
 };
@@ -277,27 +354,6 @@ evaluate()
     }
   }
 }
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-InternalEnergy<FieldT>::
-Builder::Builder( const Expr::Tag& resultTag,
-                  const Expr::Tag& tTag,
-                  const Expr::TagList& massFracTags )
-: ExpressionBuilder( resultTag ),
-  tTag_( tTag ),
-  massFracTags_( massFracTags )
-{}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-Expr::ExpressionBase*
-InternalEnergy<FieldT>::
-Builder::build() const
-{
-  return new InternalEnergy<FieldT>( tTag_, massFracTags_ );
-}
 
 //--------------------------------------------------------------------
 
@@ -386,26 +442,6 @@ evaluate()
 }
 
 //--------------------------------------------------------------------
-
-template< typename FieldT >
-SpeciesInternalEnergy<FieldT>::
-Builder::Builder( const Expr::Tag& resultTag,
-                  const Expr::Tag& tTag,
-                  const int n )
-  : ExpressionBuilder( resultTag ),
-    tTag_( tTag ),
-    n_( n )
-{}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-Expr::ExpressionBase*
-SpeciesInternalEnergy<FieldT>::
-Builder::build() const
-{
-  return new SpeciesInternalEnergy<FieldT>( tTag_, n_ );
-}
 
 } // namespace pokitt
 
