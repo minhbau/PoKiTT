@@ -343,7 +343,7 @@ evaluate()
             << __FILE__ << " : " << __LINE__ << std::endl;
         throw std::runtime_error( msg.str() );
     }
-    if( isnan( nebo_sum_interior( temp ) ) ){
+    if( std::isnan( nebo_sum_interior( temp ) ) ){
       std::ostringstream msg;
         msg << std::endl
             << "Error in pokitt::Temperature::evaluate()." << std::endl
@@ -468,7 +468,7 @@ find_bad_points( std::ostringstream& msg, const FieldT& badField, const double b
     for( int y = 1; y <= mw.extent(1); ++y ){
       for( int x = 1; x <= mw.extent(0); ++x, ++iField ){
         if( checkNaN ){
-          if( isnan( *iField ) ){
+          if( std::isnan( *iField ) ){
             ++badPoints;
             if( badPoints < 6 )
               msg << "Value = " << *iField << " at [x,y,z] = [" << x << "," <<  y << "," << z << "]" << std::endl;
@@ -660,7 +660,7 @@ evaluate()
           << __FILE__ << " : " << __LINE__ << std::endl;
       throw std::runtime_error( msg.str() );
     }
-    if( isnan( nebo_sum( temp ) ) ){
+    if( std::isnan( nebo_sum( temp ) ) ){
       std::ostringstream msg;
       msg << std::endl
           << "Error in pokitt::TemperatureFromE0::evaluate()." << std::endl
@@ -776,7 +776,7 @@ TemperatureFromE0<FieldT>::
 find_bad_points( std::ostringstream& msg, const FieldT& badField, const double badValue, const bool checkBelow )
 {
   bool checkNaN = false;
-  if( isnan( badValue ) ) checkNaN = true;
+  if( std::isnan( badValue ) ) checkNaN = true;
   typename FieldT::const_iterator iField = badField.begin();
   const SpatialOps::MemoryWindow mw = badField.window_with_ghost();
   int badPoints = 0;
@@ -787,7 +787,7 @@ find_bad_points( std::ostringstream& msg, const FieldT& badField, const double b
     for( int y = 1; y <= mw.extent(1); ++y ){
       for( int x = 1; x <= mw.extent(0); ++x, ++iField ){
         if( checkNaN ){
-          if( isnan( *iField ) ){
+          if( std::isnan( *iField ) ){
             ++badPoints;
             if( badPoints < 6 )
               msg << "Value = " << *iField << " at [x,y,z] = [" << x << "," <<  y << "," << z << "]" << std::endl;
