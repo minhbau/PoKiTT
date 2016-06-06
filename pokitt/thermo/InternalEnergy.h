@@ -112,14 +112,20 @@ namespace pokitt{
   template< typename FieldT >
   class TotalInternalEnergy : public InternalEnergy<FieldT>
   {
-    DECLARE_VECTOR_OF_FIELDS( FieldT, velocity_ )
+    const bool doX_, doY_, doZ_;
+    DECLARE_FIELDS( FieldT, u_, v_, w_ )
 
     TotalInternalEnergy( const Expr::Tag& tTag,
                          const Expr::TagList& massFracTags,
                          const Expr::TagList& velTags )
-    : InternalEnergy<FieldT>( tTag, massFracTags )
+    : InternalEnergy<FieldT>( tTag, massFracTags ),
+      doX_( velTags[0] != Expr::Tag() ),
+      doY_( velTags[1] != Expr::Tag() ),
+      doZ_( velTags[2] != Expr::Tag() )
     {
-      this->template create_field_vector_request<FieldT>( velTags, velocity_ );
+      if( doX_ )  u_ = this->template create_field_request<FieldT>(velTags[0]);
+      if( doY_ )  v_ = this->template create_field_request<FieldT>(velTags[1]);
+      if( doZ_ )  w_ = this->template create_field_request<FieldT>(velTags[2]);
     }
   public:
     class Builder : public Expr::ExpressionBuilder
@@ -132,7 +138,9 @@ namespace pokitt{
        *  @param resultTag tag for the mixture internal energy
        *  @param tTag tag for temperature
        *  @param massFracTags tags for the mass fractions: must be consistent with Cantera
-       *  @param velTags tags for the velocity components
+       *  @param velTags tags for the velocity components.  Must be length (3),
+       *         but can drop dimensionality by specifying empty tags for
+       *         inactive components of velocity.
        */
       Builder( const Expr::Tag& resultTag,
                const Expr::Tag& tTag,
@@ -155,15 +163,23 @@ namespace pokitt{
     {
       InternalEnergy<FieldT>::evaluate();
       FieldT& e0 = this->value();
-      if( velocity_.size() == 3 ){
-        const FieldT& u = velocity_[0]->field_ref();
-        const FieldT& v = velocity_[1]->field_ref();
-        const FieldT& w = velocity_[2]->field_ref();
+      if( doX_ && doY_ && doZ_ ){
+        const FieldT& u = u_->field_ref();
+        const FieldT& v = v_->field_ref();
+        const FieldT& w = w_->field_ref();
         e0 <<= e0 + 0.5*( u*u + v*v + w*w );
       }
       else{
-        for( size_t i=0; i<velocity_.size(); ++i ){
-          const FieldT& vel = velocity_[i]->field_ref();
+        if( doX_ ){
+          const FieldT& vel = u_->field_ref();
+          e0 <<= e0 + 0.5*vel*vel;
+        }
+        if( doY_ ){
+          const FieldT& vel = v_->field_ref();
+          e0 <<= e0 + 0.5*vel*vel;
+        }
+        if( doZ_ ){
+          const FieldT& vel = w_->field_ref();
           e0 <<= e0 + 0.5*vel*vel;
         }
       }
