@@ -74,6 +74,8 @@ public:
 
   class Builder : public Expr::ExpressionBuilder
   {
+    const Expr::Tag densTag_, mmwTag_;
+    const Expr::TagList yiTags_, diffCoeffTags_;
   public:
     /**
      *  @brief Build a SpeciesDiffFlux expression
@@ -89,12 +91,19 @@ public:
              const Expr::Tag& densTag,
              const Expr::Tag& mmwTag,
              const Expr::TagList& diffCoeffTags,
-             const int nghost = DEFAULT_NUMBER_OF_GHOSTS );
+             const int nghost = DEFAULT_NUMBER_OF_GHOSTS )
+    : ExpressionBuilder(fluxes, nghost),
+      densTag_ ( densTag ),
+      yiTags_( massFracs    ),
+      mmwTag_(mmwTag),
+      diffCoeffTags_(diffCoeffTags)
+    {}
+
     ~Builder(){}
-    Expr::ExpressionBase* build() const;
-  private:
-    const Expr::Tag densTag_, mmwTag_;
-    const Expr::TagList yiTags_, diffCoeffTags_;
+
+    Expr::ExpressionBase* build() const{
+      return new SpeciesDiffFlux<FluxT>( yiTags_, densTag_, mmwTag_, diffCoeffTags_ );
+    }
   };
 
   void evaluate();
@@ -165,7 +174,6 @@ SpeciesDiffFlux<FluxT>::evaluate()
   const ScalarT& density = density_->field_ref();
   const ScalarT& mmw     = mmw_    ->field_ref();
 
-
   ScalarPtrT molConc = SpatialFieldStore::get<ScalarT>( density );
   *molConc <<= density / mmw;
 
@@ -194,30 +202,6 @@ SpeciesDiffFlux<FluxT>::evaluate()
 
 
 //====================================================================
-
-
-//--------------------------------------------------------------------
-template<typename FluxT>
-SpeciesDiffFlux<FluxT>::Builder::
-Builder( const Expr::TagList& result,
-         const Expr::TagList& massFracs,
-         const Expr::Tag& densTag,
-         const Expr::Tag& mmwTag,
-         const Expr::TagList& diffCoeffTags,
-         const int nghost )
-: ExpressionBuilder(result, nghost),
-  densTag_ ( densTag ),
-  yiTags_( massFracs    ),
-  mmwTag_(mmwTag),
-  diffCoeffTags_(diffCoeffTags)
-{}
-//--------------------------------------------------------------------
-template<typename FluxT>
-Expr::ExpressionBase*
-SpeciesDiffFlux<FluxT>::Builder::build() const
-{
-  return new SpeciesDiffFlux<FluxT>( yiTags_, densTag_, mmwTag_, diffCoeffTags_ );
-}
 
 } // namespace pokitt
 

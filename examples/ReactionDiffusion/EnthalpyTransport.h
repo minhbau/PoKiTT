@@ -92,7 +92,8 @@ EnthalpyTransport( Expr::ExpressionFactory& execFactory,
   typedef typename HeatFlux           <YFluxT>::Builder HeatFluxY;
   typedef typename EnthalpyRHS        <FieldT>::Builder EnthalpyRHS;
 
-  execFactory.register_expression( new Temperature( tagMgr_[T],   tagMgr_[YI_N], tagMgr_[H]                                 ) );
+  const Expr::Tag emptyTag;
+  execFactory.register_expression( new Temperature( tagMgr_[T],   tagMgr_[YI_N], tagMgr_[H],    emptyTag                                 ) );
   execFactory.register_expression( new ThermCond  ( tagMgr_[LAM], tagMgr_[T],    tagMgr_[YI_N], tagMgr_[MMW]                ) );
   execFactory.register_expression( new HeatFluxX  ( tagMgr_[QX],  tagMgr_[T],    tagMgr_[LAM],  tagMgr_[H_N], tagMgr_[JX_N] ) );
   execFactory.register_expression( new HeatFluxY  ( tagMgr_[QY],  tagMgr_[T],    tagMgr_[LAM],  tagMgr_[H_N], tagMgr_[JY_N] ) );

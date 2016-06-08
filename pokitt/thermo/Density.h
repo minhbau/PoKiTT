@@ -64,10 +64,10 @@ public:
   public:
     /**
      *  @brief Build a Density expression
-     *  @param resultTag tag for the density
-     *  @param tTag tag for temperature
-     *  @param pTag tag for pressure
-     *  @param mmwTag tag for mixture molecular weight
+     *  @param resultTag tag for the density  (kg/m^3)
+     *  @param tTag tag for temperature (K)
+     *  @param pTag tag for pressure (Pa)
+     *  @param mmwTag tag for mixture molecular weight (kg/kmol)
      *  @param nghost number of ghost cells
      */
     Builder( const Expr::Tag& resultTag,

@@ -63,7 +63,6 @@ namespace pokitt{
 
     const int nSpec_; // number of species
     std::vector< ThermData > specThermVec_;
-
     std::ostringstream exceptionMsg_; // generic exception to be thrown
 
     InternalEnergy( const Expr::Tag& tTag,
@@ -286,14 +285,14 @@ InternalEnergy( const Expr::Tag& tTag,
       for( std::vector<double>::iterator ic = c.begin() + 1; ic!=c.end(); ++ic){
         *ic *= gasConstant / molecularWeights[n]; // dimensionalize the coefficients to mass basis
       }
-      c[ 2] /= 2;
-      c[ 3] /= 3;
-      c[ 4] /= 4;
-      c[ 5] /= 5;
-      c[ 9] /= 2;
-      c[10] /= 3;
-      c[11] /= 4;
-      c[12] /= 5;
+      c[ 2] /= 2.0;
+      c[ 3] /= 3.0;
+      c[ 4] /= 4.0;
+      c[ 5] /= 5.0;
+      c[ 9] /= 2.0;
+      c[10] /= 3.0;
+      c[11] /= 4.0;
+      c[12] /= 5.0;
       break;
     default: {
       std::ostringstream msg;

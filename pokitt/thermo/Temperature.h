@@ -73,7 +73,7 @@ class Temperature
   const Expr::Tag enthTag_;
   const Expr::TagList massFracTags_;
 
-  DECLARE_FIELD( FieldT, enth_ )
+  DECLARE_FIELDS( FieldT, enth_, tguess_ )
   DECLARE_VECTOR_OF_FIELDS( FieldT, massFracs_ )
 
   std::vector< ThermData > specThermVec_;
@@ -88,6 +88,7 @@ class Temperature
 
   Temperature( const Expr::TagList& massFracTags,
                const Expr::Tag& enthTag,
+               const Expr::Tag& temperatureGuessTag,
                const double tol,
                const double maxTemp,
                const int maxIterations);
@@ -95,12 +96,19 @@ public:
 
   class Builder : public Expr::ExpressionBuilder
   {
+    const Expr::Tag enthTag_, tempGuessTag_;
+    const Expr::TagList massFracTags_;
+    const double tol_, maxTemp_;
+    const int maxIterations_;
   public:
     /**
      *  @brief Build a Temperature expression
      *  @param resultTag the tag for the temperature of the mixture
      *  @param massFracTags tag for the mass fraction of each species, ordering is consistent with Cantera input file
      *  @param enthTag tag for the enthalpy of the mixture
+     *  @param temperatureGuessTag if supplied, this field will be used as the
+     *         guess for temperature.  If empty, we assume that the result field
+     *         is pre-populated with the guess value.
      *  @param tol     tolerance for the non-linear solve
      *  @param maxTemp the maximum allowable temperature
      *  @param maxIterations the maximum iteration count
@@ -109,18 +117,24 @@ public:
     Builder( const Expr::Tag& resultTag,
              const Expr::TagList& massFracTags,
              const Expr::Tag& enthTag,
+             const Expr::Tag& temperatureGuessTag,
              const double tol = 1e-3,
              const double maxTemp = 5000,
              const int maxIterations = 20,
-             const int nghost = DEFAULT_NUMBER_OF_GHOSTS );
+             const int nghost = DEFAULT_NUMBER_OF_GHOSTS )
+    : ExpressionBuilder( resultTag, nghost ),
+      massFracTags_( massFracTags ),
+      enthTag_( enthTag ),
+      tempGuessTag_( temperatureGuessTag ),
+      tol_( tol ),
+      maxTemp_( maxTemp ),
+      maxIterations_( maxIterations )
+    {}
 
-    Expr::ExpressionBase* build() const;
+    Expr::ExpressionBase* build() const{
+      return new Temperature<FieldT>( massFracTags_, enthTag_, tempGuessTag_, tol_, maxTemp_, maxIterations_ );
+    }
 
-  private:
-    const Expr::Tag enthTag_;
-    const Expr::TagList massFracTags_;
-    const double tol_, maxTemp_;
-    const int maxIterations_;
   };
 
   ~Temperature(){}
@@ -166,7 +180,7 @@ class TemperatureFromE0
 {
   typedef std::vector<FieldT*> SpecT;
 
-  DECLARE_FIELDS( FieldT, e0_, ke_ )
+  DECLARE_FIELDS( FieldT, e0_, ke_, tguess_ )
   DECLARE_VECTOR_OF_FIELDS( FieldT, massFracs_ )
 
   std::vector< ThermData > specThermVec_;
@@ -182,6 +196,7 @@ class TemperatureFromE0
   TemperatureFromE0( const Expr::TagList& massFracTags,
                      const Expr::Tag& e0Tag,
                      const Expr::Tag& keTag,
+                     const Expr::Tag& temperatureGuessTag,
                      const double tol,
                      const double maxTemp,
                      const int maxIterations );
@@ -189,6 +204,11 @@ public:
 
   class Builder : public Expr::ExpressionBuilder
   {
+    const Expr::Tag e0Tag_;
+    const Expr::TagList massFracTags_;
+    const Expr::Tag keTag_, tempGuessTag_;
+    const double tol_, maxTemp_;
+    const int maxIterations_;
   public:
     /**
      *  @brief Build a TemperatureFromE0 expression
@@ -196,6 +216,9 @@ public:
      *  @param massFracTags tag for the mass fraction of each species, ordering is consistent with Cantera input file
      *  @param e0Tag tag for the total energy of the mixture
      *  @param keTag tag for kinetic energy of the mixture
+     *  @param temperatureGuessTag if supplied, this field will be used as the
+     *         guess for temperature.  If empty, we assume that the result field
+     *         is pre-populated with the guess value.
      *  @param tol   tolerance for the non-linear solve
      *  @param maxTemp the maximum allowable temperature
      *  @param maxIterations the maximum iteration count
@@ -205,19 +228,25 @@ public:
              const Expr::TagList& massFracTags,
              const Expr::Tag& e0Tag,
              const Expr::Tag& keTag,
+             const Expr::Tag& temperatureGuessTag,
              const double tol = 1e-3,
              const double maxTemp = 5000,
              const int maxIterations = 20,
-             const int nghost = DEFAULT_NUMBER_OF_GHOSTS );
+             const int nghost = DEFAULT_NUMBER_OF_GHOSTS )
+    : ExpressionBuilder( resultTag, nghost ),
+      massFracTags_( massFracTags ),
+      e0Tag_( e0Tag ),
+      keTag_( keTag ),
+      tempGuessTag_( temperatureGuessTag ),
+      tol_( tol ),
+      maxTemp_( maxTemp ),
+      maxIterations_( maxIterations )
+    {}
 
-    Expr::ExpressionBase* build() const;
+    Expr::ExpressionBase* build() const{
+      return new TemperatureFromE0<FieldT>( massFracTags_, e0Tag_, keTag_, tempGuessTag_, tol_, maxTemp_, maxIterations_ );
+    }
 
-  private:
-    const Expr::Tag e0Tag_;
-    const Expr::TagList massFracTags_;
-    const Expr::Tag keTag_;
-    const double tol_, maxTemp_;
-    const int maxIterations_;
   };
 
   ~TemperatureFromE0(){}
@@ -235,6 +264,7 @@ template< typename FieldT >
 Temperature<FieldT>::
 Temperature( const Expr::TagList& massFracTags,
              const Expr::Tag& enthTag,
+             const Expr::Tag& temperatureGuessTag,
              const double tol,
              const double maxTemp,
              const int maxIterations )
@@ -251,6 +281,10 @@ Temperature( const Expr::TagList& massFracTags,
 
   enth_ = this->template create_field_request<FieldT>( enthTag );
   this->template create_field_vector_request<FieldT>( massFracTags, massFracs_ );
+
+  if( temperatureGuessTag != Expr::Tag() ){
+    tguess_ = this->template create_field_request<FieldT>( temperatureGuessTag );
+  }
 
   const std::vector<double>& molecularWeights = CanteraObjects::molecular_weights();
   const double gasConstant = CanteraObjects::gas_constant();
@@ -269,14 +303,14 @@ Temperature( const Expr::TagList& massFracTags,
       for( std::vector<double>::iterator ic = c.begin() + 1; ic!=c.end(); ++ic){
         *ic *= gasConstant / molecularWeights[n]; // dimensionalize the coefficients to mass basis
       }
-      cFrac[ 2] = c[ 2] / 2;
-      cFrac[ 3] = c[ 3] / 3;
-      cFrac[ 4] = c[ 4] / 4;
-      cFrac[ 5] = c[ 5] / 5;
-      cFrac[ 9] = c[ 9] / 2;
-      cFrac[10] = c[10] / 3;
-      cFrac[11] = c[11] / 4;
-      cFrac[12] = c[12] / 5;
+      cFrac[ 2] = c[ 2] / 2.0;
+      cFrac[ 3] = c[ 3] / 3.0;
+      cFrac[ 4] = c[ 4] / 4.0;
+      cFrac[ 5] = c[ 5] / 5.0;
+      cFrac[ 9] = c[ 9] / 2.0;
+      cFrac[10] = c[10] / 3.0;
+      cFrac[11] = c[11] / 4.0;
+      cFrac[12] = c[12] / 5.0;
       break;
     default: {
       std::ostringstream msg;
@@ -298,6 +332,10 @@ evaluate()
 {
   using namespace SpatialOps;
   FieldT& temp = this->value();
+
+  if( tguess_ ){
+    temp <<= tguess_->field_ref();
+  }
 
   const FieldT& enth = enth_->field_ref();
 
@@ -507,36 +545,6 @@ find_bad_points( std::ostringstream& msg, const FieldT& badField, const double b
       << "A total of " << badPoints << " bad point(s) detected." << std::endl;
 }
 
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-Temperature<FieldT>::
-Builder::Builder( const Expr::Tag& resultTag,
-                  const Expr::TagList& massFracTags,
-                  const Expr::Tag& enthTag,
-                  const double tol,
-                  const double maxTemp,
-                  const int maxIterations,
-                  const int nghost )
-: ExpressionBuilder( resultTag, nghost ),
-  massFracTags_( massFracTags ),
-  enthTag_( enthTag ),
-  tol_( tol ),
-  maxTemp_( maxTemp ),
-  maxIterations_( maxIterations )
-{}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-Expr::ExpressionBase*
-Temperature<FieldT>::
-Builder::build() const
-{
-  return new Temperature<FieldT>( massFracTags_, enthTag_, tol_, maxTemp_, maxIterations_ );
-}
-
 //--------------------------------------------------------------------
 
 template< typename FieldT >
@@ -544,6 +552,7 @@ TemperatureFromE0<FieldT>::
 TemperatureFromE0( const Expr::TagList& massFracTags,
                    const Expr::Tag& e0Tag,
                    const Expr::Tag& keTag,
+                   const Expr::Tag& temperatureGuessTag,
                    const double tol,
                    const double maxTemp,
                    const int maxIterations )
@@ -561,6 +570,10 @@ TemperatureFromE0( const Expr::TagList& massFracTags,
   e0_ = this->template create_field_request<FieldT>( e0Tag );
   ke_ = this->template create_field_request<FieldT>( keTag );
   this->template create_field_vector_request<FieldT>( massFracTags, massFracs_ );
+
+  if( temperatureGuessTag != Expr::Tag() ){
+    tguess_ = this->template create_field_request<FieldT>( temperatureGuessTag );
+  }
 
   const std::vector<double>& molecularWeights = CanteraObjects::molecular_weights();
   const double gasConstant = CanteraObjects::gas_constant();
@@ -614,6 +627,9 @@ evaluate()
   using namespace SpatialOps;
   FieldT& temp = this->value();
 
+  if( tguess_ ){
+    temp <<= tguess_->field_ref();
+  }
   const FieldT& e0 = e0_->field_ref();
   const FieldT& ke = ke_->field_ref();
 
@@ -630,6 +646,7 @@ evaluate()
 
   bool isConverged = false;
   int iterations = 0;
+  delE0 <<= e0 - ke;
   while( !isConverged ){
     delE0 <<= e0 - ke;
     dE0dT <<= 0.0;
@@ -827,35 +844,6 @@ find_bad_points( std::ostringstream& msg, const FieldT& badField, const double b
 }
 
 //--------------------------------------------------------------------
-
-template< typename FieldT >
-TemperatureFromE0<FieldT>::
-Builder::Builder( const Expr::Tag& resultTag,
-                  const Expr::TagList& massFracTags,
-                  const Expr::Tag& e0Tag,
-                  const Expr::Tag& keTag,
-                  const double tol,
-                  const double maxTemp,
-                  const int maxIterations,
-                  const int nghost )
-: ExpressionBuilder( resultTag, nghost ),
-  massFracTags_( massFracTags ),
-  e0Tag_( e0Tag ),
-  keTag_( keTag ),
-  tol_( tol ),
-  maxTemp_( maxTemp ),
-  maxIterations_( maxIterations )
-{}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-Expr::ExpressionBase*
-TemperatureFromE0<FieldT>::
-Builder::build() const
-{
-  return new TemperatureFromE0<FieldT>( massFracTags_, e0Tag_, keTag_, tol_, maxTemp_, maxIterations_ );
-}
 
 } // namespace pokitt
 

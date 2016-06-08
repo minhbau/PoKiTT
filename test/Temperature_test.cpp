@@ -236,11 +236,11 @@ bool driver( const bool timings,
     execFactory.register_expression( new Energy    ( energyTag ) );
     switch( energyType ){
     case H:
-      execID = execFactory.register_expression( new Temperature ( tTag, yiTags, energyTag ) );
+      execID = execFactory.register_expression( new Temperature ( tTag, yiTags, energyTag, Expr::Tag() ) );
       break;
     case E0:
-      execFactory.register_expression(          new KineticEnergy (keTag )                         );
-      execID = execFactory.register_expression( new TemperatureE0 (tTag, yiTags, energyTag, keTag) );
+      execFactory.register_expression( new KineticEnergy( keTag ) );
+      execID = execFactory.register_expression( new TemperatureE0(tTag, yiTags, energyTag, keTag, Expr::Tag() ) );
       break;
     }
   }
