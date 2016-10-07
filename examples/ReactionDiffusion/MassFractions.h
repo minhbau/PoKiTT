@@ -113,7 +113,7 @@ evaluate()
 {
   using namespace SpatialOps;
 
-  std::vector< FieldT* >& yi = this->get_value_vec();
+  typename Expr::Expression<FieldT>::ValVec& yi = this->get_value_vec();
 
   const FieldT& rho = rho_->field_ref();
 

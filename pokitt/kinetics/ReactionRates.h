@@ -146,7 +146,7 @@ template< typename FieldT >
 class ReactionRates
     : public Expr::Expression<FieldT>
 {
-  typedef std::vector< FieldT* > SpecT;
+  typedef typename Expr::Expression<FieldT>::ValVec SpecT;
   typedef std::vector< RxnData::SpeciesRxnData > SpecDataVecT; // from CanteraObjects.h
 
   DECLARE_FIELDS( FieldT, t_, rho_, mmw_ )

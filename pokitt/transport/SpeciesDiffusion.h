@@ -67,7 +67,7 @@ class SpeciesDiffFlux : public Expr::Expression< FluxT >
 
 public:
 
-  typedef std::vector<FluxT*> SpecFluxT;
+  typedef typename Expr::Expression<FluxT>::ValVec SpecFluxT;
 
   typedef SpatialOps::SpatFldPtr<  FluxT> FluxPtrT;
   typedef SpatialOps::SpatFldPtr<ScalarT> ScalarPtrT;

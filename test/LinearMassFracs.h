@@ -98,7 +98,7 @@ void
 LinearMassFracs<FieldT>::
 evaluate()
 {
-  std::vector< FieldT* >& massFracs = this->get_value_vec();
+  typename Expr::Expression<FieldT>::ValVec& massFracs = this->get_value_vec();
 
   const FieldT& xCoord = xCoord_->field_ref();
   SpatialOps::SpatFldPtr<FieldT> sum = SpatialOps::SpatialFieldStore::get<FieldT>(xCoord);

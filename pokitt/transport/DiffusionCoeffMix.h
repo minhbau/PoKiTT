@@ -241,7 +241,7 @@ DiffusionCoeff<FieldT>::
 evaluate()
 {
   using namespace SpatialOps;
-  std::vector< FieldT* >& mixD = this->get_value_vec();
+  typename Expr::Expression<FieldT>::ValVec& mixD = this->get_value_vec();
 
   const FieldT& p    = p_          ->field_ref();
   const FieldT& temp = temperature_->field_ref();
@@ -364,7 +364,7 @@ DiffusionCoeffMol<FieldT>::
 evaluate()
 {
   using namespace SpatialOps;
-  std::vector< FieldT* >& mixD = this->get_value_vec();
+  typename Expr::Expression<FieldT>::ValVec& mixD = this->get_value_vec();
 
   const FieldT& p    = p_          ->field_ref();
   const FieldT& temp = temperature_->field_ref();

@@ -178,7 +178,7 @@ evaluate()
     inverseSum <<= inverseSum + yi / speciesTCond * molecularWeightsInv_[n];
   }
 
-  mixTCond <<= 0.5 * ( sum * mmw + 1 / (inverseSum * mmw) ); // mixing rule
+  mixTCond <<= 0.5 * ( sum * mmw + 1.0 / (inverseSum * mmw) ); // mixing rule
 }
 
 //--------------------------------------------------------------------

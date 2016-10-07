@@ -165,7 +165,7 @@ HeatFlux<FluxT>::evaluate()
   using namespace SpatialOps;
   FluxT& flux = this->value();
 
-  const ScalarT& t = t_->field_ref();
+  const ScalarT& t     = t_    ->field_ref();
   const ScalarT& tCond = tCond_->field_ref();
 
   flux <<= - (*interpOp_) ( tCond ) * (*gradOp_) ( t );
