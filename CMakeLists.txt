@@ -164,13 +164,20 @@ set( TPL_LIBRARIES ${TPL_LIBRARIES} exprlib )
 #----------------------------------- Cantera -----------------------------------
 #-------------------------------------------------------------------------------
 
-set( Cantera_BIN_DIR ${Cantera_DIR}/bin )
-set( Cantera_INCLUDE_DIR ${Cantera_DIR}/include )
-set( Cantera_LIBRARY ${Cantera_DIR}/lib )
-set( Cantera_LIBRARIES ${Cantera_LIBRARY}/libcantera.a )
-find_package( BLAS REQUIRED )
-message( STATUS "Cantera libraries at " ${Cantera_LIBRARY} )
+if( Cantera_DIR STREQUAL "" ) 
+  find_library( Cantera_LIBRARIES NAMES cantera HINTS /usr/local )
+  find_path( Cantera_INCLUDE_DIR NAMES IdealGasMix.h HINTS /usr/local PATH_SUFFIXES cantera )
+else()
+  find_library( Cantera_LIBRARIES NAMES cantera PATHS ${Cantera_DIR} NO_DEFAULT_PATH )
+  find_path( Cantera_INCLUDE_DIR NAMES IdealGasMix.h PATHS ${Cantera_DIR}/include NO_DEFAULT_PATH PATH_SUFFIXES cantera )
+  set( Cantera_INCLUDE_DIR ${Cantera_DIR}/include )
+  set( Cantera_LIBRARIES ${Cantera_DIR}/lib/libcantera.a )
+endif()
+message( STATUS "Cantera libraries at " ${Cantera_LIBRARIES} )
 message( STATUS "Cantera includes  at " ${Cantera_INCLUDE_DIR} )
+
+find_package( BLAS REQUIRED )
+
 set( TPL_LIBRARIES ${TPL_LIBRARIES} ${Cantera_LIBRARIES}  ${BLAS_LIBRARIES} )
 set( TPL_INCLUDES ${TPL_INCLUDES} ${Cantera_INCLUDE_DIR} )
 
