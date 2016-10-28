@@ -26,6 +26,8 @@
 #define CanteraObjects_h
 
 #include <queue>
+#include <vector>
+#include <map>
 #include <string>
 
 #include <boost/bimap.hpp>
@@ -131,6 +133,7 @@ public:
   static const std::vector< double >& molecular_weights();
 
   static std::string species_name( const int i );
+  static const std::vector<std::string>& species_names();
   static int species_index( const std::string& name );
   static const ThermData& species_thermo( const int i );
   static const RxnData& rxn_data( const int r );
@@ -157,7 +160,7 @@ private:
   int numRxns_;
   std::vector< double > molecularWeights_;
 
-  std::map< int, std::string > speciesNames_;
+  std::vector< std::string > speciesNames_;
   std::map< std::string, int > speciesIndices_;
   std::map< int, ThermData > thermDataMap_;
   std::map< int, RxnData > rxnDataMap_;

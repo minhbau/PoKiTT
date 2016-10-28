@@ -347,10 +347,11 @@ CanteraObjects::extract_thermo_data()
   phaseName_ = gas->name();
   numSpecies_ = gas->nSpecies();
   molecularWeights_ = gas->molecularWeights();
+  speciesNames_.clear();
   const Cantera::SpeciesThermo& spThermo = gas->speciesThermo();
   for( int i = 0; i != numSpecies_; ++i ){
     thermDataMap_.insert( std::pair< int, ThermData >( i, ThermData( spThermo, i ) ) );
-    speciesNames_.insert( std::pair< int, std::string>( i, gas->speciesName(i) ) );
+    speciesNames_.push_back( gas->speciesName(i) );
     speciesIndices_.insert( std::pair< std::string, int>( gas->speciesName(i), i ) );
   }
 }
@@ -494,15 +495,24 @@ CanteraObjects::species_name( const int i )
 {
   const CanteraObjects& co = CanteraObjects::self();
   assert( co.hasBeenSetup_ );
-  if( co.speciesNames_.find(i) != co.speciesNames_.end() )
-    return co.speciesNames_.find(i)->second;
-  else{
+  if( i >= number_species() ){
     std::ostringstream msg;
     msg << "Error in " __FILE__ << " : " << __LINE__ << std::endl
-        << " species_name called for a species that doesn't exist " << std::endl
+        << " species_name() called for a species that doesn't exist " << std::endl
         << " Species # "<< i << std::endl;
     throw std::runtime_error( msg.str() );
   }
+  return co.speciesNames_[i];
+}
+
+//--------------------------------------------------------------------
+
+const std::vector<std::string>&
+CanteraObjects::species_names()
+{
+  const CanteraObjects& co = CanteraObjects::self();
+  assert( co.hasBeenSetup_ );
+  return co.speciesNames_;
 }
 
 //--------------------------------------------------------------------
