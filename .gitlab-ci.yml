@@ -1,0 +1,251 @@
+#----------------------------------------------------------
+# to help get the yaml right, see:
+#  https://software.crsim.utah.edu:8443/ci/lint
+#  http://yaml-online-parser.appspot.com/
+#----------------------------------------------------------
+
+#----------------------------------------------------------
+# Prerequisites & assumptions:
+#  - CMake and CTest are installed on all of the runners
+#  - modern C++ compilers are available
+#  - boost (and possibly cuda) installations are present
+#  - doxygen is installed
+#----------------------------------------------------------
+
+
+#--------------------------------------------------------------------
+#--------------------- Upstream library builds: ---------------------
+.clone_spatialops      : &clone_so   git clone https://software.crsim.utah.edu:8443/James_Research_Group/SpatialOps.git; cd SpatialOps; git reset --hard b2197579447241ead961aeb2906e542816a5b126; cd ..
+.clone_exprlib         : &clone_expr git clone https://software.crsim.utah.edu:8443/James_Research_Group/ExprLib.git;    cd ExprLib;    git reset --hard ff0a7bfa977bb6c4db7cb2eba09cb066bae36194; cd ..
+
+.conf_spatialops       : &conf_so        cmake ../SpatialOps -DCMAKE_BUILD_TYPE=Release -DENABLE_TESTS=OFF -DENABLE_EXAMPLES=OFF -DCMAKE_CXX_FLAGS=-fvisibility-inlines-hidden -DCMAKE_INSTALL_PREFIX=$CI_PROJECT_DIR/install 
+.conf_spatialops_thread: &conf_so_thread cmake ../SpatialOps -DCMAKE_BUILD_TYPE=Release -DENABLE_TESTS=OFF -DENABLE_EXAMPLES=OFF -DCMAKE_CXX_FLAGS=-fvisibility-inlines-hidden -DCMAKE_INSTALL_PREFIX=$CI_PROJECT_DIR/install -DENABLE_THREADS=ON -DNTHREADS=8
+.conf_spatialops_gpu   : &conf_so_gpu    cmake ../SpatialOps -DCMAKE_BUILD_TYPE=Release -DENABLE_TESTS=OFF -DENABLE_EXAMPLES=OFF -DCMAKE_CXX_FLAGS=-fvisibility-inlines-hidden -DCMAKE_INSTALL_PREFIX=$CI_PROJECT_DIR/install -DENABLE_CUDA=ON
+ 
+.conf_exprlib          : &conf_expr cmake ../ExprLib -DCMAKE_BUILD_TYPE=Release -DENABLE_OUTPUT=ON -DENABLE_TESTS=OFF -DSpatialOps_DIR=$CI_PROJECT_DIR/install/share -DCMAKE_INSTALL_PREFIX=$CI_PROJECT_DIR/install -DCMAKE_CXX_FLAGS=-fvisibility-inlines-hidden
+#--------------------- Upstream library builds: ---------------------
+#--------------------------------------------------------------------
+
+
+ 
+# define a few "stages" for the build.  Things within a stage can happen concurrently, but we synchronize between stages.
+stages:
+  - build_test
+  - docs
+  
+.conf-opt : &conf_opt  cmake .. -DBUILD_UPSTREAM_LIBS=OFF -DENABLE_EXAMPLES=ON -DENABLE_TESTS=ON -DExprLib_DIR=$CI_PROJECT_DIR/install/share -DCMAKE_CXX_FLAGS=-fvisibility-inlines-hidden -DCMAKE_BUILD_TYPE=Release
+.conf-dbg : &conf_dbg  cmake .. -DBUILD_UPSTREAM_LIBS=OFF -DENABLE_EXAMPLES=ON -DENABLE_TESTS=ON -DExprLib_DIR=$CI_PROJECT_DIR/install/share -DCMAKE_CXX_FLAGS=-fvisibility-inlines-hidden -DCMAKE_BUILD_TYPE=Debug
+.build_cmd: &build_cmd make  -j8
+.test_cmd : &test_cmd  ctest -j4
+
+  
+.build:linux: &build_linux
+  stage: build_test
+  tags:
+    - linux
+  artifacts:
+    name     : "BuildResults_$CI_BUILD_REF_NAME"
+    when     : always
+    expire_in: 10 days
+    paths    :
+    - build/Testing
+    
+    #expire_in: 6 hours
+    #untracked: true
+  
+.build:mac: &build_mac
+  <<: *build_linux
+  tags:
+    - mac
+    
+# define all of the unique builds that we will run
+build:linux:opt:
+  <<: *build_linux
+  script: 
+    - module load cmake
+    - mkdir build; cd build;
+    - *clone_so
+    - mkdir so; cd so
+    - *conf_so
+    - make -j8 install
+    - cd ..
+    - *clone_expr
+    - mkdir expr; cd expr
+    - *conf_expr
+    - make -j8 install
+    - cd ..
+    - rm -rf expr so ExprLib SpatialOps
+    - *conf_opt
+    - *build_cmd
+    - *test_cmd
+    
+build:linux:dbg:
+  <<: *build_linux
+  script: 
+    - module load cmake
+    - mkdir build; cd build;
+    - *clone_so
+    - mkdir so; cd so
+    - *conf_so
+    - make -j8 install
+    - cd ..
+    - *clone_expr
+    - mkdir expr; cd expr
+    - *conf_expr
+    - make -j8 install
+    - cd ..
+    - rm -rf expr so ExprLib SpatialOps
+    - *conf_dbg
+    - *build_cmd
+    - *test_cmd
+    
+build:linux:threaded:opt:
+  <<: *build_linux
+  script: 
+    - module load cmake
+    - mkdir build; cd build;
+    - *clone_so
+    - mkdir so; cd so
+    - *conf_so_thread
+    - make -j8 install
+    - cd ..
+    - *clone_expr
+    - mkdir expr; cd expr
+    - *conf_expr
+    - make -j8 install
+    - cd ..
+    - rm -rf expr so ExprLib SpatialOps
+    - *conf_opt
+    - *build_cmd
+    - *test_cmd
+    
+build:linux:threaded:dbg:
+  <<: *build_linux
+  script: 
+    - module load cmake
+    - mkdir build; cd build;
+    - *clone_so
+    - mkdir so; cd so
+    - *conf_so_thread
+    - make -j8 install
+    - cd ..
+    - *clone_expr
+    - mkdir expr; cd expr
+    - *conf_expr
+    - make -j8 install
+    - cd ..
+    - rm -rf expr so ExprLib SpatialOps
+    - *conf_dbg
+    - *build_cmd
+    - *test_cmd
+    
+build:linux:gpu:
+  <<: *build_linux
+  script: 
+    - module load cmake
+    - mkdir build; cd build;
+    - *clone_so
+    - mkdir so; cd so
+    - *conf_so_gpu
+    - make -j8 install
+    - cd ..
+    - *clone_expr
+    - mkdir expr; cd expr
+    - *conf_expr
+    - make -j8 install
+    - cd ..
+    - rm -rf expr so ExprLib SpatialOps
+    - *conf_opt
+    - *build_cmd
+    - *test_cmd
+
+build:mac:opt:
+  <<: *build_mac
+  script: 
+    - mkdir build; cd build;
+    - *clone_so
+    - mkdir so; cd so
+    - *conf_so
+    - make -j8 install
+    - cd ..
+    - *clone_expr
+    - mkdir expr; cd expr
+    - *conf_expr
+    - make -j8 install
+    - cd ..
+    - rm -rf expr so ExprLib SpatialOps
+    - *conf_opt
+    - *build_cmd
+    - *test_cmd
+    
+build:mac:dbg:
+  <<: *build_mac
+  script:
+    - mkdir build; cd build;
+    - *clone_so
+    - mkdir so; cd so
+    - *conf_so
+    - make -j8 install
+    - cd ..
+    - *clone_expr
+    - mkdir expr; cd expr
+    - *conf_expr
+    - make -j8 install
+    - cd ..
+    - rm -rf expr so ExprLib SpatialOps
+    - *conf_dbg
+    - *build_cmd
+    - *test_cmd
+
+##------------------------ TESTING --------------------
+#.test: &do_test
+#  stage: test
+#  script:
+#    - *test_cmd
+#  artifacts:
+#    name     : "TestResults_$CI_BUILD_REF_NAME"
+#    when     : on_failure
+#    expire_in: 10 days
+#    paths    :
+#    - build/Testing
+#
+#test:mac:dbg:
+#  dependencies:
+#    - build:mac:dbg
+#  <<: *do_test
+#test:mac:opt:
+#  dependencies:
+#    - build:mac:opt
+#  <<: *do_test
+#
+#test:linux:dbg:
+#  dependencies:
+#    - build:linux:dbg
+#  <<: *do_test
+#test:linux:opt:
+#  dependencies:
+#    - build:linux:opt
+#  <<: *do_test
+#  
+#test:linux:gpu:
+#  dependencies:
+#    - build:linux:gpu
+#  <<: *do_test
+#
+#test:linux:threaded:dbg:
+#  dependencies:
+#    - build:linux:threaded:dbg
+#  <<: *do_test
+#test:linux:threaded:opt:
+#  dependencies:
+#    - build:linux:threaded:opt
+#  <<: *do_test
+  
+#------------------------ Doxygen -------------------------
+doxygen:
+  stage     : docs
+  script    : doxygen Doxyfile
+  artifacts :
+    expire_in: 10 days
+    paths:
+      - doc/html
