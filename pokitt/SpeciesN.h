@@ -39,9 +39,13 @@ namespace pokitt{
 template< typename FieldT >
 class SpeciesN : public Expr::Expression<FieldT>
 {
+  const bool disableBoundsCheck_;
   DECLARE_VECTOR_OF_FIELDS( FieldT, species_ )
 
-  SpeciesN( const Expr::TagList& speciesTags ) : Expr::Expression<FieldT>()
+  SpeciesN( const Expr::TagList& speciesTags,
+            const bool disableBoundsCheck )
+  : Expr::Expression<FieldT>(),
+    disableBoundsCheck_( disableBoundsCheck )
   {
     this->set_gpu_runnable(true);
     this->template create_field_vector_request<FieldT>( speciesTags, species_ );
@@ -52,6 +56,7 @@ public:
   class Builder : public Expr::ExpressionBuilder
   {
     Expr::TagList speciesTags_;
+    const bool disableBoundsCheck_;
   public:
     /**
      *  @brief Build a SpeciesN expression
@@ -61,8 +66,10 @@ public:
      */
     Builder( const Expr::Tag& specNTag,
              const Expr::TagList& speciesTags,
+             const bool disableBoundsCheck = false,
              const int nghost = DEFAULT_NUMBER_OF_GHOSTS )
-      : ExpressionBuilder( specNTag, nghost )
+      : ExpressionBuilder( specNTag, nghost ),
+        disableBoundsCheck_( disableBoundsCheck )
     {
       for( size_t i=0; i<speciesTags.size(); ++i ){
         if( speciesTags[i] != specNTag ) speciesTags_.push_back( speciesTags[i] );
@@ -77,6 +84,7 @@ public:
      */
     Builder( const Expr::TagList& speciesTags,
              const size_t specNum,
+             const bool disableBoundsCheck = false,
              const int nghost = DEFAULT_NUMBER_OF_GHOSTS )
       : ExpressionBuilder( speciesTags[specNum], nghost ),
         speciesTags_( speciesTags )
@@ -85,7 +93,7 @@ public:
     }
 
     Expr::ExpressionBase* build() const{
-      return new SpeciesN<FieldT>( speciesTags_ );
+      return new SpeciesN<FieldT>( speciesTags_, disableBoundsCheck_ );
     }
   };
 
@@ -99,11 +107,13 @@ public:
     }
 
 #   ifndef ENABLE_CUDA
-    const double tol = 10*std::numeric_limits<double>::epsilon();
-    if( field_max_interior( specN ) > (1.0+tol) || field_min_interior( specN ) < (0.0-tol) ){
-      std::ostringstream msg;
-      msg << __FILE__ << " : " << __LINE__ << "\nSpecies fractions are out of bounds!\n";
-      throw std::runtime_error( msg.str() );
+    if( !disableBoundsCheck_ ){
+      const double tol = 10*std::numeric_limits<double>::epsilon();
+      if( field_max_interior( specN ) > (1.0+tol) || field_min_interior( specN ) < (0.0-tol) ){
+        std::ostringstream msg;
+        msg << __FILE__ << " : " << __LINE__ << "\nSpecies fractions are out of bounds!\n";
+        throw std::runtime_error( msg.str() );
+      }
     }
 #   endif
   }
