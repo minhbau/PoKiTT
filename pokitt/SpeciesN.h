@@ -87,7 +87,8 @@ public:
              const bool disableBoundsCheck = false,
              const int nghost = DEFAULT_NUMBER_OF_GHOSTS )
       : ExpressionBuilder( speciesTags[specNum], nghost ),
-        speciesTags_( speciesTags )
+        speciesTags_( speciesTags ),
+        disableBoundsCheck_( disableBoundsCheck )
     {
       speciesTags_.erase( speciesTags_.begin() + specNum );
     }
