@@ -1,5 +1,6 @@
 add_subdirectory( kinetics )
 add_subdirectory( thermo )
+add_subdirectory( transformations )
 add_subdirectory( transport )
 
 add_library( pokitt CanteraObjects.cpp MixtureFraction.cpp )
