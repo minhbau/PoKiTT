@@ -146,8 +146,7 @@ class ReactionRates
                  const Expr::Tag& rhoTag,
                  const Expr::TagList& yiTags,
                  const Expr::Tag& mmwTag,
-                 const boost::shared_ptr<ChemicalSourceJacobian>& aj,
-                 const bool computeJacobian );
+                 const boost::shared_ptr<ChemicalSourceJacobian>& aj );
 public:
   class Builder : public Expr::ExpressionBuilder
   {
@@ -167,10 +166,18 @@ public:
              const Expr::TagList& yiTags,
              const Expr::Tag& mmwTag,
              const boost::shared_ptr<ChemicalSourceJacobian>& analyticalJacobian = boost::shared_ptr<ChemicalSourceJacobian>(),
-             const bool computeJacobian = false, // todo: if aj above is not null, then true, so remove this argument
-             const int nghost = DEFAULT_NUMBER_OF_GHOSTS );
+             const int nghost = DEFAULT_NUMBER_OF_GHOSTS )
+    : ExpressionBuilder( resultTags, nghost ),
+      tTag_( tTag ),
+      rhoTag_( rhoTag ),
+      yiTags_( yiTags ),
+      mmwTag_( mmwTag ),
+      analyticalJacobian_( analyticalJacobian )
+    {}
 
-    Expr::ExpressionBase* build() const;
+    Expr::ExpressionBase* build() const{
+      return new ReactionRates<FieldT>( tTag_, rhoTag_, yiTags_, mmwTag_, analyticalJacobian_ );
+    }
 
   private:
     const Expr::Tag tTag_;
@@ -178,17 +185,13 @@ public:
     const Expr::TagList yiTags_;
     const Expr::Tag mmwTag_;
     const boost::shared_ptr<ChemicalSourceJacobian> analyticalJacobian_;
-    const bool computeJacobian_;
   };
 
   ~ReactionRates(){}
   void evaluate();
   void sensitivity( const Expr::Tag& );
 
-  bool override_sensitivity() const
-  {
-    return computeJacobian_;
-  }
+  inline bool override_sensitivity() const{ return computeJacobian_; }
 };
 
 
@@ -206,8 +209,7 @@ ReactionRates( const Expr::Tag& tTag,
                const Expr::Tag& rhoTag,
                const Expr::TagList& yiTags,
                const Expr::Tag& mmwTag,
-               const boost::shared_ptr<ChemicalSourceJacobian>& analyticalJacobian,
-               const bool computeJacobian )
+               const boost::shared_ptr<ChemicalSourceJacobian>& analyticalJacobian )
   : Expr::Expression<FieldT>(),
     nSpec_( CanteraObjects::number_species() ),
     nRxns_( CanteraObjects::number_rxns() ),
@@ -217,7 +219,7 @@ ReactionRates( const Expr::Tag& tTag,
     rhoTag_( rhoTag ),
     yiTags_( yiTags ),
     analyticalJacobian_( analyticalJacobian ),
-    computeJacobian_( computeJacobian )
+    computeJacobian_( analyticalJacobian )
 {
   this->set_gpu_runnable( true );
 
@@ -581,36 +583,8 @@ sensitivity( const Expr::Tag& tag )
 
 //--------------------------------------------------------------------
 
-template< typename FieldT >
-ReactionRates<FieldT>::
-Builder::Builder( const Expr::TagList& resultTags,
-                  const Expr::Tag& tTag,
-                  const Expr::Tag& rhoTag,
-                  const Expr::TagList& yiTags,
-                  const Expr::Tag& mmwTag,
-                  const boost::shared_ptr<ChemicalSourceJacobian>& analyticalJacobian,
-                  const bool computeJacobian,
-                  const int nghost )
-: ExpressionBuilder( resultTags, nghost ),
-  tTag_( tTag ),
-  rhoTag_( rhoTag ),
-  yiTags_( yiTags ),
-  mmwTag_( mmwTag ),
-  analyticalJacobian_( analyticalJacobian ),
-  computeJacobian_( computeJacobian )
-{}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-Expr::ExpressionBase*
-ReactionRates<FieldT>::
-Builder::build() const
-{
-  return new ReactionRates<FieldT>( tTag_, rhoTag_, yiTags_, mmwTag_, analyticalJacobian_, computeJacobian_ );
-}
-
 } // namespace pokitt
+
 #undef POKITT_SUM2
 #undef POKITT_SUM3
 #undef POKITT_SUM4

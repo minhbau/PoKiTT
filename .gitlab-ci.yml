@@ -16,7 +16,7 @@
 #--------------------------------------------------------------------
 #--------------------- Upstream library builds: ---------------------
 .clone_spatialops      : &clone_so   git clone https://software.crsim.utah.edu:8443/James_Research_Group/SpatialOps.git; cd SpatialOps; git reset --hard b2197579447241ead961aeb2906e542816a5b126; cd ..
-.clone_exprlib         : &clone_expr git clone https://software.crsim.utah.edu:8443/James_Research_Group/ExprLib.git;    cd ExprLib;    git reset --hard ff0a7bfa977bb6c4db7cb2eba09cb066bae36194; cd ..
+.clone_exprlib         : &clone_expr git clone https://software.crsim.utah.edu:8443/James_Research_Group/ExprLib.git;    cd ExprLib;    git reset --hard e36481911d0b5b673914d76c8be57fb474104f87; cd ..
 
 .conf_spatialops       : &conf_so        cmake ../SpatialOps -DCMAKE_BUILD_TYPE=Release -DENABLE_TESTS=OFF -DENABLE_EXAMPLES=OFF -DCMAKE_CXX_FLAGS=-fvisibility-inlines-hidden -DCMAKE_INSTALL_PREFIX=$CI_PROJECT_DIR/install 
 .conf_spatialops_thread: &conf_so_thread cmake ../SpatialOps -DCMAKE_BUILD_TYPE=Release -DENABLE_TESTS=OFF -DENABLE_EXAMPLES=OFF -DCMAKE_CXX_FLAGS=-fvisibility-inlines-hidden -DCMAKE_INSTALL_PREFIX=$CI_PROJECT_DIR/install -DENABLE_THREADS=ON -DNTHREADS=8
