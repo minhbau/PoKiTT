@@ -26,10 +26,20 @@
 #define MixtureMolWeight_Expr_h
 
 #include <expression/Expression.h>
-
-#include <pokitt/CanteraObjects.h> //include cantera wrapper
+#include <pokitt/CanteraObjects.h>
 
 namespace pokitt{
+
+/**
+ * \class FractionType
+ */
+enum FractionType
+{
+  MASS,
+  MOLE
+};
+
+
 
 /**
  *  \class MixtureMolWeight
@@ -39,12 +49,14 @@ class MixtureMolWeight
  : public Expr::Expression<FieldT>
 {
 
-  std::vector<double> molecularWeightsInv_;
+  std::vector<double> molecularWeights_, molecularWeightsInv_;
   const int nSpec_;
+  const FractionType fracType_;
 
-  DECLARE_VECTOR_OF_FIELDS( FieldT, massFracs_ )
+  DECLARE_VECTOR_OF_FIELDS( FieldT, fracs_ )
 
-  MixtureMolWeight( const Expr::TagList& massFracTags );
+  MixtureMolWeight( const Expr::TagList& fracTags,
+                    const FractionType fracType );
 public:
   class Builder : public Expr::ExpressionBuilder
   {
@@ -52,19 +64,23 @@ public:
     /**
      *  @brief Build a MixtureMolWeight expression
      *  @param resultTag the tag for mixture molecular weight
-     *  @param massFracTags species mass fraction, indexing is consistent with Cantera input
+     *  @param fracTags species mass fraction, indexing is consistent with Cantera input
+     *  @param fracType if mole (MOLE) or mass (default, MASS) fractions are provided
      */
     Builder( const Expr::Tag& resultTag,
-             const Expr::TagList& massFracTags );
+             const Expr::TagList& fracTags,
+             const FractionType fracType = MASS );
 
     Expr::ExpressionBase* build() const;
 
   private:
-    const Expr::TagList massFracTags_;
+    const Expr::TagList fracTags_;
+    const FractionType fracType_;
   };
 
   ~MixtureMolWeight(){}
   void evaluate();
+  void sensitivity( const Expr::Tag& var );
 };
 
 
@@ -79,20 +95,25 @@ public:
 
 template< typename FieldT >
 MixtureMolWeight<FieldT>::
-MixtureMolWeight( const Expr::TagList& massFracTags )
+MixtureMolWeight( const Expr::TagList& fracTags,
+                  const FractionType fracType )
   : Expr::Expression<FieldT>(),
-    nSpec_( CanteraObjects::number_species() )
+    nSpec_( CanteraObjects::number_species() ),
+    fracType_( fracType )
 {
   this->set_gpu_runnable( true );
 
-  assert( massFracTags.size() == nSpec_ );
+  assert( fracTags.size() == nSpec_ );
 
   const std::vector<double>& specMW = CanteraObjects::molecular_weights();
+  molecularWeights_.resize(nSpec_);
   molecularWeightsInv_.resize(nSpec_);
-  for( size_t n=0; n<nSpec_; ++n)
+  for( size_t n=0; n<nSpec_; ++n){
+    molecularWeights_[n]    = specMW[n];
     molecularWeightsInv_[n] = 1 / specMW[n];
+  }
 
-  this->template create_field_vector_request<FieldT>( massFracTags, massFracs_ );
+  this->template create_field_vector_request<FieldT>( fracTags, fracs_ );
 }
 
 //--------------------------------------------------------------------
@@ -105,14 +126,54 @@ evaluate()
   using namespace SpatialOps;
   FieldT& mixMW = this->value();
 
-  const FieldT& y0 = massFracs_[0]->field_ref();
+  if( fracType_ == MOLE ){
+    const FieldT& x0 = fracs_[0]->field_ref();
 
-  mixMW <<= y0 * molecularWeightsInv_[0];
-  for( size_t n=1; n<nSpec_; ++n ){
-    const FieldT& yi = massFracs_[n]->field_ref();
-    mixMW <<= mixMW + yi * molecularWeightsInv_[n];
+    mixMW <<= x0 * molecularWeights_[0];
+    for( size_t n=1; n<nSpec_; ++n ){
+      const FieldT& xi = fracs_[n]->field_ref();
+      mixMW <<= mixMW + xi * molecularWeights_[n];
+    }
   }
-  mixMW <<= 1.0 / mixMW;
+  else{
+    const FieldT& y0 = fracs_[0]->field_ref();
+
+    mixMW <<= y0 * molecularWeightsInv_[0];
+    for( size_t n=1; n<nSpec_; ++n ){
+      const FieldT& yi = fracs_[n]->field_ref();
+      mixMW <<= mixMW + yi * molecularWeightsInv_[n];
+    }
+    mixMW <<= 1.0 / mixMW;
+  }
+}
+
+//--------------------------------------------------------------------
+
+template< typename FieldT >
+void
+MixtureMolWeight<FieldT>::
+sensitivity( const Expr::Tag& var )
+{
+  FieldT& mixMW = this->value();
+  FieldT& dfdv = this->sensitivity_result( var );
+  if( var == this->get_tag() ){
+    dfdv <<= 1.0;
+  }
+  else{
+    if( fracType_ == MOLE ){
+      dfdv <<= fracs_[0]->sens_field_ref( var ) * molecularWeightsInv_[0];
+      for( size_t n=1; n<nSpec_; ++n ){
+        dfdv <<= dfdv + fracs_[n]->sens_field_ref( var ) * molecularWeights_[n];
+      }
+    }
+    else{
+      dfdv <<= fracs_[0]->sens_field_ref( var ) * molecularWeightsInv_[0];
+      for( size_t n=1; n<nSpec_; ++n ){
+        dfdv <<= dfdv + fracs_[n]->sens_field_ref( var ) * molecularWeightsInv_[n];
+      }
+      dfdv <<= - mixMW * mixMW * dfdv;
+    }
+  }
 }
 
 //--------------------------------------------------------------------
@@ -120,9 +181,11 @@ evaluate()
 template< typename FieldT >
 MixtureMolWeight<FieldT>::
 Builder::Builder( const Expr::Tag& resultTag,
-                  const Expr::TagList& massFracTags )
+                  const Expr::TagList& fracTags,
+                  const FractionType fracType )
   : ExpressionBuilder( resultTag ),
-    massFracTags_( massFracTags )
+    fracTags_( fracTags ),
+    fracType_( fracType )
 {
 
 }
@@ -134,7 +197,7 @@ Expr::ExpressionBase*
 MixtureMolWeight<FieldT>::
 Builder::build() const
 {
-  return new MixtureMolWeight<FieldT>( massFracTags_ );
+  return new MixtureMolWeight<FieldT>( fracTags_, fracType_ );
 }
 
 } // namespace pokitt

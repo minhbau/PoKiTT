@@ -10,6 +10,10 @@ install( FILES
   MixtureFraction.h
   MixtureFractionExpr.h
   MixtureMolWeight.h
+  MassToMoleFracs.h
+  MoleToMassFracs.h
+  SpecificToVolumetric.h
+  VolumetricToSpecific.h
   SpecFromMixfrac.h
   SpeciesN.h
   DESTINATION ${CMAKE_INSTALL_PREFIX}/include/pokitt
