@@ -190,7 +190,10 @@ set( TPL_LIBRARIES ${TPL_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} )
 #------------------------------ Build Everything -------------------------------
 #-------------------------------------------------------------------------------
 
-include_directories( ${TPL_INCLUDES} )
+include_directories( 
+  ${TPL_INCLUDES}
+  ${CMAKE_SOURCE_DIR}
+  )
 
 add_subdirectory( pokitt )
 

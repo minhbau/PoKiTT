@@ -3,7 +3,12 @@ add_subdirectory( thermo )
 add_subdirectory( transformations )
 add_subdirectory( transport )
 
-add_library( pokitt CanteraObjects.cpp MixtureFraction.cpp )
+add_library( pokitt 
+  CanteraObjects.cpp 
+  MixtureFraction.cpp
+  kinetics/ReactionInfo.cpp 
+  )
+
 target_link_libraries( pokitt ${TPL_LIBRARIES} )
 
 install( FILES
