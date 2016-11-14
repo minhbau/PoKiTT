@@ -15,14 +15,14 @@
 
 #--------------------------------------------------------------------
 #--------------------- Upstream library builds: ---------------------
-.clone_spatialops      : &clone_so   git clone https://software.crsim.utah.edu:8443/James_Research_Group/SpatialOps.git; cd SpatialOps; git reset --hard b2197579447241ead961aeb2906e542816a5b126; cd ..
-.clone_exprlib         : &clone_expr git clone https://software.crsim.utah.edu:8443/James_Research_Group/ExprLib.git;    cd ExprLib;    git reset --hard e36481911d0b5b673914d76c8be57fb474104f87; cd ..
+.clone_spatialops      : &clone_so   git clone https://software.crsim.utah.edu:8443/James_Research_Group/SpatialOps.git; cd SpatialOps; git reset --hard 94da0f8782d7c171a2a3483f268ae957f4bfaad9; cd ..
+.clone_exprlib         : &clone_expr git clone https://software.crsim.utah.edu:8443/James_Research_Group/ExprLib.git;    cd ExprLib;    git reset --hard 2190c6cdbed648eb485e09c6516734945844aa14; cd ..
 
-.conf_spatialops       : &conf_so        cmake ../SpatialOps -DCMAKE_BUILD_TYPE=Release -DENABLE_TESTS=OFF -DENABLE_EXAMPLES=OFF -DCMAKE_CXX_FLAGS=-fvisibility-inlines-hidden -DCMAKE_INSTALL_PREFIX=$CI_PROJECT_DIR/install 
-.conf_spatialops_thread: &conf_so_thread cmake ../SpatialOps -DCMAKE_BUILD_TYPE=Release -DENABLE_TESTS=OFF -DENABLE_EXAMPLES=OFF -DCMAKE_CXX_FLAGS=-fvisibility-inlines-hidden -DCMAKE_INSTALL_PREFIX=$CI_PROJECT_DIR/install -DENABLE_THREADS=ON -DNTHREADS=8
-.conf_spatialops_gpu   : &conf_so_gpu    cmake ../SpatialOps -DCMAKE_BUILD_TYPE=Release -DENABLE_TESTS=OFF -DENABLE_EXAMPLES=OFF -DCMAKE_CXX_FLAGS=-fvisibility-inlines-hidden -DCMAKE_INSTALL_PREFIX=$CI_PROJECT_DIR/install -DENABLE_CUDA=ON
+.conf_spatialops       : &conf_so        cmake ../SpatialOps -DCMAKE_BUILD_TYPE=Release -DENABLE_TESTS=OFF -DENABLE_EXAMPLES=OFF -DCMAKE_INSTALL_PREFIX=$CI_PROJECT_DIR/install 
+.conf_spatialops_thread: &conf_so_thread cmake ../SpatialOps -DCMAKE_BUILD_TYPE=Release -DENABLE_TESTS=OFF -DENABLE_EXAMPLES=OFF -DCMAKE_INSTALL_PREFIX=$CI_PROJECT_DIR/install -DENABLE_THREADS=ON -DNTHREADS=8
+.conf_spatialops_gpu   : &conf_so_gpu    cmake ../SpatialOps -DCMAKE_BUILD_TYPE=Release -DENABLE_TESTS=OFF -DENABLE_EXAMPLES=OFF -DCMAKE_INSTALL_PREFIX=$CI_PROJECT_DIR/install -DENABLE_CUDA=ON
  
-.conf_exprlib          : &conf_expr cmake ../ExprLib -DCMAKE_BUILD_TYPE=Release -DENABLE_OUTPUT=ON -DENABLE_TESTS=OFF -DSpatialOps_DIR=$CI_PROJECT_DIR/install/share -DCMAKE_INSTALL_PREFIX=$CI_PROJECT_DIR/install -DCMAKE_CXX_FLAGS=-fvisibility-inlines-hidden
+.conf_exprlib          : &conf_expr cmake ../ExprLib -DCMAKE_BUILD_TYPE=Release -DENABLE_OUTPUT=ON -DENABLE_TESTS=OFF -DSpatialOps_DIR=$CI_PROJECT_DIR/install/share -DCMAKE_INSTALL_PREFIX=$CI_PROJECT_DIR/install
 #--------------------- Upstream library builds: ---------------------
 #--------------------------------------------------------------------
 
@@ -33,8 +33,8 @@ stages:
   - build_test
   - docs
   
-.conf-opt : &conf_opt  cmake .. -DBUILD_UPSTREAM_LIBS=OFF -DENABLE_EXAMPLES=ON -DENABLE_TESTS=ON -DExprLib_DIR=$CI_PROJECT_DIR/install/share -DCMAKE_CXX_FLAGS=-fvisibility-inlines-hidden -DCMAKE_BUILD_TYPE=Release
-.conf-dbg : &conf_dbg  cmake .. -DBUILD_UPSTREAM_LIBS=OFF -DENABLE_EXAMPLES=ON -DENABLE_TESTS=ON -DExprLib_DIR=$CI_PROJECT_DIR/install/share -DCMAKE_CXX_FLAGS=-fvisibility-inlines-hidden -DCMAKE_BUILD_TYPE=Debug
+.conf-opt : &conf_opt  cmake .. -DBUILD_UPSTREAM_LIBS=OFF -DENABLE_EXAMPLES=ON -DENABLE_TESTS=ON -DExprLib_DIR=$CI_PROJECT_DIR/install/share -DCMAKE_BUILD_TYPE=Release
+.conf-dbg : &conf_dbg  cmake .. -DBUILD_UPSTREAM_LIBS=OFF -DENABLE_EXAMPLES=ON -DENABLE_TESTS=ON -DExprLib_DIR=$CI_PROJECT_DIR/install/share -DCMAKE_BUILD_TYPE=Debug
 .build_cmd: &build_cmd make  -j8
 .test_cmd : &test_cmd  ctest -j4
 

@@ -14,6 +14,11 @@ if( CMAKE_VERSION VERSION_LESS 3.1.0 )
 endif( CMAKE_VERSION VERSION_LESS 3.1.0 )
 set( CMAKE_CXX_STANDARD 11 )
 
+if( ${CMAKE_HOST_APPLE} )
+  message( "\nOn APPLE - adding -fvisibility-inlines-hidden \n")
+  set( CMAKE_CXX_FLAGS "-fvisibility-inlines-hidden ${CMAKE_CXX_FLAGS}" )
+endif()
+
 #-------------------------------------------------------------------------------
 #-------------------------------- CONFIGURATION --------------------------------
 #-------------------------------------------------------------------------------
