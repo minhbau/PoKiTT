@@ -318,24 +318,24 @@ SpeciesHeatCapacity_Cv( const Expr::Tag& tTag,
   const std::vector<double>& molecularWeights = CanteraObjects::molecular_weights();
   const double molecularWeight = molecularWeights[n];
   const double gasConstant = CanteraObjects::gas_constant();
+
   std::vector<double>& c = specTherm_.coefficients;
-  BOOST_FOREACH( const double x, c ) std::cout << x << std::endl;
   switch ( specTherm_.type ) {
-  case CONST_POLY:
-    c[3] -= gasConstant; // change coefficients from isobaric to isometric
-    c[3] /= molecularWeight; // convert to mass basis
-    break;
-  case NASA_POLY:
-    c[1] -= 1.0; // change coefficients from isobaric to isometric
-    c[8] -= 1.0;
-    for( std::vector<double>::iterator ic = c.begin() + 1; ic!=c.end(); ++ic){
-      *ic *= gasConstant / molecularWeight; // dimensionalize the coefficients to mass basis
-    }
-    break;
-  default: {
-    std::ostringstream msg;
-    msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n_ << exceptionMsg_.str();
-    throw std::runtime_error( msg.str() );
+    case CONST_POLY:
+      c[3] -= gasConstant; // change coefficients from isobaric to isometric
+      c[3] /= molecularWeight; // convert to mass basis
+      break;
+    case NASA_POLY:
+      c[1] -= 1.0; // change coefficients from isobaric to isometric
+      c[8] -= 1.0;
+      for( std::vector<double>::iterator ic = c.begin() + 1; ic!=c.end(); ++ic){
+        *ic *= gasConstant / molecularWeight; // dimensionalize the coefficients to mass basis
+      }
+      break;
+    default: {
+      std::ostringstream msg;
+      msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n_ << exceptionMsg_.str();
+      throw std::runtime_error( msg.str() );
     }
   }
 

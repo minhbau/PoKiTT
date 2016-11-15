@@ -273,7 +273,7 @@ bool driver( const bool timings,
   for( size_t n=0; n<nSpec; ++n ){
     yiTags.push_back( Expr::Tag( "yi_" + boost::lexical_cast<std::string>(n), Expr::STATE_NONE ) );
   }
-  const Expr::Tag tTag  ( "Temperature", Expr::STATE_NONE );
+  const Expr::Tag tTag( "Temperature", Expr::STATE_NONE );
   Expr::TagList thermoTags;
   if( mix )
     thermoTags.push_back(Expr::Tag( thermo_name(thermoQuantity) + " mix", Expr::STATE_NONE));
@@ -340,22 +340,21 @@ bool driver( const bool timings,
     sizeVec.push_back( SO::IntVec( 20,  1,  1) );
   }
 
-  for( std::vector<SO::IntVec>::iterator iSize = sizeVec.begin(); iSize!= sizeVec.end(); ++iSize){
+  for( std::vector<SO::IntVec>::const_iterator iSize = sizeVec.begin(); iSize!= sizeVec.end(); ++iSize){
 
-    SO::IntVec gridSize = *iSize;
+    const SO::IntVec& gridSize = *iSize;
     fml.allocate_fields( Expr::FieldAllocInfo( gridSize, 0, 0, false, false, false ) );
-    SO::Grid grid( gridSize, SO::DoubleVec(1,1,1) );
+    const SO::Grid grid( gridSize, SO::DoubleVec(1,1,1) );
 
     CellField& xcoord = fml.field_ref< CellField >( xTag );
     grid.set_coord<SO::XDIR>( xcoord );
-    const int nPoints = xcoord.window_with_ghost().glob_npts();
 #   ifdef ENABLE_CUDA
     xcoord.set_device_as_active( GPU_INDEX );
 #   endif
     initTree.execute_tree();
 
     if( timings ){
-      std::cout << std::endl << thermo_name(thermoQuantity) << ((mix) ? " mix ":"") << " test - " << nPoints << std::endl;
+      std::cout << std::endl << thermo_name(thermoQuantity) << ((mix) ? " mix ":"") << " test - " << gridSize << std::endl;
       execTree.execute_tree(); // sets memory high-water mark
     }
 
@@ -371,7 +370,7 @@ bool driver( const bool timings,
       std::sort( times.begin(), times.end() );
       const int chop = floor(pokittReps/4);
       const double avgTime = std::accumulate( times.begin() + chop, times.end()-chop, 0.0 )/(pokittReps-2*chop);
-      std::cout << "PoKiTT  " + thermo_name(thermoQuantity) + " time " << avgTime << std::endl;
+      std::cout << "PoKiTT  " << thermo_name(thermoQuantity) << " time " << avgTime << std::endl;
     }
 
     const std::vector< CellFieldPtrT > canteraResults = get_cantera_results( mix,
@@ -396,7 +395,6 @@ bool driver( const bool timings,
         case CP  :
         case CV  : {
           status( field_equal( thermo, **iCantera, 1e-14 ) || field_equal_abs( thermo, **iCantera, 1e-11 ), thermoTag.name() );
-          std::cout << thermo[0] << "  " << (**iCantera)[0] << std::endl;
           break;
         }
         case E   :

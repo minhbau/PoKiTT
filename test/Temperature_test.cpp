@@ -281,19 +281,18 @@ bool driver( const bool timings,
 
   for( std::vector<SO::IntVec>::iterator iSize = sizeVec.begin(); iSize!= sizeVec.end(); ++iSize){
 
-    SO::IntVec gridSize = *iSize;
+    const SO::IntVec& gridSize = *iSize;
     fml.allocate_fields( Expr::FieldAllocInfo( gridSize, 0, 0, false, false, false ) );
-    SO::Grid grid( gridSize, SO::DoubleVec(1,1,1) );
+    const SO::Grid grid( gridSize, SO::DoubleVec(1,1,1) );
 
     CellField& xcoord = fml.field_ref< CellField >( xTag );
     grid.set_coord<SO::XDIR>( xcoord );
-    const int nPoints = xcoord.window_with_ghost().glob_npts();
 #   ifdef ENABLE_CUDA
     xcoord.set_device_as_active( GPU_INDEX );
 #   endif
     initTree.execute_tree();
     if( timings ){
-      std::cout << std::endl << "T from " << energy_name(energyType) << " test - " << nPoints << std::endl;
+      std::cout << std::endl << "T from " << energy_name(energyType) << " test - " << gridSize << std::endl;
       execTree.execute_tree(); // sets memory high-water mark
     }
 
