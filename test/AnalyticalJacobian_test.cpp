@@ -649,7 +649,7 @@ bool driver( const double pressure = 101325 )
   Expr::TagList rTags;
   for( size_t n=0; n<nSpec; ++n ){
     yiTags.push_back( Expr::Tag( "yi_" + boost::lexical_cast<std::string>(n), Expr::STATE_NONE ) );
-    rTags.push_back(  Expr::Tag( "ri" + boost::lexical_cast<std::string>(n), Expr::STATE_NONE ) );
+    rTags .push_back( Expr::Tag( "ri"  + boost::lexical_cast<std::string>(n), Expr::STATE_NONE ) );
   }
 
   // we use an initialization tree to avoid recalculations when timing the execution
@@ -724,7 +724,7 @@ bool driver( const double pressure = 101325 )
 
   // get fields for aj method
 
-  const so::GhostData         nghost(1);
+  const so::GhostData         nghost(DEFAULT_NUMBER_OF_GHOSTS);
   const so::BoundaryCellInfo  bcInfo = so::BoundaryCellInfo::build<CellField>( gridSize[0]>1, gridSize[1]>1, gridSize[2]>1 );
   const so::MemoryWindow      window( get_window_with_ghost( gridSize, nghost, bcInfo ) );
   so::FieldVector<CellField> productionRates       ( nSpec+1, window, bcInfo, nghost, LOCATION );
