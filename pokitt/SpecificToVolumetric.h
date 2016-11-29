@@ -60,6 +60,7 @@ namespace pokitt{
     class Builder : public Expr::ExpressionBuilder
     {
       const Expr::Tag rhoTag_, phiTag_;
+    public:
       Builder( const Expr::Tag& rhoPhiTag,
                const Expr::Tag& rhoTag,
                const Expr::Tag& phiTag,
