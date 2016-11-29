@@ -52,6 +52,8 @@ class MassFractions
 public:
   class Builder : public Expr::ExpressionBuilder
   {
+    const Expr::Tag rhoTag_;
+    const Expr::TagList rhoYiTags_;
   public:
     /**
      *  @brief Build a MassFractions expression
@@ -63,13 +65,15 @@ public:
     Builder( const Expr::TagList& yiTags,
              const Expr::Tag& rhoTag,
              const Expr::TagList& rhoYiTags,
-             const int nghost = DEFAULT_NUMBER_OF_GHOSTS );
+             const SpatialOps::GhostData nghost = DEFAULT_NUMBER_OF_GHOSTS )
+    : ExpressionBuilder( yiTags, nghost ),
+      rhoTag_( rhoTag ),
+      rhoYiTags_( rhoYiTags )
+    {}
 
-    Expr::ExpressionBase* build() const;
-
-  private:
-    const Expr::Tag rhoTag_;
-    const Expr::TagList rhoYiTags_;
+    Expr::ExpressionBase* build() const{
+      return new MassFractions<FieldT>( rhoTag_, rhoYiTags_ );
+    }
   };
 
   ~MassFractions();
@@ -127,27 +131,6 @@ evaluate()
 }
 
 //--------------------------------------------------------------------
-
-template< typename FieldT >
-MassFractions<FieldT>::
-Builder::Builder( const Expr::TagList& resultTags,
-                  const Expr::Tag& rhoTag,
-                  const Expr::TagList& rhoYiTags,
-                  const int nghost )
-: ExpressionBuilder( resultTags, nghost ),
-  rhoTag_( rhoTag ),
-  rhoYiTags_( rhoYiTags )
-{}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-Expr::ExpressionBase*
-MassFractions<FieldT>::
-Builder::build() const
-{
-  return new MassFractions<FieldT>( rhoTag_, rhoYiTags_ );
-}
 
 } // namespace pokitt
 

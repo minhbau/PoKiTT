@@ -40,7 +40,6 @@ enum FractionType
 };
 
 
-
 /**
  *  \class MixtureMolWeight
  */
@@ -60,22 +59,27 @@ class MixtureMolWeight
 public:
   class Builder : public Expr::ExpressionBuilder
   {
+    const Expr::TagList fracTags_;
+    const FractionType fracType_;
   public:
     /**
      *  @brief Build a MixtureMolWeight expression
      *  @param resultTag the tag for mixture molecular weight
      *  @param fracTags species mass fraction, indexing is consistent with Cantera input
-     *  @param fracType if mole (MOLE) or mass (default, MASS) fractions are provided
+     *  @param fracType if mole (MOLE) or mass (MASS) fractions are provided
      */
     Builder( const Expr::Tag& resultTag,
              const Expr::TagList& fracTags,
-             const FractionType fracType = MASS );
+             const FractionType fracType,
+             const SpatialOps::GhostData nghost = DEFAULT_NUMBER_OF_GHOSTS )
+    : ExpressionBuilder( resultTag, nghost ),
+      fracTags_( fracTags ),
+      fracType_( fracType )
+    {}
 
-    Expr::ExpressionBase* build() const;
-
-  private:
-    const Expr::TagList fracTags_;
-    const FractionType fracType_;
+    Expr::ExpressionBase* build() const{
+      return new MixtureMolWeight<FieldT>( fracTags_, fracType_ );
+    }
   };
 
   ~MixtureMolWeight(){}
@@ -177,28 +181,6 @@ sensitivity( const Expr::Tag& var )
 }
 
 //--------------------------------------------------------------------
-
-template< typename FieldT >
-MixtureMolWeight<FieldT>::
-Builder::Builder( const Expr::Tag& resultTag,
-                  const Expr::TagList& fracTags,
-                  const FractionType fracType )
-  : ExpressionBuilder( resultTag ),
-    fracTags_( fracTags ),
-    fracType_( fracType )
-{
-
-}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-Expr::ExpressionBase*
-MixtureMolWeight<FieldT>::
-Builder::build() const
-{
-  return new MixtureMolWeight<FieldT>( fracTags_, fracType_ );
-}
 
 } // namespace pokitt
 

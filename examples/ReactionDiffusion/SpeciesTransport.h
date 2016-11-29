@@ -47,24 +47,25 @@ class RhoYiIC : public Expr::Expression<FieldT>
 {
 public:
 
-  struct Builder : public Expr::ExpressionBuilder
+  class Builder : public Expr::ExpressionBuilder
   {
+    const Expr::Tag rho_, yi_;
+  public:
 
     Builder( const Expr::Tag& rhoYi,
              const Expr::Tag& rho,
-             const Expr::Tag& yi )
-    : Expr::ExpressionBuilder( rhoYi ),
+             const Expr::Tag& yi,
+             const SpatialOps::GhostData nghost = DEFAULT_NUMBER_OF_GHOSTS )
+    : Expr::ExpressionBuilder( rhoYi, nghost ),
       rho_( rho ),
       yi_( yi )
     {}
 
     ~Builder(){}
+
     Expr::ExpressionBase* build() const{
       return new RhoYiIC<FieldT>( rho_, yi_ );
     }
-
-  private:
-    const Expr::Tag rho_, yi_;
   };
 
   void evaluate()
@@ -222,7 +223,7 @@ register_one_time_expressions( Expr::ExpressionFactory& initFactory, Expr::Expre
   typedef typename Density< FieldT >::Builder Rho;
   typedef typename MixtureMolWeight <FieldT>::Builder MixMolWeight;
   initFactory.register_expression( new P0         ( tagM_[P], 101000   ) );
-  initFactory.register_expression( new MixMolWeight( tagM_[MMW], tagM_[YI_N]          ) );
+  initFactory.register_expression( new MixMolWeight( tagM_[MMW], tagM_[YI_N], MASS      ) );
   initFactory.register_expression( new Rho  ( tagM_[RHO], tagM_[T], tagM_[P], tagM_[MMW]) );
 
   if( execFactory.have_entry(tagM_[RHO]) )
@@ -241,7 +242,7 @@ register_one_time_expressions( Expr::ExpressionFactory& initFactory, Expr::Expre
   typedef typename SpeciesDiffFlux  <YFluxT>::Builder MassFluxY;
 
   execFactory.register_expression( new Density         ( tagM_[RHO]   ) );
-  execFactory.register_expression( new MixMolWeight    ( tagM_[MMW],  tagM_[YI_N]  ) );
+  execFactory.register_expression( new MixMolWeight    ( tagM_[MMW],  tagM_[YI_N], MASS ) );
   execFactory.register_expression( new MassFracs       ( tagM_[YI_N], tagM_[RHO],  tagM_[RHOYI_N]         ) );
   execFactory.register_expression( new Pressure        ( tagM_[P],    tagM_[T],    tagM_[RHO], tagM_[MMW] ) );
   execFactory.register_expression( new DiffusionCoeffs ( tagM_[D_N],  tagM_[T],    tagM_[P],   tagM_[YI_N], tagM_[MMW] ) );

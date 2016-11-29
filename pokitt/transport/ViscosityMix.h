@@ -80,6 +80,8 @@ class Viscosity
 public:
   class Builder : public Expr::ExpressionBuilder
   {
+    const Expr::Tag temperatureTag_;
+    const Expr::TagList massFracTags_;
   public:
     /**
      *  @brief Build a Viscosity expression
@@ -91,13 +93,14 @@ public:
     Builder( const Expr::Tag& resultTag,
              const Expr::Tag& temperatureTag,
              const Expr::TagList& massFracTags,
-             const int nghost = DEFAULT_NUMBER_OF_GHOSTS );
-
-    Expr::ExpressionBase* build() const;
-
-  private:
-    const Expr::Tag temperatureTag_;
-    const Expr::TagList massFracTags_;
+             const SpatialOps::GhostData nghost = DEFAULT_NUMBER_OF_GHOSTS )
+    : ExpressionBuilder( resultTag, nghost ),
+      temperatureTag_( temperatureTag ),
+      massFracTags_( massFracTags )
+    {}
+    Expr::ExpressionBase* build() const{
+      return new Viscosity<FieldT>( temperatureTag_, massFracTags_ );
+    }
   };
 
   ~Viscosity(){}
@@ -156,7 +159,7 @@ public:
              const double suthConstant,
              const double refVisc,
              const double refTemp,
-             const int nghost = DEFAULT_NUMBER_OF_GHOSTS );
+             const SpatialOps::GhostData nghost = DEFAULT_NUMBER_OF_GHOSTS );
     /**
      *  @brief Build a SutherlandViscosity expression
      *  @param result tag for the viscosity
@@ -165,9 +168,10 @@ public:
      */
     Builder( const Expr::Tag& result,
              const Expr::Tag& temperatureTag,
-             const int nghost = DEFAULT_NUMBER_OF_GHOSTS );
-
-    Expr::ExpressionBase* build() const;
+             const SpatialOps::GhostData nghost = DEFAULT_NUMBER_OF_GHOSTS );
+    Expr::ExpressionBase* build() const{
+      return new SutherlandViscosity<FieldT>(c_,mu0_,t0_,tTag_);
+    }
   };
 
 };
@@ -309,26 +313,7 @@ evaluate()
 
 //--------------------------------------------------------------------
 
-template< typename FieldT >
-Viscosity<FieldT>::
-Builder::Builder( const Expr::Tag& resultTag,
-                  const Expr::Tag& temperatureTag,
-                  const Expr::TagList& massFracTags,
-                  const int nghost )
-: ExpressionBuilder( resultTag, nghost ),
-  temperatureTag_( temperatureTag ),
-  massFracTags_( massFracTags )
-{}
 
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-Expr::ExpressionBase*
-Viscosity<FieldT>::
-Builder::build() const
-{
-  return new Viscosity<FieldT>( temperatureTag_, massFracTags_ );
-}
 
 //====================================================================
 
@@ -370,7 +355,7 @@ template< typename FieldT >
 SutherlandViscosity<FieldT>::Builder::
 Builder( const Expr::Tag& result,
          const Expr::Tag& temperatureTag,
-         const int nghost )
+         const SpatialOps::GhostData nghost )
   : ExpressionBuilder(result,nghost),
     c_  ( 120      ), // constant for air (K)
     mu0_( 18.27e-6 ), // ref visc for air (Pa s)
@@ -387,7 +372,7 @@ Builder( const Expr::Tag& result,
          const double suthConstant,
          const double refVisc,
          const double refTemp,
-         const int nghost )
+         const SpatialOps::GhostData nghost )
   : ExpressionBuilder(result,nghost),
     c_( suthConstant ),
     mu0_( refVisc ), // ref visc for air (Pa s)
@@ -396,14 +381,6 @@ Builder( const Expr::Tag& result,
 {}
 
 //--------------------------------------------------------------------
-
-template< typename FieldT >
-Expr::ExpressionBase*
-SutherlandViscosity<FieldT>::Builder::
-build() const
-{
-  return new SutherlandViscosity<FieldT>(c_,mu0_,t0_,tTag_);
-}
 
 } // namespace pokitt
 

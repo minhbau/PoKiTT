@@ -71,6 +71,9 @@ class ThermalConductivity
 public:
   class Builder : public Expr::ExpressionBuilder
   {
+    const Expr::Tag temperatureTag_;
+    const Expr::TagList massFracTags_;
+    const Expr::Tag mmwTag_;
   public:
     /**
      *  @brief Build a ThermalConductivity expression
@@ -84,14 +87,16 @@ public:
              const Expr::Tag& temperatureTag,
              const Expr::TagList& massFracTags,
              const Expr::Tag& mmwTag,
-             const int nghost = DEFAULT_NUMBER_OF_GHOSTS );
+             const SpatialOps::GhostData nghost = DEFAULT_NUMBER_OF_GHOSTS )
+    : ExpressionBuilder( resultTag, nghost ),
+      temperatureTag_( temperatureTag ),
+      massFracTags_( massFracTags ),
+      mmwTag_( mmwTag )
+    {}
 
-    Expr::ExpressionBase* build() const;
-
-  private:
-    const Expr::Tag temperatureTag_;
-    const Expr::TagList massFracTags_;
-    const Expr::Tag mmwTag_;
+    Expr::ExpressionBase* build() const{
+      return new ThermalConductivity<FieldT>( temperatureTag_, massFracTags_, mmwTag_ );
+    }
   };
 
   ~ThermalConductivity();
@@ -182,29 +187,6 @@ evaluate()
 }
 
 //--------------------------------------------------------------------
-
-template< typename FieldT >
-ThermalConductivity<FieldT>::
-Builder::Builder( const Expr::Tag& resultTag,
-                  const Expr::Tag& temperatureTag,
-                  const Expr::TagList& massFracTags,
-                  const Expr::Tag& mmwTag,
-                  const int nghost )
-: ExpressionBuilder( resultTag, nghost ),
-  temperatureTag_( temperatureTag ),
-  massFracTags_( massFracTags ),
-  mmwTag_( mmwTag )
-{}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-Expr::ExpressionBase*
-ThermalConductivity<FieldT>::
-Builder::build() const
-{
-  return new ThermalConductivity<FieldT>( temperatureTag_, massFracTags_, mmwTag_ );
-}
 
 } // namespace pokitt
 

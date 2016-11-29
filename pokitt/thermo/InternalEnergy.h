@@ -81,8 +81,9 @@ namespace pokitt{
        */
       Builder( const Expr::Tag& resultTag,
                const Expr::Tag& tTag,
-               const Expr::TagList& massFracTags )
-      : ExpressionBuilder( resultTag ),
+               const Expr::TagList& massFracTags,
+               const SpatialOps::GhostData nghost = DEFAULT_NUMBER_OF_GHOSTS )
+      : ExpressionBuilder( resultTag, nghost ),
         tTag_( tTag ),
         massFracTags_( massFracTags )
       {}
@@ -144,8 +145,9 @@ namespace pokitt{
       Builder( const Expr::Tag& resultTag,
                const Expr::Tag& tTag,
                const Expr::TagList& massFracTags,
-               const Expr::TagList& velTags )
-      : ExpressionBuilder( resultTag ),
+               const Expr::TagList& velTags,
+               const SpatialOps::GhostData nghost = DEFAULT_NUMBER_OF_GHOSTS )
+      : ExpressionBuilder( resultTag, nghost ),
         tTag_( tTag ),
         massFracTags_( massFracTags ),
         velTags_( velTags )
@@ -229,8 +231,9 @@ public:
      */
     Builder( const Expr::Tag& resultTag,
              const Expr::Tag& tTag,
-             const int n )
-    : ExpressionBuilder( resultTag ),
+             const int n,
+             const SpatialOps::GhostData ng = DEFAULT_NUMBER_OF_GHOSTS )
+    : ExpressionBuilder( resultTag, ng ),
       tTag_( tTag ),
       n_( n )
     {}

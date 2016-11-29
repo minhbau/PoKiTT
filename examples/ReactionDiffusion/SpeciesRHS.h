@@ -65,9 +65,15 @@ public:
     Builder( const Expr::Tag& resultTag,
              const Expr::Tag& sourceTag,
              const Expr::TagList& fluxTags,
-             const int nghost = DEFAULT_NUMBER_OF_GHOSTS );
+             const SpatialOps::GhostData nghost = DEFAULT_NUMBER_OF_GHOSTS )
+    : ExpressionBuilder( resultTag, nghost ),
+      sourceTag_( sourceTag ),
+      fluxTags_( fluxTags )
+    {}
 
-    Expr::ExpressionBase* build() const;
+    Expr::ExpressionBase* build() const{
+      return new SpeciesRHS<FieldT>( sourceTag_, fluxTags_ );
+    }
 
   private:
     const Expr::Tag sourceTag_;
@@ -140,27 +146,5 @@ evaluate()
 }
 
 //--------------------------------------------------------------------
-
-template< typename FieldT >
-SpeciesRHS<FieldT>::
-Builder::Builder( const Expr::Tag& resultTag,
-                  const Expr::Tag& sourceTag,
-                  const Expr::TagList& fluxTags,
-                  const int nghost )
-  : ExpressionBuilder( resultTag, nghost ),
-    sourceTag_( sourceTag ),
-    fluxTags_( fluxTags )
-{}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-Expr::ExpressionBase*
-SpeciesRHS<FieldT>::
-Builder::build() const
-{
-  return new SpeciesRHS<FieldT>( sourceTag_, fluxTags_ );
-}
-
 
 #endif // SpeciesRHS_Expr_h

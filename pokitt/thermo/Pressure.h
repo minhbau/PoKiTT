@@ -61,6 +61,9 @@ class Pressure
 public:
   class Builder : public Expr::ExpressionBuilder
   {
+    const Expr::Tag tTag_;
+    const Expr::Tag rhoTag_;
+    const Expr::Tag mmwTag_;
   public:
     /**
      *  @brief Build a Pressure expression
@@ -74,17 +77,19 @@ public:
              const Expr::Tag& tTag,
              const Expr::Tag& rhoTag,
              const Expr::Tag& mmwTag,
-             const int nghost = DEFAULT_NUMBER_OF_GHOSTS );
+             const SpatialOps::GhostData nghost = DEFAULT_NUMBER_OF_GHOSTS )
+    : ExpressionBuilder( resultTag, nghost ),
+      tTag_( tTag ),
+      rhoTag_( rhoTag ),
+      mmwTag_( mmwTag )
+    {}
 
-    Expr::ExpressionBase* build() const;
-
-  private:
-    const Expr::Tag tTag_;
-    const Expr::Tag rhoTag_;
-    const Expr::Tag mmwTag_;
+    Expr::ExpressionBase* build() const{
+      return new Pressure<FieldT>( tTag_, rhoTag_, mmwTag_);
+    }
   };
 
-  ~Pressure();
+  ~Pressure(){}
   void evaluate();
 
 };
@@ -113,13 +118,6 @@ Pressure( const Expr::Tag& tTag,
 //--------------------------------------------------------------------
 
 template< typename FieldT >
-Pressure<FieldT>::
-~Pressure()
-{}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
 void
 Pressure<FieldT>::
 evaluate()
@@ -130,30 +128,8 @@ evaluate()
   const FieldT& mmw = mmw_->field_ref();
   this->value() <<= rho * gasConstant_ * t / mmw;
 }
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-Pressure<FieldT>::
-Builder::Builder( const Expr::Tag& resultTag,
-                  const Expr::Tag& tTag,
-                  const Expr::Tag& rhoTag,
-                  const Expr::Tag& mmwTag,
-                  const int nghost )
-: ExpressionBuilder( resultTag, nghost ),
-  tTag_( tTag ),
-  rhoTag_( rhoTag ),
-  mmwTag_( mmwTag )
-{}
 
 //--------------------------------------------------------------------
-
-template< typename FieldT >
-Expr::ExpressionBase*
-Pressure<FieldT>::
-Builder::build() const
-{
-  return new Pressure<FieldT>( tTag_, rhoTag_, mmwTag_);
-}
 
 } // namespace pokitt
 

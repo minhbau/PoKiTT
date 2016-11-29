@@ -57,24 +57,22 @@ namespace pokitt{
 
   public:
 
-    struct Builder : public Expr::ExpressionBuilder
+    class Builder : public Expr::ExpressionBuilder
     {
-
+      const Expr::Tag rhoTag_, rhoPhiTag_;
       Builder( const Expr::Tag& phiTag,
                const Expr::Tag& rhoTag,
-               const Expr::Tag& rhoPhiTag )
-            : Expr::ExpressionBuilder( phiTag ),
-              rhoTag_( rhoTag ),
-              rhoPhiTag_( rhoPhiTag )
+               const Expr::Tag& rhoPhiTag,
+               const SpatialOps::GhostData nghost = DEFAULT_NUMBER_OF_GHOSTS )
+      : Expr::ExpressionBuilder( phiTag ),
+        rhoTag_( rhoTag ),
+        rhoPhiTag_( rhoPhiTag )
       {}
 
       ~Builder(){}
       Expr::ExpressionBase* build() const{
         return new VolumetricToSpecific<FieldT>( rhoPhiTag_, rhoTag_ );
       }
-
-    private:
-      const Expr::Tag rhoTag_, rhoPhiTag_;
     };
 
 

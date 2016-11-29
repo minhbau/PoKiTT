@@ -79,6 +79,8 @@ class DiffusionCoeff
 public:
   class Builder : public Expr::ExpressionBuilder
   {
+    const Expr::Tag temperatureTag_, pTag_, mmwTag_;
+    const Expr::TagList massFracTags_;
   public:
     /**
      *  @brief Build a DiffusionCoeff expression
@@ -94,13 +96,17 @@ public:
              const Expr::Tag& pTag,
              const Expr::TagList& massFracTags,
              const Expr::Tag& mmwTag,
-             const int nghost = DEFAULT_NUMBER_OF_GHOSTS );
+             const SpatialOps::GhostData nghost = DEFAULT_NUMBER_OF_GHOSTS )
+    : ExpressionBuilder( resultTags, nghost ),
+      temperatureTag_( temperatureTag ),
+      pTag_          ( pTag           ),
+      mmwTag_        ( mmwTag         ),
+      massFracTags_  ( massFracTags   )
+    {}
 
-    Expr::ExpressionBase* build() const;
-
-  private:
-    const Expr::Tag temperatureTag_, pTag_, mmwTag_;
-    const Expr::TagList massFracTags_;
+    Expr::ExpressionBase* build() const{
+      return new DiffusionCoeff<FieldT>( temperatureTag_, pTag_, massFracTags_, mmwTag_ );
+    }
   };
 
   ~DiffusionCoeff(){}
@@ -159,6 +165,8 @@ class DiffusionCoeffMol
 public:
   class Builder : public Expr::ExpressionBuilder
   {
+    const Expr::Tag temperatureTag_, pTag_, mmwTag_;
+    const Expr::TagList massFracTags_;
   public:
     /**
      *  @brief Build a DiffusionCoeffMol expression
@@ -174,13 +182,17 @@ public:
              const Expr::Tag& pTag,
              const Expr::TagList& massFracTags,
              const Expr::Tag& mmwTag,
-             const int nghost = DEFAULT_NUMBER_OF_GHOSTS );
+             const SpatialOps::GhostData nghost = DEFAULT_NUMBER_OF_GHOSTS )
+    : ExpressionBuilder( resultTags, nghost ),
+      temperatureTag_( temperatureTag ),
+      pTag_          ( pTag           ),
+      mmwTag_        ( mmwTag         ),
+      massFracTags_  ( massFracTags   )
+    {}
 
-    Expr::ExpressionBase* build() const;
-
-  private:
-    const Expr::Tag temperatureTag_, pTag_, mmwTag_;
-    const Expr::TagList massFracTags_;
+    Expr::ExpressionBase* build() const{
+      return new DiffusionCoeffMol<FieldT>( temperatureTag_, pTag_, massFracTags_, mmwTag_ );
+    }
   };
 
   ~DiffusionCoeffMol(){}
@@ -284,33 +296,6 @@ evaluate()
 
 }
 
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-DiffusionCoeff<FieldT>::
-Builder::Builder( const Expr::TagList& resultTags,
-                  const Expr::Tag& temperatureTag,
-                  const Expr::Tag& pTag,
-                  const Expr::TagList& massFracTags,
-                  const Expr::Tag& mmwTag,
-                  const int nghost )
-: ExpressionBuilder( resultTags, nghost ),
-  temperatureTag_( temperatureTag ),
-  pTag_          ( pTag           ),
-  mmwTag_        ( mmwTag         ),
-  massFracTags_  ( massFracTags   )
-{}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-Expr::ExpressionBase*
-DiffusionCoeff<FieldT>::
-Builder::build() const
-{
-  return new DiffusionCoeff<FieldT>( temperatureTag_, pTag_, massFracTags_, mmwTag_ );
-}
-
 
 // ###################################################################
 //
@@ -401,31 +386,6 @@ evaluate()
 }
 
 //--------------------------------------------------------------------
-
-template< typename FieldT >
-DiffusionCoeffMol<FieldT>::
-Builder::Builder( const Expr::TagList& resultTags,
-                  const Expr::Tag& temperatureTag,
-                  const Expr::Tag& pTag,
-                  const Expr::TagList& massFracTags,
-                  const Expr::Tag& mmwTag,
-                  const int nghost )
-: ExpressionBuilder( resultTags, nghost ),
-  temperatureTag_( temperatureTag ),
-  pTag_          ( pTag           ),
-  mmwTag_        ( mmwTag         ),
-  massFracTags_  ( massFracTags   )
-{}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-Expr::ExpressionBase*
-DiffusionCoeffMol<FieldT>::
-Builder::build() const
-{
-  return new DiffusionCoeffMol<FieldT>( temperatureTag_, pTag_, massFracTags_, mmwTag_ );
-}
 
 } // namespace pokitt
 

@@ -670,7 +670,7 @@ bool driver( const double pressure = 101325 )
     initFactory.register_expression(       new XCoord       ( xTag )                     );
     yID = initFactory.register_expression( new MassFracs    ( yiTags, xTag )             );
     initFactory.register_expression(       new Pressure     ( pTag, pressure )           );
-    mID = initFactory.register_expression( new MixMolWeight ( mmwTag, yiTags )           );
+    mID = initFactory.register_expression( new MixMolWeight ( mmwTag, yiTags, MASS )     );
     tID = initFactory.register_expression( new Temperature  ( tTag, xTag, 2000, 500 )    );
     pID = initFactory.register_expression( new Density      ( rhoTag, tTag, pTag, mmwTag));
     initIDs.insert( tID );

@@ -51,6 +51,8 @@ public:
 
   class Builder : public Expr::ExpressionBuilder
   {
+    const Expr::Tag tTag_, tCondTag_;
+    const Expr::TagList hTags_, massFluxTags_;
   public:
     /**
      *  @brief Build a HeatFlux expression
@@ -69,7 +71,7 @@ public:
              const Expr::Tag& tCondTag,
              const Expr::TagList& hTags,
              const Expr::TagList& massFluxTags,
-             const int nghost = DEFAULT_NUMBER_OF_GHOSTS )
+             const SpatialOps::GhostData nghost = DEFAULT_NUMBER_OF_GHOSTS )
     : ExpressionBuilder( heatFlux, nghost ),
       tTag_        ( tTag         ),
       tCondTag_    ( tCondTag     ),
@@ -82,10 +84,6 @@ public:
     Expr::ExpressionBase* build() const{
       return new HeatFlux<FluxT>( tTag_, tCondTag_, hTags_, massFluxTags_ );
     }
-
-  private:
-    const Expr::Tag tTag_, tCondTag_;
-    const Expr::TagList hTags_, massFluxTags_;
   };
 
   void evaluate();

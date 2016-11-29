@@ -150,6 +150,11 @@ class ReactionRates
 public:
   class Builder : public Expr::ExpressionBuilder
   {
+    const Expr::Tag tTag_;
+    const Expr::Tag rhoTag_;
+    const Expr::TagList yiTags_;
+    const Expr::Tag mmwTag_;
+    const boost::shared_ptr<ChemicalSourceJacobian> analyticalJacobian_;
   public:
     /**
      *  @brief Build a ReactionRates expression
@@ -166,7 +171,7 @@ public:
              const Expr::TagList& yiTags,
              const Expr::Tag& mmwTag,
              const boost::shared_ptr<ChemicalSourceJacobian>& analyticalJacobian = boost::shared_ptr<ChemicalSourceJacobian>(),
-             const int nghost = DEFAULT_NUMBER_OF_GHOSTS )
+             const SpatialOps::GhostData nghost = DEFAULT_NUMBER_OF_GHOSTS )
     : ExpressionBuilder( resultTags, nghost ),
       tTag_( tTag ),
       rhoTag_( rhoTag ),
@@ -178,13 +183,6 @@ public:
     Expr::ExpressionBase* build() const{
       return new ReactionRates<FieldT>( tTag_, rhoTag_, yiTags_, mmwTag_, analyticalJacobian_ );
     }
-
-  private:
-    const Expr::Tag tTag_;
-    const Expr::Tag rhoTag_;
-    const Expr::TagList yiTags_;
-    const Expr::Tag mmwTag_;
-    const boost::shared_ptr<ChemicalSourceJacobian> analyticalJacobian_;
   };
 
   ~ReactionRates(){}

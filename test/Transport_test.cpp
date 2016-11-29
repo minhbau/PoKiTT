@@ -255,7 +255,7 @@ bool driver( const bool timings,
     initFactory.register_expression(       new XCoord       ( xTag )                     );
     yID = initFactory.register_expression( new MassFracs    ( yiTags, xTag )             );
     pID = initFactory.register_expression( new Pressure     ( pTag, cThermo.pressure() ));
-    mID = initFactory.register_expression( new MixMolWeight ( mmwTag, yiTags )           );
+    mID = initFactory.register_expression( new MixMolWeight ( mmwTag, yiTags, MASS )     );
     tID = initFactory.register_expression( new Temperature  ( tTag ,xTag, 1000, 500 )    );
     initIDs.insert( tID );
     initIDs.insert( pID );

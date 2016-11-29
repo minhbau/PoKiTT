@@ -74,6 +74,8 @@ class HeatCapacity_Cv
 public:
   class Builder : public Expr::ExpressionBuilder
   {
+    const Expr::Tag tTag_;
+    const Expr::TagList massFracTags_;
   public:
     /**
      *  @brief Build a HeatCapacity_Cv expression
@@ -83,13 +85,16 @@ public:
      */
     Builder( const Expr::Tag& resultTag,
              const Expr::Tag& tTag,
-             const Expr::TagList& massFracTags );
+             const Expr::TagList& massFracTags,
+             const SpatialOps::GhostData nghost = DEFAULT_NUMBER_OF_GHOSTS )
+    : ExpressionBuilder( resultTag, nghost ),
+      tTag_( tTag ),
+      massFracTags_( massFracTags )
+    {}
 
-    Expr::ExpressionBase* build() const;
-
-  private:
-    const Expr::Tag tTag_;
-    const Expr::TagList massFracTags_;
+    Expr::ExpressionBase* build() const{
+      return new HeatCapacity_Cv<FieldT>( tTag_, massFracTags_ );
+    }
   };
 
   ~HeatCapacity_Cv(){}
@@ -132,6 +137,8 @@ class SpeciesHeatCapacity_Cv
 public:
   class Builder : public Expr::ExpressionBuilder
   {
+    const Expr::Tag tTag_;
+    const int n_;
   public:
     /**
      *  @brief Build a HeatCapacity expression
@@ -141,13 +148,16 @@ public:
      */
     Builder( const Expr::Tag& resultTag,
              const Expr::Tag& tTag,
-             const int n);
+             const int n,
+             const SpatialOps::GhostData nghost = DEFAULT_NUMBER_OF_GHOSTS )
+    : ExpressionBuilder( resultTag, nghost ),
+      tTag_( tTag ),
+      n_( n )
+    {}
 
-    Expr::ExpressionBase* build() const;
-
-  private:
-    const Expr::Tag tTag_;
-    const int n_;
+    Expr::ExpressionBase* build() const{
+      return new SpeciesHeatCapacity_Cv<FieldT>( tTag_, n_ );
+    }
   };
 
   ~SpeciesHeatCapacity_Cv(){}
@@ -279,28 +289,6 @@ evaluate()
 //--------------------------------------------------------------------
 
 template< typename FieldT >
-HeatCapacity_Cv<FieldT>::
-Builder::Builder( const Expr::Tag& resultTag,
-                  const Expr::Tag& tTag,
-                  const Expr::TagList& massFracTags )
-  : ExpressionBuilder( resultTag ),
-    tTag_( tTag ),
-    massFracTags_( massFracTags )
-{}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-Expr::ExpressionBase*
-HeatCapacity_Cv<FieldT>::
-Builder::build() const
-{
-  return new HeatCapacity_Cv<FieldT>( tTag_, massFracTags_ );
-}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
 SpeciesHeatCapacity_Cv<FieldT>::
 SpeciesHeatCapacity_Cv( const Expr::Tag& tTag,
                         const int n )
@@ -378,26 +366,6 @@ evaluate()
 }
 
 //--------------------------------------------------------------------
-
-template< typename FieldT >
-SpeciesHeatCapacity_Cv<FieldT>::
-Builder::Builder( const Expr::Tag& resultTag,
-                  const Expr::Tag& tTag,
-                  const int n )
-  : ExpressionBuilder( resultTag ),
-    tTag_( tTag ),
-    n_( n )
-{}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-Expr::ExpressionBase*
-SpeciesHeatCapacity_Cv<FieldT>::
-Builder::build() const
-{
-  return new SpeciesHeatCapacity_Cv<FieldT>( tTag_, n_ );
-}
 
 } // namespace pokitt
 

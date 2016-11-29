@@ -121,7 +121,7 @@ public:
              const double tol = 1e-3,
              const double maxTemp = 5000,
              const int maxIterations = 20,
-             const int nghost = DEFAULT_NUMBER_OF_GHOSTS )
+             const SpatialOps::GhostData nghost = DEFAULT_NUMBER_OF_GHOSTS )
     : ExpressionBuilder( resultTag, nghost ),
       massFracTags_( massFracTags ),
       enthTag_( enthTag ),
@@ -236,7 +236,7 @@ public:
              const double tol = 1e-3,
              const double maxTemp = 5000,
              const int maxIterations = 20,
-             const int nghost = DEFAULT_NUMBER_OF_GHOSTS )
+             const SpatialOps::GhostData nghost = DEFAULT_NUMBER_OF_GHOSTS )
     : ExpressionBuilder( resultTag, nghost ),
       massFracTags_( massFracTags ),
       e0Tag_( e0Tag ),
@@ -245,16 +245,15 @@ public:
       tol_( tol ),
       maxTemp_( maxTemp ),
       maxIterations_( maxIterations )
-  {
-    if( resultTag == temperatureGuessTag ){
-      throw std::runtime_error( "Error! Do not provide temperature's tag as the guess tag! Use an empty tag to use T as the guess." );
+    {
+      if( resultTag == temperatureGuessTag ){
+        throw std::runtime_error( "Error! Do not provide temperature's tag as the guess tag! Use an empty tag to use T as the guess." );
+      }
     }
-  }
 
     Expr::ExpressionBase* build() const{
       return new TemperatureFromE0<FieldT>( massFracTags_, e0Tag_, keTag_, tempGuessTag_, tol_, maxTemp_, maxIterations_ );
     }
-
   };
 
   ~TemperatureFromE0(){}

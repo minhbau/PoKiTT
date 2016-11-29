@@ -46,6 +46,8 @@ class MassToMoleFracs : public Expr::Expression<FieldT>
 public:
   class Builder : public Expr::ExpressionBuilder
   {
+    const Expr::TagList massFracTags_;
+    const Expr::Tag     mmwTag_;
   public:
     /**
      *  @brief Build a MassToMoleFracs expression
@@ -55,13 +57,16 @@ public:
      */
     Builder( const Expr::TagList& resultTags,
              const Expr::TagList& massFracTags,
-             const Expr::Tag&     mmwTag );
+             const Expr::Tag&     mmwTag,
+             const SpatialOps::GhostData nghost = DEFAULT_NUMBER_OF_GHOSTS )
+    : ExpressionBuilder( resultTags, nghost ),
+      massFracTags_( massFracTags ),
+      mmwTag_( mmwTag )
+    {}
 
-    Expr::ExpressionBase* build() const;
-
-  private:
-    const Expr::TagList massFracTags_;
-    const Expr::Tag     mmwTag_;
+    Expr::ExpressionBase* build() const{
+      return new MassToMoleFracs<FieldT>( massFracTags_, mmwTag_ );
+    }
   };
 
   ~MassToMoleFracs(){}
@@ -114,26 +119,6 @@ evaluate()
 }
 
 //--------------------------------------------------------------------
-
-template< typename FieldT >
-MassToMoleFracs<FieldT>::
-Builder::Builder( const Expr::TagList& resultTags,
-                  const Expr::TagList& massFracTags,
-                  const Expr::Tag&     mmwTag )
-  : ExpressionBuilder( resultTags ),
-    massFracTags_( massFracTags ),
-    mmwTag_( mmwTag )
-{}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-Expr::ExpressionBase*
-MassToMoleFracs<FieldT>::
-Builder::build() const
-{
-  return new MassToMoleFracs<FieldT>( massFracTags_, mmwTag_ );
-}
 
 } // namespace pokitt
 

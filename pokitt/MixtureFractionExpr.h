@@ -67,8 +67,9 @@ public:
     Builder( const Expr::Tag& result,
              const Expr::TagList& specTags,
              const std::vector<double>& fuelMassFracs,
-             const std::vector<double>& oxidMassFracs )
-    : ExpressionBuilder(result),
+             const std::vector<double>& oxidMassFracs,
+             const SpatialOps::GhostData nghost = DEFAULT_NUMBER_OF_GHOSTS )
+    : ExpressionBuilder(result, nghost),
       specTags_( specTags ),
       fuel_( fuelMassFracs ),
       oxid_( oxidMassFracs )
@@ -77,7 +78,6 @@ public:
     Expr::ExpressionBase* build() const{
       return new MixtureFractionExpr<FieldT>( specTags_, fuel_, oxid_ );
     }
-
   };
 
   void evaluate(){

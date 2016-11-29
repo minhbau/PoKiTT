@@ -51,7 +51,7 @@ public:
      */
     Builder( const Expr::TagList& resultTags,
              const Expr::Tag& xCoordTag,
-             const int nghost = DEFAULT_NUMBER_OF_GHOSTS )
+             const SpatialOps::GhostData nghost = DEFAULT_NUMBER_OF_GHOSTS )
   : ExpressionBuilder( resultTags, nghost ),
     xCoordTag_( xCoordTag ),
     nSpec_( resultTags.size() )

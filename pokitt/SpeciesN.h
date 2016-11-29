@@ -78,7 +78,7 @@ public:
     Builder( const Expr::Tag& specNTag,
              const Expr::TagList& speciesTags,
              const SpecNBehavior behavior = ERRORSPECN,
-             const int nghost = DEFAULT_NUMBER_OF_GHOSTS )
+             const SpatialOps::GhostData nghost = DEFAULT_NUMBER_OF_GHOSTS )
       : ExpressionBuilder( specNTag, nghost ),
         behavior_(behavior)
     {
@@ -97,7 +97,7 @@ public:
     Builder( const Expr::TagList& speciesTags,
              const size_t specNum,
              const SpecNBehavior behavior = ERRORSPECN,
-             const int nghost = DEFAULT_NUMBER_OF_GHOSTS )
+             const SpatialOps::GhostData nghost = DEFAULT_NUMBER_OF_GHOSTS )
       : ExpressionBuilder( speciesTags[specNum], nghost ),
         speciesTags_( speciesTags ),
         behavior_(behavior)

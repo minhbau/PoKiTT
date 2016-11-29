@@ -61,6 +61,9 @@ class Density
 public:
   class Builder : public Expr::ExpressionBuilder
   {
+    const Expr::Tag tTag_;
+    const Expr::Tag pTag_;
+    const Expr::Tag mmwTag_;
   public:
     /**
      *  @brief Build a Density expression
@@ -74,14 +77,16 @@ public:
              const Expr::Tag& tTag,
              const Expr::Tag& pTag,
              const Expr::Tag& mmwTag,
-             const int nghost = DEFAULT_NUMBER_OF_GHOSTS );
+             const SpatialOps::GhostData nghost = DEFAULT_NUMBER_OF_GHOSTS )
+    : ExpressionBuilder( resultTag, nghost ),
+      tTag_( tTag ),
+      pTag_( pTag ),
+      mmwTag_( mmwTag )
+    {}
 
-    Expr::ExpressionBase* build() const;
-
-  private:
-    const Expr::Tag tTag_;
-    const Expr::Tag pTag_;
-    const Expr::Tag mmwTag_;
+    Expr::ExpressionBase* build() const{
+      return new Density<FieldT>( tTag_, pTag_, mmwTag_);
+    }
   };
 
   ~Density();
@@ -131,30 +136,9 @@ evaluate()
   const FieldT& mmw = mmw_->field_ref();
   rho <<= p * mmw / ( t * gasConstant_ );
 }
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-Density<FieldT>::
-Builder::Builder( const Expr::Tag& resultTag,
-         const Expr::Tag& tTag,
-         const Expr::Tag& pTag,
-         const Expr::Tag& mmwTag,
-         const int nghost )
-: ExpressionBuilder( resultTag, nghost ),
-  tTag_( tTag ),
-  pTag_( pTag ),
-  mmwTag_( mmwTag )
-{}
 
 //--------------------------------------------------------------------
 
-template< typename FieldT >
-Expr::ExpressionBase*
-Density<FieldT>::
-Builder::build() const
-{
-  return new Density<FieldT>( tTag_, pTag_, mmwTag_);
-}
 
 } // namespace pokitt
 

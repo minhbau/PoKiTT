@@ -49,34 +49,33 @@ namespace pokitt{
 
     SpecificToVolumetric( const Expr::Tag& rhoTag, const Expr::Tag& phiTag )
     : Expr::Expression<FieldT>()
-      {
+    {
       this->set_gpu_runnable(true);
       rho_ = this->template create_field_request<FieldT>( rhoTag );
       phi_ = this->template create_field_request<FieldT>( phiTag );
-      }
+    }
 
   public:
 
-    struct Builder : public Expr::ExpressionBuilder
+    class Builder : public Expr::ExpressionBuilder
     {
-
+      const Expr::Tag rhoTag_, phiTag_;
       Builder( const Expr::Tag& rhoPhiTag,
                const Expr::Tag& rhoTag,
-               const Expr::Tag& phiTag )
-            : Expr::ExpressionBuilder( rhoPhiTag ),
-              rhoTag_( rhoTag ),
-              phiTag_( phiTag )
+               const Expr::Tag& phiTag,
+               const SpatialOps::GhostData nghost = DEFAULT_NUMBER_OF_GHOSTS )
+      : Expr::ExpressionBuilder( rhoPhiTag, nghost ),
+        rhoTag_( rhoTag ),
+        phiTag_( phiTag )
       {}
 
       ~Builder(){}
       Expr::ExpressionBase* build() const{
         return new SpecificToVolumetric<FieldT>( rhoTag_, phiTag_ );
       }
-
-    private:
-      const Expr::Tag rhoTag_, phiTag_;
     };
 
+    ~SpecificToVolumetric(){}
 
     void evaluate()
     {

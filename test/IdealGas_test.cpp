@@ -200,7 +200,7 @@ bool driver( const bool timings,
     initFactory.register_expression(       new XCoord          ( xTag                    ) );
     initFactory.register_expression(       new MassFracs       ( yiTags, xTag            ) );
     tID = initFactory.register_expression( new Temperature     ( tTag,   xTag, 1000, 500 ) );
-    mID = initFactory.register_expression( new MixtureMolWeight( mmwTag, yiTags          ) );
+    mID = initFactory.register_expression( new MixtureMolWeight( mmwTag, yiTags, MASS    ) );
     switch( gasQuantity ){
     case P:   rID = initFactory.register_expression( new RefQuantity( refTag, gasMix->density()  ) ); break;
     case RHO: rID = initFactory.register_expression( new RefQuantity( refTag, gasMix->pressure() ) ); break;

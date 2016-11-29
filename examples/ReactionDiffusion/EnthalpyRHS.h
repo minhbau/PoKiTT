@@ -61,6 +61,8 @@ public:
 
   class Builder : public Expr::ExpressionBuilder
   {
+    const Expr::Tag rhoTag_;
+    const Expr::TagList fluxTags_;
   public:
     /**
      *  @brief Build a EnthalpyRHS expression
@@ -69,13 +71,15 @@ public:
     Builder( const Expr::Tag& resultTag,
              const Expr::Tag& rhoTag,
              const Expr::TagList& fluxTags,
-             const int nghost = DEFAULT_NUMBER_OF_GHOSTS );
+             const int nghost = DEFAULT_NUMBER_OF_GHOSTS )
+    : ExpressionBuilder( resultTag, nghost ),
+      rhoTag_( rhoTag ),
+      fluxTags_( fluxTags )
+    {}
 
-    Expr::ExpressionBase* build() const;
-
-  private:
-    const Expr::Tag rhoTag_;
-    const Expr::TagList fluxTags_;
+    Expr::ExpressionBase* build() const{
+      return new EnthalpyRHS<FieldT>( rhoTag_, fluxTags_ );
+    }
   };
 
   ~EnthalpyRHS(){};
@@ -136,27 +140,6 @@ evaluate()
 }
 
 //--------------------------------------------------------------------
-
-template< typename FieldT >
-EnthalpyRHS<FieldT>::
-Builder::Builder( const Expr::Tag& resultTag,
-                  const Expr::Tag& rhoTag,
-                  const Expr::TagList& fluxTags,
-                  const int nghost )
-  : ExpressionBuilder( resultTag, nghost ),
-    rhoTag_( rhoTag ),
-    fluxTags_( fluxTags )
-{}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-Expr::ExpressionBase*
-EnthalpyRHS<FieldT>::
-Builder::build() const
-{
-  return new EnthalpyRHS<FieldT>( rhoTag_, fluxTags_ );
-}
 
 }; // namespace pokitt
 

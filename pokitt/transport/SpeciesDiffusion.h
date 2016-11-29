@@ -91,7 +91,7 @@ public:
              const Expr::Tag& densTag,
              const Expr::Tag& mmwTag,
              const Expr::TagList& diffCoeffTags,
-             const int nghost = DEFAULT_NUMBER_OF_GHOSTS )
+             const SpatialOps::GhostData nghost = DEFAULT_NUMBER_OF_GHOSTS )
     : ExpressionBuilder(fluxes, nghost),
       densTag_ ( densTag ),
       yiTags_( massFracs    ),
@@ -109,7 +109,7 @@ public:
   void evaluate();
   void bind_operators( const SpatialOps::OperatorDatabase& opDB );
 
-  protected:
+protected:
 
   SpeciesDiffFlux( const Expr::TagList& massFracs,
                    const Expr::Tag& densTag,

@@ -53,6 +53,7 @@ public:
 
   class Builder : public Expr::ExpressionBuilder
   {
+    const Expr::Tag mixfrTag_;
   public:
     /**
      *  @brief Build a SpecFromMixfrac expression
@@ -65,15 +66,12 @@ public:
              const int nghost = DEFAULT_NUMBER_OF_GHOSTS )
     : ExpressionBuilder( resultTag, nghost ),
       mixfrTag_( mixfrTag )
-  {}
+    {}
 
 
     Expr::ExpressionBase* build() const{
       return new SpecFromMixfrac<FieldT>( mixfrTag_ );
     }
-
-  private:
-    const Expr::Tag mixfrTag_;
   };
 
   ~SpecFromMixfrac(){}

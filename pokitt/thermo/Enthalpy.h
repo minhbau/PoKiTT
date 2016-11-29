@@ -70,6 +70,8 @@ class Enthalpy
 public:
   class Builder : public Expr::ExpressionBuilder
   {
+    const Expr::Tag tTag_;
+    const Expr::TagList massFracTags_;
   public:
     /**
      *  @brief Build a Enthalpy expression
@@ -79,13 +81,16 @@ public:
      */
     Builder( const Expr::Tag& resultTag,
              const Expr::Tag& tTag,
-             const Expr::TagList& massFracTags );
+             const Expr::TagList& massFracTags,
+             const SpatialOps::GhostData nghost = DEFAULT_NUMBER_OF_GHOSTS )
+    : ExpressionBuilder( resultTag, nghost ),
+      tTag_( tTag ),
+      massFracTags_( massFracTags )
+    {}
 
-    Expr::ExpressionBase* build() const;
-
-  private:
-    const Expr::Tag tTag_;
-    const Expr::TagList massFracTags_;
+    Expr::ExpressionBase* build() const{
+      return new Enthalpy<FieldT>( tTag_, massFracTags_ );
+    }
   };
 
   ~Enthalpy(){}
@@ -124,6 +129,8 @@ class SpeciesEnthalpy
 public:
   class Builder : public Expr::ExpressionBuilder
   {
+    const Expr::Tag tTag_;
+    const int n_;
   public:
     /**
      *  @brief Build a SpeciesEnthalpy expression
@@ -133,13 +140,16 @@ public:
      */
     Builder( const Expr::Tag& resultTag,
              const Expr::Tag& tTag,
-             const int n);
+             const int n,
+             const SpatialOps::GhostData nghost = DEFAULT_NUMBER_OF_GHOSTS )
+    : ExpressionBuilder( resultTag, nghost ),
+      tTag_( tTag ),
+      n_( n )
+    {}
 
-    Expr::ExpressionBase* build() const;
-
-  private:
-    const Expr::Tag tTag_;
-    const int n_;
+    Expr::ExpressionBase* build() const{
+      return new SpeciesEnthalpy<FieldT>( tTag_, n_ );
+    }
   };
 
   ~SpeciesEnthalpy(){}
@@ -276,27 +286,6 @@ evaluate()
     }
   }
 }
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-Enthalpy<FieldT>::
-Builder::Builder( const Expr::Tag& resultTag,
-                  const Expr::Tag& tTag,
-                  const Expr::TagList& massFracTags )
-: ExpressionBuilder( resultTag ),
-  tTag_( tTag ),
-  massFracTags_( massFracTags )
-{}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-Expr::ExpressionBase*
-Enthalpy<FieldT>::
-Builder::build() const
-{
-  return new Enthalpy<FieldT>( tTag_, massFracTags_ );
-}
 
 //--------------------------------------------------------------------
 
@@ -343,7 +332,6 @@ SpeciesEnthalpy( const Expr::Tag& tTag,
     throw std::runtime_error( msg.str() );
     }
   }
-
 }
 
 //--------------------------------------------------------------------
@@ -384,25 +372,6 @@ evaluate()
 
 //--------------------------------------------------------------------
 
-template< typename FieldT >
-SpeciesEnthalpy<FieldT>::
-Builder::Builder( const Expr::Tag& resultTag,
-                  const Expr::Tag& tTag,
-                  const int n )
-  : ExpressionBuilder( resultTag ),
-    tTag_( tTag ),
-    n_( n )
-{}
-
-//--------------------------------------------------------------------
-
-template< typename FieldT >
-Expr::ExpressionBase*
-SpeciesEnthalpy<FieldT>::
-Builder::build() const
-{
-  return new SpeciesEnthalpy<FieldT>( tTag_, n_ );
-}
 
 } // namespace pokitt
 
