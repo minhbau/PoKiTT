@@ -59,7 +59,7 @@ public:
              const Expr::TagList& moleFracTags,
              const Expr::Tag&     mmwTag,
              const SpatialOps::GhostData nghost = DEFAULT_NUMBER_OF_GHOSTS )
-    : ExpressionBuilder( resultTags. nghost ),
+    : ExpressionBuilder( resultTags, nghost ),
       moleFracTags_( moleFracTags ),
       mmwTag_( mmwTag )
     {}
