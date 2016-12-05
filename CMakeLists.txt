@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 3.1)
 project( PoKiTT CXX C )
 
 # warn about building in source
@@ -9,9 +9,6 @@ if( CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR )
     "Then run cmake from the 'build' directory" ) 
 endif( CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR )
 
-if( CMAKE_VERSION VERSION_LESS 3.1.0 )
-  message( WARNING "Cannot enable C++11 with the current version of CMake.\nPlease update to at least version 3.1.0\n" )
-endif( CMAKE_VERSION VERSION_LESS 3.1.0 )
 set( CMAKE_CXX_STANDARD 11 )
 
 if( ${CMAKE_HOST_APPLE} )
