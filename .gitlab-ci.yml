@@ -141,6 +141,8 @@ build:linux:threaded:dbg:
     
 build:linux:gpu:
   <<: *build_linux
+  tags:
+    - gpu
   script: 
     - module load cmake
     - mkdir build; cd build;
@@ -197,49 +199,6 @@ build:mac:dbg:
     - *build_cmd
     - *test_cmd
 
-##------------------------ TESTING --------------------
-#.test: &do_test
-#  stage: test
-#  script:
-#    - *test_cmd
-#  artifacts:
-#    name     : "TestResults_$CI_BUILD_REF_NAME"
-#    when     : on_failure
-#    expire_in: 10 days
-#    paths    :
-#    - build/Testing
-#
-#test:mac:dbg:
-#  dependencies:
-#    - build:mac:dbg
-#  <<: *do_test
-#test:mac:opt:
-#  dependencies:
-#    - build:mac:opt
-#  <<: *do_test
-#
-#test:linux:dbg:
-#  dependencies:
-#    - build:linux:dbg
-#  <<: *do_test
-#test:linux:opt:
-#  dependencies:
-#    - build:linux:opt
-#  <<: *do_test
-#  
-#test:linux:gpu:
-#  dependencies:
-#    - build:linux:gpu
-#  <<: *do_test
-#
-#test:linux:threaded:dbg:
-#  dependencies:
-#    - build:linux:threaded:dbg
-#  <<: *do_test
-#test:linux:threaded:opt:
-#  dependencies:
-#    - build:linux:threaded:opt
-#  <<: *do_test
   
 #------------------------ Doxygen -------------------------
 doxygen:

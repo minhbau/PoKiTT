@@ -35,17 +35,15 @@
 
 namespace pokitt{
 
-  /*
-   * class: SpecificToVolumetric
-   *
-   * Convert a specific quantity \f$\phi\f$ to a volumetric quantity \f$\rho\phi\f$ using the density \f$\rho\f$
+  /**
+   * \class SpecificToVolumetric
+   * \brief Convert a specific quantity \f$\phi\f$ to a volumetric quantity \f$\rho\phi\f$ using the density \f$\rho\f$
    */
   template< typename FieldT >
   class SpecificToVolumetric : public Expr::Expression<FieldT>
   {
   private:
-    DECLARE_FIELD( FieldT, rho_ )
-    DECLARE_FIELD( FieldT, phi_ )
+    DECLARE_FIELDS( FieldT, rho_, phi_ )
 
     SpecificToVolumetric( const Expr::Tag& rhoTag, const Expr::Tag& phiTag )
     : Expr::Expression<FieldT>()
@@ -100,6 +98,5 @@ namespace pokitt{
   };
 
 } // namespace pokitt
-
 
 #endif /* SPECIFICTOVOLUMETRIC_H_ */

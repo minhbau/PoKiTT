@@ -35,25 +35,23 @@
 
 namespace pokitt{
 
-  /*
-   * class: VolumetricToSpecific
-   *
-   * Convert a volumetric quantity \f$\rho\phi\f$ to a specific quantity \f$\phi\f$ using the density \f$\rho\f$
+  /**
+   * \class VolumetricToSpecific
+   * \brief Convert a volumetric quantity \f$\rho\phi\f$ to a specific quantity \f$\phi\f$ using the density \f$\rho\f$
    */
   template< typename FieldT >
   class VolumetricToSpecific : public Expr::Expression<FieldT>
   {
   private:
-    DECLARE_FIELD( FieldT, rhoPhi_ )
-    DECLARE_FIELD( FieldT, rho_ )
+    DECLARE_FIELDS( FieldT, rhoPhi_, rho_ )
 
     VolumetricToSpecific( const Expr::Tag& rhoPhiTag, const Expr::Tag& rhoTag )
     : Expr::Expression<FieldT>()
-      {
+    {
       this->set_gpu_runnable(true);
       rhoPhi_ = this->template create_field_request<FieldT>( rhoPhiTag );
-      rho_ = this->template create_field_request<FieldT>( rhoTag );
-      }
+      rho_    = this->template create_field_request<FieldT>( rhoTag    );
+    }
 
   public:
 
@@ -75,7 +73,6 @@ namespace pokitt{
         return new VolumetricToSpecific<FieldT>( rhoPhiTag_, rhoTag_ );
       }
     };
-
 
     void evaluate()
     {
@@ -100,7 +97,5 @@ namespace pokitt{
   };
 
 } // namespace pokitt
-
-
 
 #endif /* VOLUMETRICTOSPECIFIC_H_ */
