@@ -78,7 +78,7 @@ class Temperature
 
   std::vector< ThermData > specThermVec_;
   std::vector< std::vector<double> > cFracVec_; // vector of polynomial coefficients divided by integers carried from integration
-  const int nSpec_; // number of species to iterate over
+  const size_t nSpec_; // number of species to iterate over
 
   const double tol_; // tolerance for Newton's method
   const double maxTemp_; //temperatures above this will throw an exception, default is 5000K
@@ -189,7 +189,7 @@ class TemperatureFromE0
 
   std::vector< ThermData > specThermVec_;
   std::vector< std::vector<double> > cFracVec_; // vector of polynomial coefficients divided by integers carried from integration
-  const int nSpec_; // number of species to iterate over
+  const size_t nSpec_; // number of species to iterate over
 
   const double tol_; // tolerance for Newton's method
   const double maxTemp_; //temperatures above this will throw an exception, default is 5000K
@@ -817,9 +817,9 @@ find_bad_points( std::ostringstream& msg, const FieldT& badField, const double b
   double worstValue = 0;
   int xWorst, yWorst, zWorst;
 
-  for( int z = 1; z <= mw.extent(2); ++z ){
-    for( int y = 1; y <= mw.extent(1); ++y ){
-      for( int x = 1; x <= mw.extent(0); ++x, ++iField ){
+  for( size_t z = 1; z <= mw.extent(2); ++z ){
+    for( size_t y = 1; y <= mw.extent(1); ++y ){
+      for( size_t x = 1; x <= mw.extent(0); ++x, ++iField ){
         if( checkNaN ){
           if( std::isnan( *iField ) ){
             ++badPoints;

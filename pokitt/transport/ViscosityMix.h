@@ -68,7 +68,7 @@ class Viscosity
   DECLARE_FIELD( FieldT, temp_ )
   DECLARE_VECTOR_OF_FIELDS( FieldT, massFracs_ )
 
-  const int nSpec_; //number of species to iterate over
+  const size_t nSpec_; //number of species to iterate over
   const std::vector< std::vector<double> > viscosityCoefs_; // Cantera's vector of coefficients for the pure viscosity polynomials
   const std::vector<double> molecularWeights_; // molecular weights
   std::vector<double> molecularWeightsInv_; // inverse of molecular weights (diving by MW is expensive)

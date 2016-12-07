@@ -108,7 +108,7 @@ private:
       invMsp.push_back( 1.0 / Msp[s] );
     }
 
-    for( int r=0; r<nr; ++r){
+    for( size_t r=0; r<nr; ++r){
 
       const RxnData& rxnDat = CanteraObjects::rxn_data( r );
       rxnDataVec_.push_back( &rxnDat );
