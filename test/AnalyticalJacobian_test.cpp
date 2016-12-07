@@ -56,7 +56,6 @@
 
 #include <pokitt/CanteraObjects.h>
 #include <pokitt/kinetics/AnalyticalJacobian.h>
-#include <pokitt/transformations/ConservedPrimitive.h>
 #include "LinearMassFracs.h"
 #include <pokitt/MixtureMolWeight.h>
 #include <pokitt/kinetics/ReactionRates.h>
@@ -262,91 +261,6 @@ void get_timings( size_t n, size_t numberOfRepeats, std::string inputFileName )
       chemPrimitiveJac(i,j) <<= primitiveSensitivities(i-2,j);
   }
 
-  // ---------------- use a state transformation to get the conserved Jacobian for the conserved variables ----------------
-  so::FieldMatrix<CellField> dVdU( ns+1, window, bcInfo, nghost, LOCATION );
-  so::FieldMatrix<CellField> chemJac( ns+1, window, bcInfo, nghost, LOCATION );
-
-#   ifdef ENABLE_CUDA
-  for( size_t prodRateIdx=0; prodRateIdx<ns+1; ++prodRateIdx ){
-    for( size_t primVarIdx=0; primVarIdx<ns+1; ++primVarIdx ){
-      dVdU(prodRateIdx,primVarIdx).set_device_as_active( GPU_INDEX );
-      chemJac(prodRateIdx,primVarIdx).set_device_as_active( GPU_INDEX );
-    }
-  }
-#   endif
-
-  pokitt::ConservedPrimitiveTransformer pct;
-
-  // compute additional fields necessary for transformation
-  const Expr::Tag egyTag( "egy", Expr::STATE_NONE );
-  const Expr::Tag cvTag( "cv", Expr::STATE_NONE );
-
-  Expr::TagList massTags, specEgyTags;
-  for( size_t i=0; i<ns; ++i ){
-    massTags.push_back( Expr::Tag( "Y_" + CanteraObjects::species_name( i ), Expr::STATE_NONE ) );
-    specEgyTags.push_back( Expr::Tag( "e_" + CanteraObjects::species_name( i ), Expr::STATE_NONE ) );
-  }
-
-  Expr::ExpressionFactory factory;
-  std::set<Expr::ExpressionID> roots;
-
-  typedef Expr::PlaceHolder<FieldT>::Builder PlaceHolderT;
-  typedef pokitt::InternalEnergy<FieldT>::Builder EnergyT;
-  typedef pokitt::SpeciesInternalEnergy<FieldT>::Builder SpecEnergyT;
-  typedef pokitt::HeatCapacity_Cv<FieldT>::Builder HeatCapT;
-
-  const Expr::ExpressionID tempID = factory.register_expression( new PlaceHolderT( tempTag ) );
-  roots.insert( tempID );
-  for( size_t i=0; i<ns; ++i ){
-    const Expr::ExpressionID massID = factory.register_expression( new PlaceHolderT( massTags[i] ) );
-    roots.insert( massID );
-    const Expr::ExpressionID specEgyID = factory.register_expression( new SpecEnergyT( specEgyTags[i], tempTag, i ) );
-    roots.insert( specEgyID );
-  }
-  const Expr::ExpressionID cvID = factory.register_expression( new HeatCapT( cvTag, tempTag, massTags ) );
-  roots.insert( cvID );
-  const Expr::ExpressionID egyID = factory.register_expression( new EnergyT( egyTag, tempTag, massTags ) );
-  roots.insert( egyID );
-
-  Expr::ExpressionTree tree( roots , factory, 0 );
-  Expr::FieldManagerList fml;
-  tree.register_fields( fml );
-  tree.bind_fields( fml );
-  tree.lock_fields( fml );
-  fml.allocate_fields( Expr::FieldAllocInfo( npts, 0, 0, false, false, false ) );
-
-  fml.field_ref<FieldT>( tempTag ) <<= T;
-  for( size_t i=0; i<ns; ++i ){
-    fml.field_ref<FieldT>( massTags[i] ) <<= *YPtr[i];
-  }
-  tree.execute_tree();
-
-  const FieldT& cv = fml.field_ref<FieldT>( cvTag );
-  const FieldT& etotal = fml.field_ref<FieldT>( egyTag );
-  std::vector< const FieldT* > speciesEnergyPtr;
-  for( size_t i=0; i<YPtr.size(); ++i ){
-    speciesEnergyPtr.push_back( &( fml.field_ref<FieldT>( specEgyTags[i] ) ) );
-  }
-
-  timeLogger.start( "state transformation matrix" );
-  for( size_t nTimes=0; nTimes<numberOfRepeats; ++nTimes )
-    pct.sens_of_primitive_matrix( dVdU, T, rho, YPtrForJac, cv, speciesEnergyPtr );
-  timeLogger.stop( "state transformation matrix" );
-
-  timeLogger.start( "dense state transformation" );
-  for( size_t nTimes=0; nTimes<numberOfRepeats; ++nTimes )
-    chemJac = chemPrimitiveJac * dVdU;
-  timeLogger.stop( "dense state transformation" );
-
-  // in-place transformation
-  for( size_t i=0; i<chemJac.elements(); ++i ){
-    chemJac(i) <<= chemPrimitiveJac(i);
-  }
-  timeLogger.start( "sparse state transformation" );
-  for( size_t nTimes=0; nTimes<numberOfRepeats; ++nTimes )
-    pct.right_multiply_to_conserved( chemJac, T, rho, YPtrForJac, cv, speciesEnergyPtr );
-  timeLogger.stop( "sparse state transformation" );
-
   // ---------------- do a direct linear solve with the Jacobian ----------------
   so::FieldVector<CellField> xVector( ns+1, window, bcInfo, nghost, LOCATION );
 
@@ -358,7 +272,7 @@ void get_timings( size_t n, size_t numberOfRepeats, std::string inputFileName )
 
   timeLogger.start( "linear solve" );
   for( size_t nTimes=0; nTimes<numberOfRepeats; ++nTimes )
-    xVector = chemJac.solve( chemRhs );
+    xVector = chemPrimitiveJac.solve( chemRhs );
   timeLogger.stop( "linear solve" );
 
   // ---------------- calculate eigenvalues of the Jacobian ----------------
@@ -372,7 +286,7 @@ void get_timings( size_t n, size_t numberOfRepeats, std::string inputFileName )
 
   timeLogger.start( "eigendecomposition" );
   for( size_t nTimes=0; nTimes<numberOfRepeats; ++nTimes )
-    eigenvalues = chemJac.eigen_values();
+    eigenvalues = chemPrimitiveJac.eigen_values();
   timeLogger.stop( "eigendecomposition" );
 
   // ---------------- find maximum local eigenvalue of the Jacobian ----------------
@@ -407,10 +321,6 @@ void get_timings( size_t n, size_t numberOfRepeats, std::string inputFileName )
   std::cout << " Timings in microseconds per cell" << std::endl
             << " - Production rates: \t " << timeLogger.timer("production rates" ).elapsed_time() * 1.0e6 / n / n / numberOfRepeats << std::endl
             << " - Rates + Jacobian: \t " << timeLogger.timer("production rates + Jacobian" ).elapsed_time() * 1.0e6 / n / n / numberOfRepeats << std::endl
-            << " - Dense transform: \t " << ( timeLogger.timer("state transformation matrix" ).elapsed_time() + \
-                                              timeLogger.timer("dense state transformation" ).elapsed_time() ) * 1.0e6 / n / n / numberOfRepeats << std::endl
-            << " - Sparse transform: \t " << ( timeLogger.timer("state transformation matrix" ).elapsed_time() + \
-                                               timeLogger.timer("sparse state transformation" ).elapsed_time() ) * 1.0e6 / n / n / numberOfRepeats << std::endl
             << " - Linear solve: \t " << timeLogger.timer("linear solve" ).elapsed_time() * 1.0e6 / n / n / numberOfRepeats << std::endl
             << " - Eigenvalues: \t " << timeLogger.timer("eigendecomposition" ).elapsed_time() * 1.0e6 / n / n / numberOfRepeats << std::endl
             << " - Gesat step size: \t " << timeLogger.timer("GESAT dual time step size" ).elapsed_time() * 1.0e6 / n / n / numberOfRepeats << std::endl

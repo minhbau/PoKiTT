@@ -12,9 +12,6 @@ file( COPY ${JACOBIAN_GOLD} DESTINATION ${CMAKE_CURRENT_BINARY_DIR} )
 
 include_directories( ${CMAKE_SOURCE_DIR} )
 
-nebo_add_executable( transformations_test Transformations_test.cpp )
-target_link_libraries( transformations_test pokitt )
-
 nebo_add_executable( idealgas_test IdealGas_test.cpp )
 target_link_libraries( idealgas_test pokitt )
 
@@ -51,7 +48,6 @@ add_test( NAME thermo_test_h2                 COMMAND thermo_test            --x
 add_test( NAME transport_test_h2              COMMAND transport_test         --xml-input-file=h2o2.xml     )
 add_test( NAME ajrates_test_h2_1atm           COMMAND aj_test                --xml-input-file=h2o2.xml --pressure=101325 --rates-vs-cantera )
 add_test( NAME ajrates_test_h2_2atm           COMMAND aj_test                --xml-input-file=h2o2.xml --pressure=202650 --rates-vs-cantera )
-add_test( NAME transformations_test_h2        COMMAND transformations_test   --xml-input-file=h2o2.xml     )
                                                                              
 add_test( NAME idealgas_test_GRI              COMMAND idealgas_test          --xml-input-file=gri30.xml    )
 add_test( NAME rxn_test_GRI_1atm              COMMAND rxn_test               --xml-input-file=gri30.xml --pressure=101325 )
@@ -63,7 +59,6 @@ add_test( NAME transport_test_GRI             COMMAND transport_test         --x
 if( CMAKE_BUILD_TYPE STREQUAL "Release" )
     add_test( NAME ajrates_test_GRI_1atm    COMMAND aj_test              --xml-input-file=gri30.xml --pressure=101325 --rates-vs-cantera )
     add_test( NAME ajrates_test_GRI_2atm    COMMAND aj_test              --xml-input-file=gri30.xml --pressure=202650 --rates-vs-cantera )
-    add_test( NAME transformations_test_GRI COMMAND transformations_test --xml-input-file=gri30.xml )
 endif()
                                            
 add_test( NAME idealgas_test_methanol         COMMAND idealgas_test          --xml-input-file=methanol.xml )
