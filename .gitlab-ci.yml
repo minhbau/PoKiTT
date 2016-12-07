@@ -15,8 +15,8 @@
 
 #--------------------------------------------------------------------
 #--------------------- Upstream library builds: ---------------------
-.clone_spatialops      : &clone_so   git clone https://software.crsim.utah.edu:8443/James_Research_Group/SpatialOps.git; cd SpatialOps; git reset --hard 9f222a5ae5a5d389ea4be8669af2c8266c10d322; cd ..
-.clone_exprlib         : &clone_expr git clone https://software.crsim.utah.edu:8443/James_Research_Group/ExprLib.git;    cd ExprLib;    git reset --hard 768dbfb3ac9c523f84e9c0e12df1112ec3813271; cd ..
+.clone_spatialops      : &clone_so   git clone https://software.crsim.utah.edu:8443/James_Research_Group/SpatialOps.git; cd SpatialOps; git reset --hard 12dd25a71171536cd4d3152608b4a094ef6461c3; cd ..
+.clone_exprlib         : &clone_expr git clone https://software.crsim.utah.edu:8443/James_Research_Group/ExprLib.git;    cd ExprLib;    git reset --hard a75f4106e0abdb0c70bd57b3b23c14e1cb3e781d; cd ..
 
 .conf_spatialops       : &conf_so        cmake ../SpatialOps -DCMAKE_BUILD_TYPE=Release -DENABLE_TESTS=OFF -DENABLE_EXAMPLES=OFF -DCMAKE_INSTALL_PREFIX=$CI_PROJECT_DIR/install 
 .conf_spatialops_thread: &conf_so_thread cmake ../SpatialOps -DCMAKE_BUILD_TYPE=Release -DENABLE_TESTS=OFF -DENABLE_EXAMPLES=OFF -DCMAKE_INSTALL_PREFIX=$CI_PROJECT_DIR/install -DENABLE_THREADS=ON -DNTHREADS=8
@@ -141,6 +141,8 @@ build:linux:threaded:dbg:
     
 build:linux:gpu:
   <<: *build_linux
+  tags:
+    - gpu
   script: 
     - module load cmake
     - mkdir build; cd build;
@@ -197,49 +199,6 @@ build:mac:dbg:
     - *build_cmd
     - *test_cmd
 
-##------------------------ TESTING --------------------
-#.test: &do_test
-#  stage: test
-#  script:
-#    - *test_cmd
-#  artifacts:
-#    name     : "TestResults_$CI_BUILD_REF_NAME"
-#    when     : on_failure
-#    expire_in: 10 days
-#    paths    :
-#    - build/Testing
-#
-#test:mac:dbg:
-#  dependencies:
-#    - build:mac:dbg
-#  <<: *do_test
-#test:mac:opt:
-#  dependencies:
-#    - build:mac:opt
-#  <<: *do_test
-#
-#test:linux:dbg:
-#  dependencies:
-#    - build:linux:dbg
-#  <<: *do_test
-#test:linux:opt:
-#  dependencies:
-#    - build:linux:opt
-#  <<: *do_test
-#  
-#test:linux:gpu:
-#  dependencies:
-#    - build:linux:gpu
-#  <<: *do_test
-#
-#test:linux:threaded:dbg:
-#  dependencies:
-#    - build:linux:threaded:dbg
-#  <<: *do_test
-#test:linux:threaded:opt:
-#  dependencies:
-#    - build:linux:threaded:opt
-#  <<: *do_test
   
 #------------------------ Doxygen -------------------------
 doxygen:
