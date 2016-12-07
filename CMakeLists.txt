@@ -166,18 +166,23 @@ set( TPL_LIBRARIES ${TPL_LIBRARIES} exprlib )
 #----------------------------------- Cantera -----------------------------------
 #-------------------------------------------------------------------------------
 
-if( Cantera_DIR STREQUAL "" ) 
-  find_library( Cantera_LIBRARIES NAMES cantera HINTS /usr/local )
-  find_path( Cantera_INCLUDE_DIR NAMES IdealGasMix.h HINTS /usr/local PATH_SUFFIXES cantera )
-else()
-  find_library( Cantera_LIBRARIES NAMES cantera PATHS ${Cantera_DIR} NO_DEFAULT_PATH )
-  find_path( Cantera_INCLUDE_DIR NAMES IdealGasMix.h PATHS ${Cantera_DIR}/include NO_DEFAULT_PATH PATH_SUFFIXES cantera )
-  set( Cantera_INCLUDE_DIR ${Cantera_DIR}/include )
-  set( Cantera_LIBRARIES ${Cantera_DIR}/lib/libcantera.a )
+find_library( Cantera_LIBRARIES NAMES cantera PATHS ${Cantera_DIR} NO_DEFAULT_PATH )
+find_path( Cantera_INCLUDE_DIR NAMES IdealGasMix.h PATHS ${Cantera_DIR}/include NO_DEFAULT_PATH PATH_SUFFIXES cantera )
+if( ${Cantera_INCLUDE_DIR} STREQUAL Cantera_INCLUDE_DIR-NOTFOUND )
+  message( WARNING "Could not find Cantera in suggested location ${Cantera_DIR}. Looking in other locations\n" )
+endif()
+# try other locations
+find_library( Cantera_LIBRARIES NAMES cantera HINTS /usr/local )
+find_path( Cantera_INCLUDE_DIR NAMES IdealGasMix.h HINTS /usr/local PATH_SUFFIXES cantera )
+if( ${Cantera_INCLUDE_DIR} STREQUAL Cantera_INCLUDE_DIR-NOTFOUND )
+  message( FATAL_ERROR "Could not find Cantera\n" )
 endif()
 message( STATUS "Cantera libraries at " ${Cantera_LIBRARIES} )
 message( STATUS "Cantera includes  at " ${Cantera_INCLUDE_DIR} )
 
+#-------------------------------------------------------------------------------
+#------------------------------- BLAS & Threads --------------------------------
+#-------------------------------------------------------------------------------
 find_package( BLAS REQUIRED )
 
 set( TPL_LIBRARIES ${TPL_LIBRARIES} ${Cantera_LIBRARIES}  ${BLAS_LIBRARIES} )
