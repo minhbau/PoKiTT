@@ -286,7 +286,7 @@ void get_timings( size_t n, size_t numberOfRepeats, std::string inputFileName )
 
   timeLogger.start( "eigendecomposition" );
   for( size_t nTimes=0; nTimes<numberOfRepeats; ++nTimes )
-    eigenvalues = chemPrimitiveJac.eigen_values();
+    eigenvalues = chemPrimitiveJac.real_eigenvalues();
   timeLogger.stop( "eigendecomposition" );
 
   // ---------------- find maximum local eigenvalue of the Jacobian ----------------
