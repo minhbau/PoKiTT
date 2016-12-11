@@ -91,7 +91,7 @@ public:
 
   ~Density();
   void evaluate();
-
+  void sensitivity( const Expr::Tag& var );
 };
 
 // ###################################################################
@@ -135,6 +135,24 @@ evaluate()
   const FieldT& p   =   p_->field_ref();
   const FieldT& mmw = mmw_->field_ref();
   rho <<= p * mmw / ( t * gasConstant_ );
+}
+
+//--------------------------------------------------------------------
+
+template< typename FieldT >
+void
+Density<FieldT>::
+sensitivity( const Expr::Tag& var )
+{
+  using namespace SpatialOps;
+  if( var == this->get_tag() ){
+    this->sensitivity_result( var ) <<= 0.0;
+  }
+  else{
+    this->sensitivity_result( var ) <<= this->value() * ( p_  ->sens_field_ref( var ) / p_  ->field_ref() +
+                                                          mmw_->sens_field_ref( var ) / mmw_->field_ref() - /* yes, this is a minus */
+                                                          t_  ->sens_field_ref( var ) / t_  ->field_ref() );
+  }
 }
 
 //--------------------------------------------------------------------

@@ -91,7 +91,7 @@ public:
 
   ~Pressure(){}
   void evaluate();
-
+  void sensitivity( const Expr::Tag& var );
 };
 
 // ###################################################################
@@ -127,6 +127,24 @@ evaluate()
   const FieldT& t   = t_  ->field_ref();
   const FieldT& mmw = mmw_->field_ref();
   this->value() <<= rho * gasConstant_ * t / mmw;
+}
+
+//--------------------------------------------------------------------
+
+template< typename FieldT >
+void
+Pressure<FieldT>::
+sensitivity( const Expr::Tag& var )
+{
+  using namespace SpatialOps;
+  if( var == this->get_tag() ){
+    this->sensitivity_result( var ) <<= 0.0;
+  }
+  else{
+    this->sensitivity_result( var ) <<= this->value() * ( rho_->sens_field_ref( var ) / rho_->field_ref() +
+                                                          t_  ->sens_field_ref( var ) / t_  ->field_ref() - /* yes, this is a minus */
+                                                          mmw_->sens_field_ref( var ) / mmw_->field_ref() );
+  }
 }
 
 //--------------------------------------------------------------------
