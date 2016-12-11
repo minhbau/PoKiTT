@@ -52,8 +52,11 @@ add_test( NAME thermo_test_mix_h2             COMMAND thermo_test --mix      --x
 add_test( NAME thermo_test_h2                 COMMAND thermo_test            --xml-input-file=h2o2.xml     )
 add_test( NAME transport_test_h2              COMMAND transport_test         --xml-input-file=h2o2.xml     )
 add_test( NAME ajrates_test_h2_1atm           COMMAND aj_test                --xml-input-file=h2o2.xml --pressure=101325 --rates-vs-cantera )
-add_test( NAME ajrates_test_h2_2atm           COMMAND aj_test                --xml-input-file=h2o2.xml --pressure=202650 --rates-vs-cantera )    
-add_test( NAME idealgas_sens_test_h2          COMMAND idealgas_sens_test )
+add_test( NAME ajrates_test_h2_2atm           COMMAND aj_test                --xml-input-file=h2o2.xml --pressure=202650 --rates-vs-cantera )  
+
+if( NOT ENABLE_CUDA )   
+    add_test( NAME idealgas_sens_test_h2          COMMAND idealgas_sens_test )
+endif()
                                                                              
 add_test( NAME idealgas_test_GRI              COMMAND idealgas_test          --xml-input-file=gri30.xml    )
 add_test( NAME rxn_test_GRI_1atm              COMMAND rxn_test               --xml-input-file=gri30.xml --pressure=101325 )
