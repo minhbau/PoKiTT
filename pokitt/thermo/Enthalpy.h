@@ -64,6 +64,7 @@ class Enthalpy
   const int nSpec_; // number of species
   std::vector< ThermData > specThermVec_;
   std::ostringstream exceptionMsg_; // generic exception to be thrown
+  const Expr::Tag& temperatureTag_;
 
   Enthalpy( const Expr::Tag& tTag,
             const Expr::TagList& massFracTags );
@@ -123,6 +124,7 @@ class SpeciesEnthalpy
   const int n_; //index of species to be evaluated
   ThermData specTherm_;
   std::ostringstream exceptionMsg_; // generic exception to be thrown
+  const Expr::Tag& temperatureTag_;
 
   SpeciesEnthalpy( const Expr::Tag& tTag,
                    const int n );
@@ -154,6 +156,7 @@ public:
 
   ~SpeciesEnthalpy(){}
   void evaluate();
+  void sensitivity( const Expr::Tag& var );
 };
 
 
@@ -169,7 +172,8 @@ Enthalpy<FieldT>::
 Enthalpy( const Expr::Tag& tTag,
           const Expr::TagList& massFracTags )
   : Expr::Expression<FieldT>(),
-    nSpec_( CanteraObjects::number_species() )
+    nSpec_( CanteraObjects::number_species() ),
+    temperatureTag_( tTag )
 {
   this->set_gpu_runnable( true );
 
@@ -295,7 +299,8 @@ SpeciesEnthalpy( const Expr::Tag& tTag,
                  const int n )
   : Expr::Expression<FieldT>(),
     n_ ( n ),
-    specTherm_( CanteraObjects::species_thermo( n ) )
+    specTherm_( CanteraObjects::species_thermo( n ) ),
+    temperatureTag_( tTag )
 {
   this->set_gpu_runnable( true );
 
@@ -366,6 +371,48 @@ evaluate()
     std::ostringstream msg;
     msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n_ << exceptionMsg_.str();
     throw std::runtime_error( msg.str() );
+    }
+  }
+}
+
+//--------------------------------------------------------------------
+
+template< typename FieldT >
+void
+SpeciesEnthalpy<FieldT>::
+sensitivity( const Expr::Tag& var )
+{
+  using namespace SpatialOps;
+  FieldT& dhdv = this->sensitivity_result( var );
+
+  const FieldT& temp = t_->field_ref();
+  const FieldT& dTdv = t_->sens_field_ref( var );
+
+  if( var == this->get_tag() ){
+    dhdv <<= 1.0;
+  }
+  else{
+    const std::vector<double>& c = specTherm_.coefficients;
+    const double minT = specTherm_.minTemp;
+    const double maxT = specTherm_.maxTemp;
+    switch ( specTherm_.type ) {
+      /* polynomial can be out of bounds low, low temp, high temp, or out of bounds high
+       * if out of bounds, enthalpy is interpolated from min or max temp using a constant cp
+       */
+      case CONST_POLY:
+        dhdv <<= c[3] * dTdv;
+        break;
+      case NASA_POLY:
+        dhdv <<= cond( temp <= c[0] && temp >= minT, dTdv * ( c[8] + temp * ( 2.0 * c[9] + temp * ( 3.0 * c[10] + temp * ( 4.0 * c[11] + 5.0 * temp * c[12] )))) )  // if low temp
+                     ( temp >  c[0] && temp <= maxT, dTdv * ( c[1] + temp * ( 2.0 * c[2] + temp * ( 3.0 * c[ 3] + temp * ( 4.0 * c[ 4] + 5.0 * temp * c[ 5] )))) )  // else if high temp
+                     ( temp < minT,                  c[8] * dTdv + minT * ( 2*c[9] * dTdv + minT * ( 3*c[10] * dTdv - c[9] + minT * ( 4*c[11] * dTdv - 2*c[10] + minT * ( 5*c[12] * dTdv - 3*c[11] + minT * -4*c[12] )))) )  // else if out of bounds - low
+                     (                               c[1] * dTdv + maxT * ( 2*c[2] * dTdv + maxT * ( 3*c[ 3] * dTdv - c[2] + maxT * ( 4*c[ 4] * dTdv - 2*c[ 3] + maxT * ( 5*c[ 5] * dTdv - 3*c[ 4] + maxT * -4*c[ 5] )))) ); // else out of bounds - high
+        break;
+      default: {
+        std::ostringstream msg;
+        msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n_ << exceptionMsg_.str();
+        throw std::runtime_error( msg.str() );
+      }
     }
   }
 }
