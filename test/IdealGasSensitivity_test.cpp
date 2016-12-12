@@ -52,9 +52,6 @@ using PressureT  = pokitt::Pressure<CellFieldT>::Builder;
 using SpeciesNT  = pokitt::SpeciesN<CellFieldT>::Builder;
 
 
-
-
-
 /**
  * !!!! GPU SUPPORT WILL BE DISABLED UNTIL SENSITIVITIES WORK ON GPU !!!!
  */
@@ -66,8 +63,6 @@ using SpeciesNT  = pokitt::SpeciesN<CellFieldT>::Builder;
 /**
  * !!!! GPU SUPPORT WILL BE DISABLED UNTIL SENSITIVITIES WORK ON GPU !!!!
  */
-
-
 
 
 int main()
@@ -112,8 +107,8 @@ int main()
     const Expr::Tag mmwTag( "mmw", Expr::STATE_NONE );
 
     tree.insert_tree( factory.register_expression( new PlaceHolderT( gridTag ) ) );
-    tree.insert_tree( factory.register_expression( new LinearT( tempTag, gridTag, leftTemp, rightTemp-leftTemp ) ) );
-    tree.insert_tree( factory.register_expression( new LinearT( presTag, gridTag, leftPres, rightPres-leftPres ) ) );
+    tree.insert_tree( factory.register_expression( new LinearT( tempTag, gridTag, rightTemp-leftTemp, leftTemp ) ) );
+    tree.insert_tree( factory.register_expression( new LinearT( presTag, gridTag, rightPres-leftPres, leftPres ) ) );
     for( int i=0; i<nSpec-1; ++i ){
       tree.insert_tree( factory.register_expression( new ConstantT( massTags[i], massFracs[i] ) ) );
     }

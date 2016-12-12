@@ -96,6 +96,7 @@ public:
 
   ~Enthalpy(){}
   void evaluate();
+  void sensitivity( const Expr::Tag& var );
 };
 
 /**
@@ -285,6 +286,94 @@ evaluate()
         std::ostringstream msg;
         msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_.str();
         throw std::runtime_error( msg.str() );
+        }
+      }
+    }
+  }
+}
+
+//--------------------------------------------------------------------
+
+template< typename FieldT >
+void
+Enthalpy<FieldT>::
+sensitivity( const Expr::Tag& var )
+{
+  using namespace SpatialOps;
+  FieldT& dhdv = this->sensitivity_result( var );
+
+  const FieldT& temp = t_->field_ref();
+  const FieldT& dTdv = t_->sens_field_ref( var );
+
+  if( var == this->get_tag() ){
+    dhdv <<= 1.0;
+  }
+  else{
+# ifndef ENABLE_CUDA
+    const double maxTval = field_max_interior(temp);
+    const double minTval = field_min_interior(temp);
+# endif
+
+    dhdv <<= 0.0;
+
+    for( size_t n=0; n<nSpec_; ++n ){
+      const FieldT& yi = massFracs_[n]->field_ref();
+      const FieldT& dyidv = massFracs_[n]->sens_field_ref( var );
+      SpatFldPtr<FieldT> hiPtr = SpatialFieldStore::get<FieldT>( yi );
+      FieldT& hi = *hiPtr;
+
+      const ThermData& thermo = specThermVec_[n];
+      const ThermoPoly polyType = thermo.type;
+      const std::vector<double>& c = thermo.coefficients;
+      const double minT = thermo.minTemp;
+      const double maxT = thermo.maxTemp;
+#   ifndef ENABLE_CUDA // optimization benefits only the CPU - cond performs betters with if/else than with if/elif/elif/else
+      if( maxTval <= maxT && minTval >= minT){ // if true, temperature can only be either high or low
+        switch (polyType) {
+          /* polynomial can be low temp or high temp */
+          case CONST_POLY: // constant heat capacity
+            hi <<= c[1] + c[3] * (temp - c[0]);
+            dhdv <<= dhdv + hi * dyidv + yi * c[3] * dTdv;
+            break;
+          case NASA_POLY:
+            hi <<= cond( temp <= c[0] , c[13] + temp * ( c[8] + temp * ( c[9] + temp * ( c[10] + temp * ( c[11] + temp * c[12] )))) )  // if low temp
+                       (                c[ 6] + temp * ( c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * ( c[ 4] + temp * c[ 5] )))) );  // else if high temp
+            dhdv <<= dhdv + hi * dyidv + ( yi * cond( temp <= c[0] , dTdv * ( c[8] + temp * ( 2.0 * c[9] + temp * ( 3.0 * c[10] + temp * ( 4.0 * c[11] + 5.0 * temp * c[12] )))) )  // if low temp
+                                                    (                dTdv * ( c[1] + temp * ( 2.0 * c[2] + temp * ( 3.0 * c[ 3] + temp * ( 4.0 * c[ 4] + 5.0 * temp * c[ 5] )))) ) );  // else if high temp
+            break;
+          default: {
+            std::ostringstream msg;
+            msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_.str();
+            throw std::runtime_error( msg.str() );
+          }
+        }
+      }
+      else
+#   endif
+      {
+        switch (polyType) {
+          /* polynomial can be out of bounds low, low temp, high temp, or out of bounds high
+           * if out of bounds, enthalpy is interpolated from min or max temp using a constant cp
+           */
+          case CONST_POLY: // constant heat capacity
+            hi <<= ( c[1] + c[3] * (temp - c[0]) );
+            dhdv <<= dhdv + hi * dyidv + yi * c[3] * dTdv;
+            break;
+          case NASA_POLY:
+            hi <<= cond( temp <= c[0] && temp >= minT, c[13] + temp * ( c[8] + temp * ( c[9] + temp * ( c[10] + temp * ( c[11] + temp * c[12] )))) )  // if low temp
+                       ( temp >  c[0] && temp <= maxT, c[ 6] + temp * ( c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * ( c[ 4] + temp * c[ 5] )))) )  // else if high temp
+                       ( temp < minT,                  c[13] + c[8] * temp + minT * ( 2*c[9] * temp + minT * ( 3*c[10] * temp - c[9] + minT * ( 4*c[11] * temp - 2*c[10] + minT * ( 5*c[12] * temp - 3*c[11] + minT * -4*c[12] )))) )  // else if out of bounds - low
+                       (                               c[ 6] + c[1] * temp + maxT * ( 2*c[2] * temp + maxT * ( 3*c[ 3] * temp - c[2] + maxT * ( 4*c[ 4] * temp - 2*c[ 3] + maxT * ( 5*c[ 5] * temp - 3*c[ 4] + maxT * -4*c[ 5] )))) ); // else out of bounds - high
+            dhdv <<= dhdv + hi * dyidv + yi * ( cond( temp <= c[0] && temp >= minT, dTdv * ( c[8] + temp * ( 2.0 * c[9] + temp * ( 3.0 * c[10] + temp * ( 4.0 * c[11] + 5.0 * temp * c[12] )))) )  // if low temp
+                                                    ( temp >  c[0] && temp <= maxT, dTdv * ( c[1] + temp * ( 2.0 * c[2] + temp * ( 3.0 * c[ 3] + temp * ( 4.0 * c[ 4] + 5.0 * temp * c[ 5] )))) )  // else if high temp
+                                                    ( temp < minT,                  c[8] * dTdv + minT * ( 2*c[9] * dTdv + minT * ( 3*c[10] * dTdv - c[9] + minT * ( 4*c[11] * dTdv - 2*c[10] + minT * ( 5*c[12] * dTdv - 3*c[11] + minT * -4*c[12] )))) )  // else if out of bounds - low
+                                                    (                               c[1] * dTdv + maxT * ( 2*c[2] * dTdv + maxT * ( 3*c[ 3] * dTdv - c[2] + maxT * ( 4*c[ 4] * dTdv - 2*c[ 3] + maxT * ( 5*c[ 5] * dTdv - 3*c[ 4] + maxT * -4*c[ 5] )))) ) ); // else out of bounds - high
+            break;
+          default: {
+            std::ostringstream msg;
+            msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_.str();
+            throw std::runtime_error( msg.str() );
+          }
         }
       }
     }
