@@ -102,6 +102,7 @@ public:
 
   ~HeatCapacity_Cp();
   void evaluate();
+  void sensitivity( const Expr::Tag& var );
 };
 
 /**
@@ -167,6 +168,7 @@ public:
 
   ~SpeciesHeatCapacity_Cp();
   void evaluate();
+  void sensitivity( const Expr::Tag& var );
 };
 
 
@@ -303,6 +305,86 @@ evaluate()
 //--------------------------------------------------------------------
 
 template< typename FieldT >
+void
+HeatCapacity_Cp<FieldT>::
+sensitivity( const Expr::Tag& var )
+{
+  using namespace SpatialOps;
+  using namespace Cantera;
+
+  FieldT& dcpdv = this->sensitivity_result( var );
+
+  const FieldT& t = t_->field_ref();
+  const FieldT& dTdv = t_->sens_field_ref( var );
+
+# ifndef ENABLE_CUDA
+  const double maxTval = field_max_interior(t);
+  const double minTval = field_min_interior(t);
+# endif
+
+  dcpdv <<= 0.0; // set cp to 0 before starting summation
+
+  for( size_t n=0; n<nSpec_; ++n ){
+    const FieldT& yi = massFracs_[n]->field_ref();
+    const FieldT& dyidv = massFracs_[n]->sens_field_ref( var );
+    SpatFldPtr<FieldT> cpiPtr = SpatialFieldStore::get<FieldT>( yi );
+    FieldT& cpi = *cpiPtr;
+    const ThermData& thermo = specThermVec_[n];
+    const ThermoPoly polyType = thermo.type;
+    const std::vector<double>& c = thermo.coefficients;
+    const double minT = thermo.minTemp;
+    const double maxT = thermo.maxTemp;
+#   ifndef ENABLE_CUDA // optimization benefits only the CPU - cond performs betters with if/else than with if/elif/elif/else
+    if( maxTval <= maxT && minTval >= minT){ // if true, temperature can only be either high or low
+      switch (polyType) {
+      case CONST_POLY:
+        dcpdv <<= dcpdv + dyidv * c[3];
+        break;
+        /* polynomials are applicable in two temperature ranges - high and low
+         * If the temperature is out of range, the value is set to the value at the min or max temp
+         */
+      case NASA_POLY:
+        cpi <<= cond( t <= c[0] , c[8] + t  * ( c[9] + t  * ( c[10] + t  * ( c[11] + t  * c[12] ))) )  // if low temp
+                    (             c[1] + t  * ( c[2] + t  * ( c[ 3] + t  * ( c[ 4] + t  * c[ 5] ))) );  // else if high temp
+        dcpdv <<= dcpdv + dyidv * cpi + yi * cond( t <= c[0] , dTdv  * ( c[9] + t  * ( 2.0 * c[10] + t  * ( 3.0 * c[11] + t  * 4.0 * c[12] ))) )  // if low temp
+                                                 (             dTdv  * ( c[2] + t  * ( 2.0 * c[ 3] + t  * ( 3.0 * c[ 4] + t  * 4.0 * c[ 5] ))) );  // else if high temp
+        break;
+      default: {
+        std::ostringstream msg;
+        msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_.str();
+        throw std::runtime_error( msg.str() );
+        }
+      }
+    }
+    else
+#   endif
+    {
+      switch (polyType) {
+      case CONST_POLY:
+        dcpdv <<= dcpdv + dyidv * c[3];
+        break;
+        /* polynomials are applicable in two temperature ranges - high and low
+         * If the temperature is out of range, the value is set to the value at the min or max temp
+         */
+      case NASA_POLY:
+        dcpdv <<= dcpdv + dyidv * cpi + yi * cond( t <= c[0] && t >= minT, dTdv  * ( c[9] + t  * ( 2.0 * c[10] + t  * ( 3.0 * c[11] + t  * 4.0 * c[12] ))) )  // if low temp
+                                                 ( t >  c[0] && t <= maxT, dTdv  * ( c[2] + t  * ( 2.0 * c[ 3] + t  * ( 3.0 * c[ 4] + t  * 4.0 * c[ 5] ))) )  // else if high temp
+                                                 ( t < minT,               0.0 )  // else if out of bounds - low
+                                                 (                         0.0 ); // else out of bounds - high
+        break;
+      default: {
+        std::ostringstream msg;
+        msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_.str();
+        throw std::runtime_error( msg.str() );
+        }
+      }
+    }
+  }
+}
+
+//--------------------------------------------------------------------
+
+template< typename FieldT >
 SpeciesHeatCapacity_Cp<FieldT>::
 SpeciesHeatCapacity_Cp( const Expr::Tag& tTag,
                         const int n )
@@ -372,6 +454,42 @@ evaluate()
                ( t >  c[0] && t <= maxT, c[1] + t    * ( c[2] + t    * ( c[ 3] + t    * ( c[ 4] + t    * c[ 5] ))) )  // else if high temp
                ( t < minT,               c[8] + minT * ( c[9] + minT * ( c[10] + minT * ( c[11] + minT * c[12] ))) )  // else if out of bounds - low
                (                         c[1] + maxT * ( c[2] + maxT * ( c[ 3] + maxT * ( c[ 4] + maxT * c[ 5] ))) ); // else out of bounds - high
+    break;
+  default: {
+    std::ostringstream msg;
+    msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n_ << exceptionMsg_.str();
+    throw std::runtime_error( msg.str() );
+    }
+  }
+}
+
+//--------------------------------------------------------------------
+
+template< typename FieldT >
+void
+SpeciesHeatCapacity_Cp<FieldT>::
+sensitivity( const Expr::Tag& var )
+{
+  using namespace SpatialOps;
+  FieldT& dcpdv = this->sensitivity_result( var );
+  const FieldT t = t_->field_ref();
+  const FieldT dTdv = t_->sens_field_ref( var );
+
+  const std::vector<double>& c = specTherm_.coefficients;
+  const double minT = specTherm_.minTemp;
+  const double maxT = specTherm_.maxTemp;
+  switch ( specTherm_.type ) {
+  case CONST_POLY:
+    dcpdv <<= 0.0;
+    break;
+  case NASA_POLY:
+    /* polynomials are applicable in two temperature ranges - high and low
+     * If the temperature is out of range, the value is set to the value at the min or max temp
+     */
+    dcpdv <<= cond( t <= c[0] && t >= minT, dTdv * ( c[9] + t    * ( 2.0 * c[10] + t    * ( 3.0 * c[11] + t    * 4.0 * c[12] ))) )  // if low temp
+                  ( t >  c[0] && t <= maxT, dTdv * ( c[2] + t    * ( 2.0 * c[ 3] + t    * ( 3.0 * c[ 4] + t    * 4.0 * c[ 5] ))) )  // else if high temp
+                  ( t < minT,               0.0 )  // else if out of bounds - low
+                  (                         0.0 ); // else out of bounds - high
     break;
   default: {
     std::ostringstream msg;

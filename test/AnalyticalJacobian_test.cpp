@@ -119,8 +119,7 @@ void get_timings( size_t n, size_t numberOfRepeats, std::string inputFileName )
   for( size_t s=0; s<ns; ++s ){
     invMsp[s] = 1.0 / Msp[s];
   }
-  const double Ru    = CanteraObjects::gas_constant();
-  const double invRu = 1.0/Ru;
+  const double Ru = CanteraObjects::gas_constant();
 
   CellField T ( window, bcInfo, nghost, NULL, so::InternalStorage, LOCATION ); // temperature
 
@@ -290,8 +289,6 @@ void get_timings( size_t n, size_t numberOfRepeats, std::string inputFileName )
   timeLogger.stop( "eigendecomposition" );
 
   // ---------------- find maximum local eigenvalue of the Jacobian ----------------
-  double maxRealPosEig = 0.0;
-
   so::SpatFldPtr<CellField> dsPtr     = so::SpatialFieldStore::get<CellField>( T ); CellField& ds     = *dsPtr;
   so::SpatFldPtr<CellField> maxEigPtr = so::SpatialFieldStore::get<CellField>( T ); CellField& maxEig = *maxEigPtr;
 
@@ -379,8 +376,7 @@ void generate_jacobian_for_accuracy_test( const std::string& inputFile )
   for( size_t s=0; s<ns; ++s ){
     invMsp[s] = 1.0 / Msp[s];
   }
-  const double Ru    = CanteraObjects::gas_constant();
-  const double invRu = 1.0/Ru;
+  const double Ru = CanteraObjects::gas_constant();
 
   CellField T ( window, bcInfo, nghost, NULL, so::InternalStorage, LOCATION ); // temperature
 
