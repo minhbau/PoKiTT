@@ -64,7 +64,6 @@ class Enthalpy
   const int nSpec_; // number of species
   std::vector< ThermData > specThermVec_;
   std::ostringstream exceptionMsg_; // generic exception to be thrown
-  const Expr::Tag& temperatureTag_;
 
   Enthalpy( const Expr::Tag& tTag,
             const Expr::TagList& massFracTags );
@@ -125,7 +124,6 @@ class SpeciesEnthalpy
   const int n_; //index of species to be evaluated
   ThermData specTherm_;
   std::ostringstream exceptionMsg_; // generic exception to be thrown
-  const Expr::Tag& temperatureTag_;
 
   SpeciesEnthalpy( const Expr::Tag& tTag,
                    const int n );
@@ -173,8 +171,7 @@ Enthalpy<FieldT>::
 Enthalpy( const Expr::Tag& tTag,
           const Expr::TagList& massFracTags )
   : Expr::Expression<FieldT>(),
-    nSpec_( CanteraObjects::number_species() ),
-    temperatureTag_( tTag )
+    nSpec_( CanteraObjects::number_species() )
 {
   this->set_gpu_runnable( true );
 
@@ -321,7 +318,6 @@ sensitivity( const Expr::Tag& var )
       const FieldT& dyidv = massFracs_[n]->sens_field_ref( var );
       SpatFldPtr<FieldT> hiPtr = SpatialFieldStore::get<FieldT>( yi );
       FieldT& hi = *hiPtr;
-
       const ThermData& thermo = specThermVec_[n];
       const ThermoPoly polyType = thermo.type;
       const std::vector<double>& c = thermo.coefficients;
@@ -388,8 +384,7 @@ SpeciesEnthalpy( const Expr::Tag& tTag,
                  const int n )
   : Expr::Expression<FieldT>(),
     n_ ( n ),
-    specTherm_( CanteraObjects::species_thermo( n ) ),
-    temperatureTag_( tTag )
+    specTherm_( CanteraObjects::species_thermo( n ) )
 {
   this->set_gpu_runnable( true );
 
