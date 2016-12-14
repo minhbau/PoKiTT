@@ -327,8 +327,8 @@ MixtureFraction::set_stoichiometry( const Cantera::IdealGasMix& gas )
   //    CO2  H2O  N2  AR
   // Reactants have negative coefficients while Products have positive coefficients
         
-  std::vector<double> phi_reactant;   phi_reactant.assign( nspec_, 0.0 );
-  std::vector<double> phi_product ;   phi_product.assign(  nspec_, 0.0 );
+  std::vector<double> phiReactant;   phiReactant.assign( nspec_, 0.0 );
+  std::vector<double> phiProduct ;   phiProduct .assign( nspec_, 0.0 );
         
   vector<double> elemMoles_rx( nelem_, 0.0 );
         
@@ -336,8 +336,8 @@ MixtureFraction::set_stoichiometry( const Cantera::IdealGasMix& gas )
   // set the reactant composition (mole fractions) at stoichiometric conditions
   // this is also the stoichiometric coefficients for these species.
   //
-  mixfrac_to_species( stoichMixfrac_, phi_reactant );
-  mass_to_mole( specMolWt_, phi_reactant, phi_reactant );
+  mixfrac_to_species( stoichMixfrac_, phiReactant );
+  mass_to_mole( specMolWt_, phiReactant, phiReactant );
         
   //
   // get the elemental mole fractions for the reactants
@@ -346,7 +346,7 @@ MixtureFraction::set_stoichiometry( const Cantera::IdealGasMix& gas )
   for( int ielm=0; ielm<nelem_; ielm++ ){
     elemMoles_rx[ielm] = 0.0;
     for( int isp=0; isp<nspec_; isp++ ){
-      elemMoles_rx[ielm] += nAtom_[isp][ielm] * phi_reactant[isp];
+      elemMoles_rx[ielm] += nAtom_[isp][ielm] * phiReactant[isp];
     }
   }
         
@@ -355,24 +355,23 @@ MixtureFraction::set_stoichiometry( const Cantera::IdealGasMix& gas )
   // Carbon balance to get phi[iCO2], assuming CO2 is the only product containing C
   const int iCO2 = gas.speciesIndex("CO2");
   const int iC   = gas.elementIndex("C");
-  if( iCO2 >= 0 )
-    phi_product[iCO2] = elemMoles_rx[iC] + phi_reactant[iCO2];
+  if( iCO2 >= 0 ) phiProduct[iCO2] = elemMoles_rx[iC] + phiReactant[iCO2];
         
   // Hydrogen balance to get phi[iH2O], assuming H2O is the only product containing H
   const int iH2O = gas.speciesIndex("H2O");
   const int iH   = gas.elementIndex("H");
-  if( iH2O >= 0 )  phi_product[iH2O] = 0.5*elemMoles_rx[iH] + phi_reactant[iH2O];
+  if( iH2O >= 0 )  phiProduct[iH2O] = 0.5*elemMoles_rx[iH] + phiReactant[iH2O];
         
   // N2 balance
   const int iN2 = gas.speciesIndex("N2");
   const int iN  = gas.elementIndex("N");
-  if( iN2 >= 0 ) phi_product[iN2] = 0.5*elemMoles_rx[iN];
+  if( iN2 >= 0 ) phiProduct[iN2] = 0.5*elemMoles_rx[iN];
         
-  // Sulfur balanceot get phi[iSO2], assuming SO2 is the only product containing S.
+  // Sulfur balance to get phi[iSO2], assuming SO2 is the only product containing S.
   const int iSspecies = gas.speciesIndex("S");
   const int iSelem    = gas.elementIndex("S");
   const int iSO2      = gas.speciesIndex("SO2");
-  if( iSO2 >= 0 ) phi_product[iSO2] = phi_reactant[iSspecies] + elemMoles_rx[iSelem];
+  if( iSO2 >= 0 ) phiProduct[iSO2] = phiReactant[iSspecies] + elemMoles_rx[iSelem];
         
   // deal with other elements
   const vector<string> & elementNames = gas.elementNames();
@@ -389,14 +388,14 @@ MixtureFraction::set_stoichiometry( const Cantera::IdealGasMix& gas )
       assert( n <= 1 );
       if( n == 1 ){
         assert( ispec >= 0 );
-        phi_product[ispec] = elemMoles_rx[ielm];
+        phiProduct[ispec] = elemMoles_rx[ielm];
       }
     }
   }
         
   // normalize phi_product so that we have the product mole fractions
   // at stoichiometric conditions for complete reaction.
-  stoichProdMassFrac_ = phi_product;
+  stoichProdMassFrac_ = phiProduct;
   const double invSum = 1.0 / accumulate( stoichProdMassFrac_.begin(), stoichProdMassFrac_.end(), 0.0 );
   for( vector<double>::iterator ispmf = stoichProdMassFrac_.begin();
        ispmf != stoichProdMassFrac_.end();
@@ -404,8 +403,8 @@ MixtureFraction::set_stoichiometry( const Cantera::IdealGasMix& gas )
     {
       (*ispmf) *= invSum;
     }
-        
 }
+
 //--------------------------------------------------------------------
 
 } // namespace PoKiTT
