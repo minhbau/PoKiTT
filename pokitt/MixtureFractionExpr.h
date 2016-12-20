@@ -30,7 +30,7 @@
 #include <pokitt/MixtureFraction.h>  // mixture fraction support
 
 
-namespace PoKiTT{
+namespace pokitt{
 
 
 /**
@@ -171,6 +171,6 @@ public:
 };
 
 //--------------------------------------------------------------------
-} // namespace PoKiTT
+} // namespace pokitt
 
 #endif // MixtureFractionExpr_h

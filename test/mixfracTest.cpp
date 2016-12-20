@@ -81,7 +81,7 @@ bool test_mixfrac()
     fuel[ gas.speciesIndex("H2")  ] = 0.332;
     fuel[ gas.speciesIndex("N2")  ] = 0.447;
 
-    PoKiTT::MixtureFraction f( gas, oxid, fuel, false );
+    pokitt::MixtureFraction f( gas, oxid, fuel, false );
 
     //-----------------------------------------
     {
