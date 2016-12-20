@@ -1,5 +1,4 @@
 #include <pokitt/MixtureFraction.h>
-#include <pokitt/CanteraObjects.h>
 
 #include <pokitt/MixtureFractionExpr.h> // tests syntax only.
 #include <spatialops/structured/FVStaggeredFieldTypes.h>
@@ -89,7 +88,8 @@ bool test_mixfrac()
     {
       typedef pokitt::MixtureFractionToSpecies<SpatialOps::SingleValueField> Z2Y;
       typedef Z2Y::Builder MixFracToSpec;
-      MixFracToSpec* z2y = new MixFracToSpec( Expr::tag_list( CanteraObjects::species_names(), Expr::STATE_N ),
+      std::vector<std::string> specNames = {"CH4","H2","N2","O2"};
+      MixFracToSpec* z2y = new MixFracToSpec( Expr::tag_list( specNames, Expr::STATE_N ),
                                               Expr::Tag("MixtureFraction",Expr::STATE_NONE),
                                               fuel,
                                               oxid,
