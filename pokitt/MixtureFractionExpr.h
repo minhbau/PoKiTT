@@ -99,11 +99,6 @@ template<typename FieldT>
 class MixtureFractionToSpecies
   : public Expr::Expression<FieldT>
 {
-  enum ReactedState{
-    REACTED_COMPOSITION,
-    UNREACTED_COMPOSITION
-  };
-
   DECLARE_FIELD( FieldT, mixFracField_ )
 
   const MixtureFraction mixfrac_;
@@ -124,6 +119,11 @@ class MixtureFractionToSpecies
   ~MixtureFractionToSpecies(){}
 
 public:
+
+  enum ReactedState{
+    REACTED_COMPOSITION,
+    UNREACTED_COMPOSITION
+  };
 
   class Builder : public Expr::ExpressionBuilder
   {
