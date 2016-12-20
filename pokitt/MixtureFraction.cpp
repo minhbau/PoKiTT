@@ -10,7 +10,7 @@
 using std::vector;
 using std::string;
 
-namespace PoKiTT{
+namespace pokitt{
 
 //====================================================================
 
@@ -407,4 +407,4 @@ MixtureFraction::set_stoichiometry( const Cantera::IdealGasMix& gas )
 
 //--------------------------------------------------------------------
 
-} // namespace PoKiTT
+} // namespace pokitt

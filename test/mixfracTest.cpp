@@ -70,7 +70,7 @@ bool test_mixfrac()
     // mole fractions
     fuel[ gas.speciesIndex("CH4") ] = 0.221;
 
-    PoKiTT::MixtureFraction f0( gas, oxid, fuel, false );
+    pokitt::MixtureFraction f0( gas, oxid, fuel, false );
 
     // mole fractions
     oxid[ gas.speciesIndex("O2") ] = 0.21;

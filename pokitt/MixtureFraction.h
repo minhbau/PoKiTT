@@ -40,7 +40,7 @@ namespace Cantera{
 ///** test the mixture fraction class.  Returns true for pass, false for fail */
 //bool perform_mixfrac_tests();
 
-namespace PoKiTT{
+namespace pokitt{
 
 //--------------------------------------------------------------------
 /**
