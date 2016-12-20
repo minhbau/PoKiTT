@@ -1,4 +1,9 @@
 #include <pokitt/MixtureFraction.h>
+#include <pokitt/CanteraObjects.h>
+
+#include <pokitt/MixtureFractionExpr.h> // tests syntax only.
+#include <spatialops/structured/FVStaggeredFieldTypes.h>
+#include <expression/Tag.h>
 
 #include <cantera/IdealGasMix.h>
 #include <cantera/thermo/ConstCpPoly.h>
@@ -80,6 +85,16 @@ bool test_mixfrac()
     fuel[ gas.speciesIndex("CH4") ] = 0.221;
     fuel[ gas.speciesIndex("H2")  ] = 0.332;
     fuel[ gas.speciesIndex("N2")  ] = 0.447;
+
+    {
+      typedef pokitt::MixtureFractionToSpecies<SpatialOps::SingleValueField> Z2Y;
+      typedef Z2Y::Builder MixFracToSpec;
+      MixFracToSpec* z2y = new MixFracToSpec( Expr::tag_list( CanteraObjects::species_names(), Expr::STATE_N ),
+                                              Expr::Tag("MixtureFraction",Expr::STATE_NONE),
+                                              fuel,
+                                              oxid,
+                                              Z2Y::REACTED_COMPOSITION );
+    }
 
     pokitt::MixtureFraction f( gas, oxid, fuel, false );
 

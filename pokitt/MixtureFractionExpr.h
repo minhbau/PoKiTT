@@ -96,30 +96,9 @@ public:
  * \brief Calculate the species compositions (either unreacted or reacted with infinitely fast chemistry) given the mixture fraction.
  */
 template<typename FieldT>
-class MixtureFractionToSpecies
-  : public Expr::Expression<FieldT>
+class MixtureFractionToSpecies : public Expr::Expression<FieldT>
 {
-  DECLARE_FIELD( FieldT, mixFracField_ )
-
-  const MixtureFraction mixfrac_;
-  const ReactedState state_;
-
-  MixtureFractionToSpecies( const Expr::Tag& mixFracTag,
-                            const std::vector<double>& fuelMassFracs,
-                            const std::vector<double>& oxidMassFracs,
-                            const ReactedState state )
-  : Expr::Expression<FieldT>(),
-    mixfrac_( oxidMassFracs, fuelMassFracs, true ),
-    state_( state )
-  {
-    this->set_gpu_runnable(true);
-    this->template create_field_request<FieldT>( mixFracTag, mixFracField_ );
-  }
-
-  ~MixtureFractionToSpecies(){}
-
 public:
-
   enum ReactedState{
     REACTED_COMPOSITION,
     UNREACTED_COMPOSITION
@@ -161,12 +140,34 @@ public:
   };
 
   void evaluate(){
+    const FieldT& mixfrac = mixFracField_->field_ref();
     switch( state_ ){
-      case UNREACTED_COMPOSITION: mixfrac_.mixfrac_to_species   ( mixFracField_, this->get_value_vec() ); break;
-      case   REACTED_COMPOSITION: mixfrac_.estimate_product_comp( mixFracField_, this->get_value_vec() ); break;
+      case UNREACTED_COMPOSITION: mixfrac_.mixfrac_to_species   <FieldT>( mixfrac, this->get_value_vec() ); break;
+      case   REACTED_COMPOSITION: mixfrac_.estimate_product_comp<FieldT>( mixfrac, this->get_value_vec() ); break;
       default: assert( false );
     }
   }
+
+private:
+
+  DECLARE_FIELD( FieldT, mixFracField_ )
+
+  const MixtureFraction mixfrac_;
+  const ReactedState state_;
+
+  MixtureFractionToSpecies( const Expr::Tag& mixFracTag,
+                            const std::vector<double>& fuelMassFracs,
+                            const std::vector<double>& oxidMassFracs,
+                            const ReactedState state )
+  : Expr::Expression<FieldT>(),
+    mixfrac_( oxidMassFracs, fuelMassFracs, true ),
+    state_( state )
+  {
+    this->set_gpu_runnable(true);
+    mixFracField_ = this->template create_field_request<FieldT>( mixFracTag );
+  }
+
+  ~MixtureFractionToSpecies(){}
 
 };
 

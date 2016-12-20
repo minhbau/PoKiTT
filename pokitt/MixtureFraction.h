@@ -156,7 +156,7 @@ public:
    */
   template< typename FieldT >
   inline void
-  species_to_mixfrac( std::vector< boost::shared_ptr< const Expr::FieldRequest<FieldT> > >& massFrac,
+  species_to_mixfrac( std::vector< SpatialOps::SpatFldPtr<FieldT> >& massFrac,
                       FieldT& mixFrac ) const
   {
     using namespace SpatialOps;
@@ -190,7 +190,7 @@ public:
       }
       fac /= ( beta1_ - beta0_ );
 
-      mixFrac <<= mixFrac + fac * massFrac[i]->field_ref() / specMolWt_[i];
+      mixFrac <<= mixFrac + fac * *massFrac[i] / specMolWt_[i];
     }
   }
 
@@ -209,13 +209,13 @@ public:
   template< typename FieldT >
   inline void
   mixfrac_to_species( const FieldT& mixFrac,
-                      std::vector< boost::shared_ptr< const Expr::FieldRequest<FieldT> > >& massFrac ) const
+                      std::vector< SpatialOps::SpatFldPtr<FieldT> >& massFrac ) const
   {
     using namespace SpatialOps;
     assert( ready_ );
     assert( nspec_ == (int)massFrac.size() );
     for( size_t isp=0; isp!=nspec_; ++isp ){
-      massFrac[isp]->field_ref() <<= mixFrac * fuelMassFrac_[isp] + (1.0-mixFrac) * oxidMassFrac_[isp];
+      *massFrac[isp] <<= mixFrac * fuelMassFrac_[isp] + (1.0-mixFrac) * oxidMassFrac_[isp];
     }
   }
 
@@ -304,7 +304,7 @@ public:
    */
   template< typename FieldT >
   void estimate_product_comp( const FieldT& mixFrac,
-                              std::vector<FieldT*> & massFrac ) const
+                              std::vector< SpatialOps::SpatFldPtr<FieldT> > & massFrac ) const
   {
     using namespace SpatialOps;
     SpatFldPtr<FieldT> rich = SpatialFieldStore::get<FieldT>( mixFrac );
