@@ -43,11 +43,11 @@ setup_test()
 {
   std::cout <<"calling setup_test...\n";
 
-  std::string inputFileName = "gri30.xml";
+  std::string inputFileName = "h2o2.xml";
   const CanteraObjects::Setup setup( "Mix", inputFileName );
   CanteraObjects::setup_cantera( setup );
 
-  const size_t nSpec = CanteraObjects::number_species();
+  const size_t nSpec = CanteraObjects::number_species(); std::cout<<"\nnSpec: " <<nSpec<<std::endl;
   const std::vector<std::string>& spNames = CanteraObjects::species_names();
   const std::vector<std::string>  spNamesNM1(spNames.begin(),spNames.end()-1);
 
@@ -65,8 +65,9 @@ setup_test()
   std::vector<double> rhoYi( nSpec-1, 0.0 );
   for( int i=0; i<nSpec; ++i ){
     yiOld[i] = 1.         / static_cast<double>( nSpec );
-
+    std::cout<<"\nsetting yi: " <<i<<std::endl;
     if( i < nSpec-1){
+      std::cout<<"\n setting rhoYi: " <<i<<std::endl;
       rhoYi[i] = newDensity / static_cast<double>( nSpec );
     }
   }
@@ -94,6 +95,7 @@ setup_test()
   std::cout<<"\ncheckpoint 2\n";
 
   for( int i=0; i<nSpec-1; ++i ){
+    std::cout<<"\nregistering yi and rhoYi: " <<i<<std::endl;
     tree.insert_tree( factory.register_expression( new ConstantT( yiOldTags[i], yiOld[i] ) ) );
     tree.insert_tree( factory.register_expression( new ConstantT( rhoYiTags[i], rhoYi[i] ) ) );
   }
@@ -109,6 +111,7 @@ setup_test()
   tree.insert_tree( factory.register_expression( new DensityT( oldDensTag, oldTempTag, pressTag, mixMWTag ) ) );
 
   tree.insert_tree( factory.register_expression( new DensSolveT( newDensTag, oldDensTag, oldEnthTag, rhoEnthTag, yiOldTags, rhoYiTags, rTol, iter ) ) );
+//  tree.insert_tree( factory.register_expression( new DensityT( newDensTag, oldTempTag, pressTag, mixMWTag ) ) );
   std::cout<<"\ncheckpoint 3\n";
 
   tree.register_fields( fml );
