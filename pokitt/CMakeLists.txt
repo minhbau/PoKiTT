@@ -6,6 +6,7 @@ add_library( pokitt
   CanteraObjects.cpp 
   MixtureFraction.cpp
   kinetics/ReactionInfo.cpp 
+  DensitySolve/DensityCalculator_Species.cc
   )
 
 target_link_libraries( pokitt ${TPL_LIBRARIES} )

@@ -26,6 +26,9 @@ if( NOT ENABLE_CUDA )
     target_link_libraries( cp_sens_test pokitt )
 endif()
 
+nebo_add_executable( DensitySolveTest DensitySolveTest.cpp )
+target_link_libraries( DensitySolveTest pokitt )
+
 nebo_add_executable( rxn_test ReactionRates_test.cpp )
 target_link_libraries( rxn_test pokitt )
 
