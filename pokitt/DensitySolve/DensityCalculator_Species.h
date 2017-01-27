@@ -100,6 +100,7 @@ public:
              const unsigned       maxiter );
 
     Expr::ExpressionBase* build() const{
+      std::cout<<"Expr::build()\n";
       return new DensityFromSpecies<FieldT>( rhoOldTag_, hOldTag_, rhoHTag_, yiOldTags_, rhoYiTags_ );
     }
 

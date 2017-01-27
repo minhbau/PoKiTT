@@ -109,7 +109,7 @@ evaluate()
     }
 
     //enthalpy
-    phi(nEq_) = hOld_->field_ref();
+    phi(nEq_-1) = hOld_->field_ref();
 
 
 //  ================= nonlinear solve =================== //
@@ -154,7 +154,7 @@ calc_jac_and_res( SpatialOps::FieldMatrix<FieldT>& jacobian,
     negOfResidual(i) <<= -rhoYi_[i]->field_ref() + rho * phi(i);
   }
   // enthalpy
-  negOfResidual(nEq_) <<= -rhoH_->field_ref() + rho * phi(nEq_);
+  negOfResidual(nEq_-1) <<= -rhoH_->field_ref() + rho * phi(nEq_-1);
 
   // [Jacobian] - rho*[identity]
   for( int i = 0; i<nEq_-1; ++i){
