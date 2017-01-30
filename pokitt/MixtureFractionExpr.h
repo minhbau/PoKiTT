@@ -148,6 +148,17 @@ public:
     }
   }
 
+  void sensitivity( const Expr::Tag& varTag ){
+    const Expr::TagList& specTags = this->get_tags();
+    for( const auto& t : specTags ){
+      this->sensitivity_result( t, varTag ) <<= 0.0;
+    }
+    const auto& specTagIter = std::find( specTags.begin(), specTags.end(), varTag );
+    if( specTagIter != specTags.end() ){
+      this->sensitivity_result( *specTagIter, varTag ) <<= 1.0;
+    }
+  }
+
 private:
 
   DECLARE_FIELD( FieldT, mixFracField_ )
