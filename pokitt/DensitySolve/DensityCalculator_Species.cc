@@ -5,6 +5,8 @@
 #include <spatialops/structured/SpatialFieldStore.h>
 #include <spatialops/structured/MatVecOps.h>
 
+#include <expression/ExprPatch.h>
+
 namespace WasatchCore{
 
 // ###################################################################
@@ -42,6 +44,9 @@ DensityFromSpecies( const Expr::Tag&     rhoOldTag,
 
   this->template create_field_vector_request<FieldT>(yiOldTags, yiOld_);
   this->template create_field_vector_request<FieldT>(rhoYiTags, rhoYi_);
+
+  // Define a patch based on the MemoryWindow of the rhoOld field
+  const SpatialOps::MemoryWindow&     window   = rhoOld_->field_ref().window_with_ghost();
   std::cout<<"done\n";
 }
 
@@ -84,6 +89,7 @@ evaluate()
   const BoundaryCellInfo& bcInfo   = rho.boundary_info();
   const GhostData&        ghosts   = rho.get_ghost_data();
   const short int         devIndex = rho.active_device_index();
+
 
   // how are we going to update these?
   SpatFldPtr<FieldT> mixMW       = SpatialFieldStore::get<FieldT>( rho );
