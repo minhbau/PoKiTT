@@ -219,6 +219,27 @@ public:
     }
   }
 
+
+  /**
+   *  @brief Compute sensitivity of the unreacted species mass fractions to mixture fraction
+   *
+   *  @param mixFracSensitivity  : Sensitivity field of the mixture fraction
+   *  @param massFracSensitivity : Sensitivity of the UNREACTED mixture mass fractions obtained
+   *                               by pure mixing of the fuel and oxidizer streams
+   */
+  template< typename FieldT >
+  inline void
+  mixfrac_to_species_sensitivity( const FieldT& mixFracSensitivity,
+                                  std::vector< SpatialOps::SpatFldPtr<FieldT> >& massFracSensitivity ) const
+  {
+    using namespace SpatialOps;
+    assert( ready_ );
+    assert( nspec_ == (int)massFracSensitivity.size() );
+    for( size_t isp=0; isp!=nspec_; ++isp ){
+      *massFracSensitivity[isp] <<= mixFracSensitivity * ( fuelMassFrac_[isp] - oxidMassFrac_[isp] );
+    }
+  }
+
   // scalar version
   void mixfrac_to_species( const double mixFrac,
                            std::vector<double> & species ) const;
@@ -318,6 +339,35 @@ public:
                            ( mixFrac < stoichMixfrac_,
                                oxidMassFrac_[i] * ( 1.0 - *lean ) + stoichProdMassFrac_[i] * *lean )
                            ( stoichProdMassFrac_[i] );
+    }
+  }
+
+
+  /**
+   *  @brief Estimate sensitivity of the products of COMPLETE combustion
+   *  @param mixFracValue        : The mixture fraction value field.
+   *  @param mixFracSensitivity  : The mixture fraction sensitivity field.
+   *  @param massFracSensitivity : Sensitivity of product composition for COMPLETE combustion
+   *
+   *  See docs of estimate_product_comp for more details.
+   */
+  template< typename FieldT >
+  void estimate_product_comp_sensitivity( const FieldT& mixFracValue,
+                                          const FieldT& mixFracSensitivity,
+                                          std::vector< SpatialOps::SpatFldPtr<FieldT> > & massFracSensitivity ) const
+  {
+    using namespace SpatialOps;
+    SpatFldPtr<FieldT> rich = SpatialFieldStore::get<FieldT>( mixFracSensitivity );
+    SpatFldPtr<FieldT> lean = SpatialFieldStore::get<FieldT>( mixFracSensitivity );
+
+    *rich <<= mixFracSensitivity / (1.0-stoichMixfrac_);
+    *lean <<= mixFracSensitivity / stoichMixfrac_;
+    for( size_t i=0; i<nspec_; ++i ){
+      *massFracSensitivity[i] <<= cond( mixFracValue > stoichMixfrac_,
+                                        -stoichProdMassFrac_[i]* *rich + fuelMassFrac_[i] * *rich )
+                                      ( mixFracValue < stoichMixfrac_,
+                                        -oxidMassFrac_[i] * *lean + stoichProdMassFrac_[i] * *lean )
+                                      ( 0.0 );
     }
   }
                 

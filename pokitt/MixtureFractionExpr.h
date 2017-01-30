@@ -150,12 +150,33 @@ public:
 
   void sensitivity( const Expr::Tag& varTag ){
     const Expr::TagList& specTags = this->get_tags();
-    for( const auto& t : specTags ){
-      this->sensitivity_result( t, varTag ) <<= 0.0;
-    }
     const auto& specTagIter = std::find( specTags.begin(), specTags.end(), varTag );
-    if( specTagIter != specTags.end() ){
+
+    if( specTagIter != specTags.end() ){ // if varTag is a species tag, then do a Kronecker delta
+      for( const auto& t : specTags ){
+        this->sensitivity_result( t, varTag ) <<= 0.0;
+      }
       this->sensitivity_result( *specTagIter, varTag ) <<= 1.0;
+    }
+    else{ // if varTag is not a species tag, then use the chain rule
+      const FieldT& mixfracValue       = mixFracField_->field_ref();
+      const FieldT& mixfracSensitivity = mixFracField_->sens_field_ref( varTag );
+
+      std::vector<SpatialOps::SpatFldPtr<FieldT> > sensitivityVec;
+      const int nSpec = specTags.size();
+      for( int i=0; i<nSpec; ++i ){
+        sensitivityVec.push_back( this->sensitivity_result_ptr( specTags[i], varTag ) );
+      }
+
+      switch( state_ ){
+        case UNREACTED_COMPOSITION: mixfrac_.mixfrac_to_species_sensitivity   <FieldT>( mixfracSensitivity,
+                                                                                        sensitivityVec ); break;
+        case   REACTED_COMPOSITION: mixfrac_.estimate_product_comp_sensitivity<FieldT>( mixfracValue,
+                                                                                        mixfracSensitivity,
+                                                                                        sensitivityVec ); break;
+        default: assert( false );
+      }
+
     }
   }
 
