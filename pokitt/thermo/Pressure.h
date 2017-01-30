@@ -138,7 +138,7 @@ sensitivity( const Expr::Tag& var )
 {
   using namespace SpatialOps;
   if( var == this->get_tag() ){
-    this->sensitivity_result( var ) <<= 0.0;
+    this->sensitivity_result( var ) <<= 1.0;
   }
   else{
     this->sensitivity_result( var ) <<= this->value() * ( rho_->sens_field_ref( var ) / rho_->field_ref() +
