@@ -7,6 +7,7 @@ add_library( pokitt
   MixtureFraction.cpp
   kinetics/ReactionInfo.cpp 
   DensitySolve/DensityCalculator_Species.cc
+  DensitySolve/JacobianElements.cc
   )
 
 target_link_libraries( pokitt ${TPL_LIBRARIES} )

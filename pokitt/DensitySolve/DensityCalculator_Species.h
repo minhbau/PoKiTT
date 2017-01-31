@@ -32,7 +32,11 @@
 //#error Solving density from species mass fractions requires PoKitt.
 //#endif
 
+#include <expression/ExprLib.h>
+#include <expression/ExprPatch.h>
 #include <expression/Expression.h>
+#include <expression/ExpressionFactory.h>
+#include <expression/FieldManagerList.h>
 #include <spatialops/structured/MatVecFields.h>
 
 
@@ -66,19 +70,32 @@ namespace WasatchCore{
 template< typename FieldT >
 class DensityFromSpecies : public Expr::Expression<FieldT>
 {
-  DECLARE_FIELDS(FieldT, rhoOld_, hOld_, rhoH_)
+  DECLARE_FIELDS(FieldT, rhoOld_, hOld_, rhoH_, temp_, pressure_)
   DECLARE_VECTOR_OF_FIELDS(FieldT, yiOld_)
   DECLARE_VECTOR_OF_FIELDS(FieldT, rhoYi_)
 
+  //
+  Expr::ExpressionFactory  localFactory_;
+  Expr::ExprPatch*         patchPtr_;
+  Expr::TimeStepper*       integratorPtr_;
+
+  bool setupHasRun_;
+
+  // tags to fields that exist on a local patch
+  const Expr::Tag hGuessTag_, rhoGuessTag_, mmwTag_, tGuessTag_, pTag_;
+  Expr::TagList yiGuessTags_;
+
+  void setup();
+
   const int nSpec_, nEq_;
-//  Expr::ExpressionBuilder* builder_;
-//  Expr::ExpressionBase* mmwExpr_;
   const std::vector<double> mw_;
   std::vector<double> mwInv_;
 
   DensityFromSpecies( const Expr::Tag&     rhoOldTag,
                       const Expr::Tag&     hOldTag,
                       const Expr::Tag&     rhoHTag,
+                      const Expr::Tag&     tOldTag,
+                      const Expr::Tag&     pTag,
                       const Expr::TagList& yiOldTags,
                       const Expr::TagList& rhoYiTags );
 
@@ -94,6 +111,8 @@ public:
              const Expr::Tag&     rhoOldTag,
              const Expr::Tag&     hOldTag,
              const Expr::Tag&     rhoHTag,
+             const Expr::Tag&     tOldTag,
+             const Expr::Tag&     pTag,
              const Expr::TagList& yiOldTags,
              const Expr::TagList& rhoYiTags,
              const double         rtol,
@@ -101,26 +120,18 @@ public:
 
     Expr::ExpressionBase* build() const{
       std::cout<<"Expr::build()\n";
-      return new DensityFromSpecies<FieldT>( rhoOldTag_, hOldTag_, rhoHTag_, yiOldTags_, rhoYiTags_ );
+      return new DensityFromSpecies<FieldT>( rhoOldTag_, hOldTag_, rhoHTag_, tOldTag_, pTag_, yiOldTags_, rhoYiTags_ );
     }
 
     private:
-      const Expr::Tag rhoOldTag_, hOldTag_, rhoHTag_;
+      const Expr::Tag rhoOldTag_, hOldTag_, rhoHTag_, tOldTag_, pTag_;
       const Expr::TagList yiOldTags_, rhoYiTags_;
       const double rTol_;       // relative error tolerance
       const unsigned maxIter_; // maximum number of iterations
     };
 
   void evaluate();
-  void calc_jac_and_res( SpatialOps::FieldMatrix<FieldT>& jacobian,
-                         SpatialOps::FieldVector<FieldT>& residual,
-                         const SpatialOps::FieldVector<FieldT>& dRhodPhi,
-                         const SpatialOps::FieldVector<FieldT>& phi );
-
-  void drho_dphi( SpatialOps::FieldVector<FieldT>& dRhodPhi,
-                  const SpatialOps::SpatFldPtr<FieldT> mixMW,
-                  const SpatialOps::SpatFldPtr<FieldT> cp,
-                  const SpatialOps::SpatFldPtr<FieldT> temperature );
+  ~DensityFromSpecies();
   };
 }//namespace WasatchCore
 

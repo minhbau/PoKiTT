@@ -110,7 +110,7 @@ setup_test()
 
   tree.insert_tree( factory.register_expression( new DensityT( oldDensTag, oldTempTag, pressTag, mixMWTag ) ) );
 
-  tree.insert_tree( factory.register_expression( new DensSolveT( newDensTag, oldDensTag, oldEnthTag, rhoEnthTag, yiOldTags, rhoYiTags, rTol, iter ) ) );
+  tree.insert_tree( factory.register_expression( new DensSolveT( newDensTag, oldDensTag, oldEnthTag, rhoEnthTag, oldTempTag, pressTag,  yiOldTags, rhoYiTags, rTol, iter ) ) );
 //  tree.insert_tree( factory.register_expression( new DensityT( newDensTag, oldTempTag, pressTag, mixMWTag ) ) );
   std::cout<<"\ncheckpoint 3\n";
 
