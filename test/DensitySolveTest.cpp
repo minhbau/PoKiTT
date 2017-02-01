@@ -104,7 +104,6 @@ setup_test()
   tree.insert_tree( factory.register_expression( new ConstantT( pressTag, pressure ) ) );
   tree.insert_tree( factory.register_expression( new ConstantT( oldTempTag, oldTemp ) ) );
   tree.insert_tree( factory.register_expression( new EnthalpyT( oldEnthTag, oldTempTag, yiOldTags ) ) );
-//  tree.insert_tree( factory.register_expression( new ConstantT( newDensTag, newDensity ), true ) );
   tree.insert_tree( factory.register_expression( new LinearT( rhoEnthTag, oldEnthTag, newDensity, 0 ) ) );
   tree.insert_tree( factory.register_expression( new MixMWT( mixMWTag, yiOldTags, pokitt::FractionType::MASS ) ) );
 

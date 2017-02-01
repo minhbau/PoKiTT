@@ -77,14 +77,16 @@ class DensityFromSpecies : public Expr::Expression<FieldT>
   using ScaledIdentityMatType = matrix::ScaledIdentityMatrix<FieldT>;
   using DensePtrType          = boost::shared_ptr<DenseMatType         >;
   using ScaledIdentityPtrType = boost::shared_ptr<ScaledIdentityMatType>;
+  using JacobianPtrType       = boost::shared_ptr<matrix::AssemblerBase<FieldT> >;
 
   DECLARE_FIELDS(FieldT, rhoOld_, hOld_, rhoH_, temp_, pressure_)
   DECLARE_VECTOR_OF_FIELDS(FieldT, yiOld_)
   DECLARE_VECTOR_OF_FIELDS(FieldT, rhoYi_)
 
   const std::string suffix_;
-  DensePtrType jac_, aMat_;
+  DensePtrType          aMat_;
   ScaledIdentityPtrType bMat_;
+  JacobianPtrType       jac_;
 
   Expr::ExpressionFactory  localFactory_;
   Expr::ExprPatch*         patchPtr_;
@@ -94,9 +96,18 @@ class DensityFromSpecies : public Expr::Expression<FieldT>
 
   // tags to fields that exist on a local patch
   const Expr::Tag hGuessTag_, rhoGuessTag_, mmwTag_, tGuessTag_, pTag_;
-  Expr::TagList yiGuessTags_, phidRhoTags_;
+  Expr::TagList yiGuessTags_, aMatTags_, jacobianTags_;
 
   void setup();
+  void register_matrix_element_expressions();
+  void set_initial_guesses();
+
+  /*
+   * this funtion returns a flat index given row and column indecies row
+   * and col, respectively.
+   */
+  inline const int
+  flat_index( const int row, const int col);
 
   const int nSpec_, nEq_;
   const std::vector<double> mw_;
