@@ -9,7 +9,8 @@
 #include <spatialops/structured/SpatialFieldStore.h>
 #include <spatialops/structured/MatVecOps.h>
 
-#include <expression/Functions.h>
+#include <expression/matrix-assembly/MapUtilities.h>
+
 
 namespace WasatchCore{
 
@@ -29,33 +30,56 @@ DensityFromSpecies( const Expr::Tag&     rhoOldTag,
                     const Expr::TagList& yiOldTags,
                     const Expr::TagList& rhoYiTags )
   : Expr::Expression<FieldT>(),
+    suffix_("_?"),
     localFactory_(),
+    jac_          ( boost::make_shared<DenseMatType>( "density_solve_Jacobian" )  ),
     patchPtr_     ( nullptr ),
     integratorPtr_( nullptr ),
     setupHasRun_  ( false   ),
-    hGuessTag_    ( hOldTag.name()  +"_local", Expr::STATE_NONE ),
-    rhoGuessTag_  ( rhoOldTag.name()+"_local", Expr::STATE_NONE ),
-    mmwTag_       ( "mixMW_local"            , Expr::STATE_NONE ),
-    tGuessTag_    ( tOldTag.name()+"_local"  , Expr::STATE_NONE ),
-    pTag_         ( pTag.name()+"_local"     , Expr::STATE_NONE ),
+    hGuessTag_    ( hOldTag.name()   + suffix_, Expr::STATE_NONE ),
+    rhoGuessTag_  ( rhoOldTag.name() + suffix_, Expr::STATE_NONE ),
+    mmwTag_       ( "mixMW"          + suffix_, Expr::STATE_NONE ),
+    tGuessTag_    ( tOldTag.name()   + suffix_, Expr::STATE_NONE ),
+    pTag_         ( pTag.name()      + suffix_, Expr::STATE_NONE ),
     nSpec_        ( CanteraObjects::number_species()),
-    nEq_          ( nSpec_ ), // number of independent species (nSpec - 1) + enthalpy
+    nEq_          ( nSpec_ ), // number of independent species (nSpec - 1) + temperature
     mw_           ( CanteraObjects::molecular_weights() )
 {
   std::cout<<"Constructor... ";
   this->set_gpu_runnable(true);
 
   /*
-   * set tags for guesses for species mass fractions
+   * set tags for guesses for species mass fractions, and
    * and calculate inverse of species molecular weights
    */
   mwInv_.clear(); yiGuessTags_.clear();
   for(int i = 0; i<nSpec_; ++i)
   {
-     const Expr::Tag yTag(yiOldTags[i].name()+"_local", Expr::STATE_NONE);
+     const Expr::Tag yTag(yiOldTags[i].name() + suffix_, Expr::STATE_NONE );
      yiGuessTags_.push_back(yTag);
      mwInv_.push_back(1.0/mw_[i]);
   };
+
+  /*
+   * Populate some string vectors. These will be used for tags for
+   * \f[ \phi_i \times \frac{\partial \rho}{\partial \phi_j} \f]
+   */
+  {
+    std::vector<std::string> rowNames, colNames;
+    const std::string rowSuffix = "_times_dRho";
+    const std::string colPrefix = "d";
+    // for first n-1 species
+    for(int i=0; i<nSpec_-1; ++i)
+    {
+      rowNames.push_back(yiOldTags[i].name() + rowSuffix );
+      colNames.push_back(colPrefix + yiOldTags[i].name() );
+    }
+    //for temperature
+    rowNames.push_back(tOldTag.name() + rowSuffix );
+    colNames.push_back(colPrefix + tOld.name() );
+
+    phidRhoTags_ = Expr::matrix::matrix_tags( rowNames,"_",colNames);
+  }
 
   rhoOld_   = this->template create_field_request<FieldT>( rhoOldTag );
   hOld_     = this->template create_field_request<FieldT>( hOldTag   );
@@ -147,9 +171,16 @@ setup()
 
   //==============================================================================
   //==============================================================================
-  /*
-   * todo: register fields for Jacobian elements and residuals.
-   */
+  // setup jacobian matrix
+
+  for(int i=0; i<nEq_; ++i)
+    for(int j=0; j<nEq_; ++j)
+    {
+      const int flatIndex = i*nEq_ + j;
+      const Expr::Tag tag = phidRhoTags_( flatIndex );
+      aMat_-> template element<FieldT>(i,j) = tag;
+    }
+  aMat_-> template finalize();
   //==============================================================================
   //==============================================================================
 
@@ -179,6 +210,32 @@ evaluate()
   // setup() needs to be run here because we need fields to be defined before it runs
   if(!setupHasRun_){setup(); setupHasRun_=true;}
 
+  // obtain memory for the matrix and vector
+  int nvars_ = 2;
+  std::vector<SpatialOps::SpatFldPtr<FieldT> > resPtrs, lhsPtrs;
+  for( size_t i=0; i<nvars_; ++i ){
+    resPtrs.push_back( SpatialOps::SpatialFieldStore::get<FieldT>( rho ) );
+    for( size_t j=0; j<nvars_; ++j )
+      lhsPtrs.push_back( SpatialOps::SpatialFieldStore::get<FieldT>( rho ) );
+  }
+  SpatialOps::FieldVector<FieldT> resVector( resPtrs );
+  SpatialOps::FieldMatrix<FieldT> lhsMatrix( lhsPtrs );
+
+
+  // collect residuals
+  for( size_t i=0; i<nvars_; ++i )
+    resVector(i) <<= i+2;
+
+  // build the lhs matrix
+  for( matrix::OrdinalType rowIdx=0; rowIdx < nvars_; ++rowIdx ){
+    SpatialOps::FieldVector<FieldT> row( lhsMatrix.row( rowIdx ) );
+    jac_->assemble( row, rowIdx, matrix::Place() );
+  }
+
+  // do linear solve and dispatch updates
+  resVector = lhsMatrix.solve( resVector );
+  for( size_t i=0; i<nvars_; ++i )
+//    *newValues[i] <<= oldValues_[i]->field_ref() + dualTimeStep_->field_ref() * resVector(i)
 
 //  // how are we going to update these?
 //  SpatFldPtr<FieldT> mixMW       = SpatialFieldStore::get<FieldT>( rho );
@@ -226,7 +283,15 @@ evaluate()
 //  ===================================================== //
 
   rho <<= 42;
-  std::cout<<"done\n";
+  std::cout<<"\nelement 0:\n";
+  print_field(resVector(0), std::cout );
+
+  std::cout<<"\nelement 1:\n";
+  print_field(resVector(1), std::cout );
+//  std::cout<<std::endl;
+//  std::cout << jac_->assembler_name() << ": " << '\n';
+//  std::cout << jac_->get_structure();
+//  std::cout << "--------\n";
 }
 
 //--------------------------------------------------------------------

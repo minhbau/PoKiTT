@@ -37,7 +37,10 @@
 #include <expression/Expression.h>
 #include <expression/ExpressionFactory.h>
 #include <expression/FieldManagerList.h>
+
 #include <spatialops/structured/MatVecFields.h>
+#include <expression/matrix-assembly/DenseSubMatrix.h>
+#include <expression/matrix-assembly/ScaledIdentityMatrix.h>
 
 
 namespace WasatchCore{
@@ -70,11 +73,19 @@ namespace WasatchCore{
 template< typename FieldT >
 class DensityFromSpecies : public Expr::Expression<FieldT>
 {
+  using DenseMatType          = matrix::DenseSubMatrix      <FieldT>;
+  using ScaledIdentityMatType = matrix::ScaledIdentityMatrix<FieldT>;
+  using DensePtrType          = boost::shared_ptr<DenseMatType         >;
+  using ScaledIdentityPtrType = boost::shared_ptr<ScaledIdentityMatType>;
+
   DECLARE_FIELDS(FieldT, rhoOld_, hOld_, rhoH_, temp_, pressure_)
   DECLARE_VECTOR_OF_FIELDS(FieldT, yiOld_)
   DECLARE_VECTOR_OF_FIELDS(FieldT, rhoYi_)
 
-  //
+  const std::string suffix_;
+  DensePtrType jac_, aMat_;
+  ScaledIdentityPtrType bMat_;
+
   Expr::ExpressionFactory  localFactory_;
   Expr::ExprPatch*         patchPtr_;
   Expr::TimeStepper*       integratorPtr_;
@@ -83,7 +94,7 @@ class DensityFromSpecies : public Expr::Expression<FieldT>
 
   // tags to fields that exist on a local patch
   const Expr::Tag hGuessTag_, rhoGuessTag_, mmwTag_, tGuessTag_, pTag_;
-  Expr::TagList yiGuessTags_;
+  Expr::TagList yiGuessTags_, phidRhoTags_;
 
   void setup();
 

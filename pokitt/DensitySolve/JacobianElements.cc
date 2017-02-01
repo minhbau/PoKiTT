@@ -27,7 +27,7 @@ PartialJacobian_Species( const Expr::Tag& rhoGuessTag,
                          const double     mw_i,
                          const double     mw_n )
   : Expr::Expression<FieldT>(),
-    mwTerm_( 1./mw_i - 1./mw_n )
+    mwTerm_( 1.0/mw_i - 1.0/mw_n )
 {
   this->set_gpu_runnable(true);
   rhoGuess_ = this->template create_field_request<FieldT>( rhoGuessTag );
