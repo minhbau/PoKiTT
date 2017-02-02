@@ -46,8 +46,9 @@ evaluate()
    * calculate \f$A_{i,j} = - \phi_i\frac{\partial \rho}{\partial \Y_j}\f$
    * for fixed \f i \f$.
    */
-  for(int i=0; i<result.size(); ++i)
+  for(int i=0; i<result.size(); ++i){
   *result[i] <<= ( phi_[i]->field_ref() )*(*x);
+  }
 }
 
 //--------------------------------------------------------------------
@@ -127,8 +128,9 @@ evaluate()
    * for fixed \f i \f$.
    */
 
-  for(int i=0; i<result.size(); ++i)
+  for(int i=0; i<result.size(); ++i){
     *result[i] <<= ( phi_[i]->field_ref() )*(*x);
+  }
 }
 
 //--------------------------------------------------------------------
@@ -200,8 +202,9 @@ evaluate()
   /*
    * calculate \f$A_{i,j} = - \phi_i\frac{\partial \rho}{\partial T}\f$
    */
-  for(int i=0; i<result.size(); ++i)
+  for(int i=0; i<result.size(); ++i){
     *result[i] <<= ( phi_[i]->field_ref() )*(*x);
+  }
 }
 
 //--------------------------------------------------------------------

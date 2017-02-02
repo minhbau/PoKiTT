@@ -34,13 +34,13 @@ DensityFromSpecies( const Expr::Tag&     rhoOldTag,
                     const Expr::TagList& yiOldTags,
                     const Expr::TagList& rhoYiTags )
   : Expr::Expression<FieldT>(),
-    suffix_("_?"),
+    suffix_("_densSolve"),
     localFactory_(),
     aMat_( boost::make_shared<DenseMatType         >( "A" ) ),
     bMat_( boost::make_shared<ScaledIdentityMatType>( "B" ) ),
     jac_          ( nullptr ),
     patchPtr_     ( nullptr ),
-    integratorPtr_( nullptr ),
+    treePtr_      ( nullptr ),
     setupHasRun_  ( false   ),
     hGuessTag_    ( hOldTag.name()   + suffix_, Expr::STATE_NONE ),
     rhoGuessTag_  ( rhoOldTag.name() + suffix_, Expr::STATE_NONE ),
@@ -147,10 +147,9 @@ setup()
 
 // define a pointer to a patch, integrator, and a local field manager list
   patchPtr_ = new Expr::ExprPatch(extent[0], extent[1], extent[2]);
-  integratorPtr_ = new Expr::TimeStepper(localFactory_, Expr::TSMethod::FORWARD_EULER, "local_time_stepper", patchPtr_->id());
   Expr::FieldManagerList& localfml = patchPtr_->field_manager_list();
 
-  Expr::ExpressionTree* tree = integratorPtr_->get_tree();
+  std::set<Expr::ExpressionID> rootIDs;
   typedef typename Expr::PlaceHolder<FieldT>::Builder PlcHldr;
 
   /*
@@ -170,11 +169,11 @@ setup()
      *  tree->insert_tree for a set of ExprIDs to avoid a segfault when I call
      *  tree->register_fields. I wonder why this is...
      */
-    tree->insert_tree(localFactory_.register_expression(new PlcHldr(yiGuessTags_[i])) );
+    localFactory_.register_expression(new PlcHldr(yiGuessTags_[i]));
   }
   // register placeholders for temperature and pressure
-  tree->insert_tree(localFactory_.register_expression(new PlcHldr(tGuessTag_)) );
-  tree->insert_tree(localFactory_.register_expression(new PlcHldr(pTag_     )) );
+  localFactory_.register_expression(new PlcHldr(tGuessTag_));
+  localFactory_.register_expression(new PlcHldr(pTag_     ));
 
   // register an expression for the nth species, mixture molecular weight, enthalpy, and density.
   localFactory_.register_expression(new typename pokitt::SpeciesN        <FieldT>::Builder(yiGuessTags_[nSpec_-1], yiGuessTags_     ));
@@ -183,32 +182,37 @@ setup()
   localFactory_.register_expression(new typename pokitt::Density         <FieldT>::Builder(rhoGuessTag_, tGuessTag_, pTag_, mmwTag_ ));
 
   // register expressions for elements of matrices we will need
-  register_matrix_element_expressions();
+  rootIDs = register_matrix_element_expressions();
 
-  tree->register_fields( localfml );
-  tree->lock_fields( localfml );
+  treePtr_  = new Expr::ExpressionTree( rootIDs, localFactory_, patchPtr_->id(), "species_density_solve" );
+  treePtr_->register_fields( localfml );
+  treePtr_->lock_fields( localfml );
   localfml.allocate_fields( patchPtr_->field_info() );
-  tree->bind_fields( localfml );
-  integratorPtr_->finalize( localfml, patchPtr_->operator_database(), patchPtr_->field_info() );
+  treePtr_->bind_fields( localfml );
+  {
+	  std::ofstream ofile("inner_tree.dot");
+	  treePtr_->write_tree(ofile);
+  }
 }
 
 //--------------------------------------------------------------------
 
 template< typename FieldT >
-void
+std::set<Expr::ExpressionID>
 DensityFromSpecies<FieldT>::
 register_matrix_element_expressions()
 {
-  //set up a TagList for phi={Y_j,T};
+  std::set<Expr::ExpressionID> rootIDs;
+  //set up a TagList for phi={Y_j,h};
   Expr::TagList phiTags; phiTags.clear();
-  phiTags.insert(phiTags.begin(),yiGuessTags_.begin(),yiGuessTags_.end()-1);
-  phiTags.push_back(tGuessTag_);
+  phiTags.insert(phiTags.begin(),yiGuessTags_.begin(), yiGuessTags_.end()-1);
+  phiTags.push_back(hGuessTag_);
 
   /*
    * setup aMat_ = Jacobian + rho*Identity.
-   * aMat_{i,j} = (phi_i)*d(rho)/d(Y_j) for j in [0,nEq_-2], phi={Y_j,T};
-   *
-   * aMat_{i,j} = (phi_i)*d(rho)/d(T) for j = nEq_-1
+   * aMat_{i,j} = (phi_i)*d(rho)/d(Y_j) for j in [0,nEq_-2],
+   * aMat_{i,j} = (phi_i)*d(rho)/d(T)   for j = nEq_-1,
+   * where phi = {Y_j,T}
    */
   for(int i=0; i<nEq_; ++i)
     for(int j=0; j<nEq_; ++j)
@@ -247,8 +251,9 @@ register_matrix_element_expressions()
   // calculate jacobian matrix jac_ = aMat_ - bMat_
   jac_ = aMat_ - bMat_;
   typedef typename matrix::MatrixExpression<FieldT>::Builder MatrixExprBuilder;
-  Expr::ExpressionID matID = localFactory_.register_expression( new MatrixExprBuilder( jacobianTags_, jac_ ) );
+  rootIDs.insert(localFactory_.register_expression( new MatrixExprBuilder( jacobianTags_, jac_ ) ));
 
+  return rootIDs;
 }
 
 //--------------------------------------------------------------------
@@ -281,6 +286,46 @@ set_initial_guesses()
 template< typename FieldT >
 void
 DensityFromSpecies<FieldT>::
+calculate_residuals( SpatialOps::FieldVector<FieldT>& residualVec )
+{
+//  assert( residualVec.size() == nEq_ );
+
+  Expr::FieldManagerList& localfml = patchPtr_->field_manager_list();
+
+  const FieldT& rhoGuess = localfml.field_manager<FieldT>().field_ref( rhoGuessTag_ );
+  const FieldT& hGuess   = localfml.field_manager<FieldT>().field_ref( hGuessTag_   );
+  const FieldT& rhoH     = rhoH_->field_ref();
+
+  //compute residuals (multiplied by -1) corresponding to nSpec_-1 species being solved for
+  for(int i=0; i<nSpec_-1; ++i)
+  {
+    const FieldT& yiGuess = localfml.field_manager<FieldT>().field_ref( yiGuessTags_[i] );
+    const FieldT& rhoYi   = rhoYi_[i]->field_ref();
+    residualVec(i) <<= rhoGuess*yiGuess - rhoYi;
+  }
+
+  //compute residual (multiplied by -1) corresponding to enthalpy. This should be the last element.
+  residualVec(nEq_ -1 ) <<= rhoGuess*hGuess - rhoH;
+}
+
+//--------------------------------------------------------------------
+
+template< typename FieldT >
+void
+DensityFromSpecies<FieldT>::
+assemble_jacobian(SpatialOps::FieldMatrix<FieldT>& jacobian )
+{
+  for( matrix::OrdinalType rowIdx=0; rowIdx < nEq_; ++rowIdx ){
+	SpatialOps::FieldVector<FieldT> row( jacobian.row( rowIdx ) );
+	jac_->assemble( row, rowIdx, matrix::Place() );
+  }
+}
+
+//--------------------------------------------------------------------
+
+template< typename FieldT >
+void
+DensityFromSpecies<FieldT>::
 evaluate()
 {
   std::cout<<"evaluate... ";
@@ -295,24 +340,33 @@ evaluate()
   // setup() needs to be run here because we need fields to be defined before it runs
   if(!setupHasRun_){setup(); setupHasRun_=true;}
 
+  Expr::FieldManagerList& localfml = patchPtr_->field_manager_list();
   // set initial guesses for density, species mass fractions, and temperature;
   set_initial_guesses();
 
-  Expr::ExpressionTree* tree = integratorPtr_->get_tree();
-  tree->execute_tree();
+  std::cout<<"\nExecuting tree...\n";
+  treePtr_->execute_tree();
 
-  //
-
-  // obtain memory for the matrix and vector
-  int nvars_ = 2;
-  std::vector<SpatialOps::SpatFldPtr<FieldT> > resPtrs, lhsPtrs;
-  for( size_t i=0; i<nvars_; ++i ){
+  // obtain memory for the jacobian and residual
+  std::vector<SpatialOps::SpatFldPtr<FieldT> > resPtrs, jacPtrs;
+  for( int i=0; i<nEq_; ++i ){
     resPtrs.push_back( SpatialOps::SpatialFieldStore::get<FieldT>( rho ) );
-    for( size_t j=0; j<nvars_; ++j )
-      lhsPtrs.push_back( SpatialOps::SpatialFieldStore::get<FieldT>( rho ) );
+    for( int j=0; j<nEq_; ++j )
+      jacPtrs.push_back( SpatialOps::SpatialFieldStore::get<FieldT>( rho ) );
   }
-  SpatialOps::FieldVector<FieldT> resVector( resPtrs );
-  SpatialOps::FieldMatrix<FieldT> lhsMatrix( lhsPtrs );
+  FieldVector<FieldT> residualVec( resPtrs );
+  FieldMatrix<FieldT> jacobian   ( jacPtrs );
+
+  /*
+   * compute residuals (multiplied by -1) corresponding to nSpec_-1 species being
+   * solved for and assemble the jacobian matrix
+   */
+  calculate_residuals( residualVec );
+  assemble_jacobian  ( jacobian    );
+
+  // do linear solve and dispatch updates
+  residualVec = jacobian.solve( residualVec );
+
 
 
 //  // collect residuals
@@ -404,7 +458,7 @@ DensityFromSpecies<FieldT>::
 ~DensityFromSpecies()
 {
   delete patchPtr_;
-  delete integratorPtr_;
+  delete treePtr_;
 }
 
 //====================================================================

@@ -90,7 +90,7 @@ class DensityFromSpecies : public Expr::Expression<FieldT>
 
   Expr::ExpressionFactory  localFactory_;
   Expr::ExprPatch*         patchPtr_;
-  Expr::TimeStepper*       integratorPtr_;
+  Expr::ExpressionTree*    treePtr_;
 
   bool setupHasRun_;
 
@@ -99,8 +99,10 @@ class DensityFromSpecies : public Expr::Expression<FieldT>
   Expr::TagList yiGuessTags_, aMatTags_, jacobianTags_;
 
   void setup();
-  void register_matrix_element_expressions();
+  std::set<Expr::ExpressionID> register_matrix_element_expressions();
   void set_initial_guesses();
+  void calculate_residuals( SpatialOps::FieldVector<FieldT>& residualVec );
+  void assemble_jacobian( SpatialOps::FieldMatrix<FieldT>& jacobian );
 
   /*
    * this funtion returns a flat index given row and column indecies row
