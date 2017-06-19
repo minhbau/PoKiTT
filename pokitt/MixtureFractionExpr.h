@@ -47,8 +47,8 @@ class SpeciesToMixtureFraction
   const MixtureFraction mixfrac_;
 
   SpeciesToMixtureFraction( const Expr::TagList& specTags,
-                       const std::vector<double>& fuelMassFracs,
-                       const std::vector<double>& oxidMassFracs )
+                            const std::vector<double>& fuelMassFracs,
+                            const std::vector<double>& oxidMassFracs )
   : Expr::Expression<FieldT>(),
     mixfrac_( oxidMassFracs, fuelMassFracs, true )
   {

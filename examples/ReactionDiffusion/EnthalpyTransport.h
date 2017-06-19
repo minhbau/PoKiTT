@@ -126,8 +126,9 @@ setup_boundary_conditions( const SpatialOps::Grid& grid, Expr::ExpressionFactory
     yplusPts. push_back( SpatialOps::IntVec(i, grid.extent(1), 0) );
   }
 
-  const typename SpatialOps::BoundaryCellInfo xInfo = SpatialOps::BoundaryCellInfo::build<XFluxT>(true,true,true);
-  const typename SpatialOps::BoundaryCellInfo yInfo = SpatialOps::BoundaryCellInfo::build<YFluxT>(true,true,true);
+  const SpatialOps::IntVec hasBC(true,true,true);
+  const typename SpatialOps::BoundaryCellInfo xInfo = SpatialOps::BoundaryCellInfo::build<XFluxT>(hasBC,hasBC);
+  const typename SpatialOps::BoundaryCellInfo yInfo = SpatialOps::BoundaryCellInfo::build<YFluxT>(hasBC,hasBC);
   const SpatialOps::MemoryWindow xwindow( SpatialOps::get_window_with_ghost( grid.extent(), ghosts, xInfo ) );
   const SpatialOps::MemoryWindow ywindow( SpatialOps::get_window_with_ghost( grid.extent(), ghosts, yInfo ) );
 
