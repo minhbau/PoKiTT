@@ -86,7 +86,8 @@ void get_timings( size_t n, size_t numberOfRepeats, std::string inputFileName )
   const so::Grid              grid( npts, lengths );
   const so::DoubleVec         spacings = grid.spacing();
   const so::GhostData         nghost(0);
-  const so::BoundaryCellInfo  bcInfo = so::BoundaryCellInfo::build<CellField>( npts[0]>1, npts[1]>1, npts[2]>1 );
+  const so::IntVec            hasBC(npts[0]>1, npts[1]>1, npts[2]>1);
+  const so::BoundaryCellInfo  bcInfo = so::BoundaryCellInfo::build<CellField>(hasBC,hasBC);
   const so::MemoryWindow      window( get_window_with_ghost( npts, nghost, bcInfo ) );
 
   CellField xCoordinate( window, bcInfo, nghost, NULL, so::InternalStorage, LOCATION );
@@ -353,7 +354,8 @@ void generate_jacobian_for_accuracy_test( const std::string& inputFile )
   const so::Grid              grid( npts, lengths );
   const so::DoubleVec         spacings = grid.spacing();
   const so::GhostData         nghost(0);
-  const so::BoundaryCellInfo  bcInfo = so::BoundaryCellInfo::build<CellField>( npts[0]>1, npts[1]>1, npts[2]>1 );
+  const so::IntVec            hasBC(npts[0]>1, npts[1]>1, npts[2]>1);
+  const so::BoundaryCellInfo  bcInfo = so::BoundaryCellInfo::build<CellField>( hasBC,hasBC );
   const so::MemoryWindow      window( get_window_with_ghost( npts, nghost, bcInfo ) );
 
   CellField xCoordinate( window, bcInfo, nghost, NULL, so::InternalStorage, LOCATION );
@@ -631,7 +633,8 @@ bool driver( const double pressure = 101325 )
   // get fields for aj method
 
   const so::GhostData         nghost(DEFAULT_NUMBER_OF_GHOSTS);
-  const so::BoundaryCellInfo  bcInfo = so::BoundaryCellInfo::build<CellField>( gridSize[0]>1, gridSize[1]>1, gridSize[2]>1 );
+  const so::IntVec            hasBC(gridSize[0]>1, gridSize[1]>1, gridSize[2]>1);
+  const so::BoundaryCellInfo  bcInfo = so::BoundaryCellInfo::build<CellField>( hasBC,hasBC );
   const so::MemoryWindow      window( get_window_with_ghost( gridSize, nghost, bcInfo ) );
   so::FieldVector<CellField> productionRates       ( nSpec+1, window, bcInfo, nghost, LOCATION );
   so::FieldMatrix<CellField> primitiveSensitivities( nSpec+1, window, bcInfo, nghost, LOCATION );
