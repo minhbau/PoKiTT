@@ -44,7 +44,7 @@ class SpeciesToMixtureFraction
 {
   DECLARE_VECTOR_OF_FIELDS( FieldT, species_ )
 
-  const MixtureFraction mixfrac_;
+  MixtureFraction mixfrac_;
 
   SpeciesToMixtureFraction( const Expr::TagList& specTags,
                             const std::vector<double>& fuelMassFracs,
