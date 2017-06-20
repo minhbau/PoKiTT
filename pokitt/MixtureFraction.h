@@ -156,7 +156,7 @@ public:
    */
   template< typename FieldT >
   inline void
-  species_to_mixfrac( std::vector< SpatialOps::SpatFldPtr<FieldT> >& massFrac,
+  species_to_mixfrac( std::vector< const SpatialOps::SpatFldPtr<FieldT> >& massFrac,
                       FieldT& mixFrac ) const
   {
     using namespace SpatialOps;

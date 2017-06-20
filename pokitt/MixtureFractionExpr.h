@@ -44,7 +44,7 @@ class SpeciesToMixtureFraction
 {
   DECLARE_VECTOR_OF_FIELDS( FieldT, species_ )
 
-  const MixtureFraction mixfrac_;
+  MixtureFraction mixfrac_;
 
   SpeciesToMixtureFraction( const Expr::TagList& specTags,
                             const std::vector<double>& fuelMassFracs,
@@ -81,8 +81,13 @@ public:
     }
   };
 
-  void evaluate(){
-    mixfrac_.species_to_mixfrac( species_, this->value() );
+  void evaluate()
+  {
+    std::vector<const SpatialOps::SpatFldPtr<FieldT>> specs;
+    for( size_t i=0; i<species_.size(); ++i ){
+      specs.push_back( species_[i]->field_ptr() );
+    }
+    mixfrac_.species_to_mixfrac<FieldT>( specs, this->value() );
   }
 
 };
