@@ -83,7 +83,7 @@ public:
 
   void evaluate()
   {
-    std::vector<const SpatialOps::SpatFldPtr<FieldT>> specs;
+    std::vector<SpatialOps::SpatFldPtr<FieldT> > specs;
     for( size_t i=0; i<species_.size(); ++i ){
       specs.push_back( species_[i]->field_ptr() );
     }
