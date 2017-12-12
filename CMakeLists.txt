@@ -115,9 +115,12 @@ if( BUILD_UPSTREAM_LIBS )
   # Build SpatialOps
   set( TPL_DIR ${PROJECT_BINARY_DIR}/tpl )
   file( MAKE_DIRECTORY ${TPL_DIR}/build/spatialops )
-  execute_process( COMMAND ${GIT_EXECUTABLE} clone --depth 1 https://software.crsim.utah.edu:8443/James_Research_Group/SpatialOps.git
+  execute_process( COMMAND ${GIT_EXECUTABLE} clone https://software.crsim.utah.edu:8443/James_Research_Group/SpatialOps.git
                    WORKING_DIRECTORY ${TPL_DIR}
                    RESULT_VARIABLE result  )
+  execute_process( COMMAND ${GIT_EXECUTABLE} reset --hard 076dc6e05db9077b333a30f7c7fe70d9c50abda0
+                   WORKING_DIRECTORY ${TPL_DIR}/SpatialOps )
+
   execute_process( COMMAND ${CMAKE_COMMAND} -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
                    -DENABLE_THREADS=${ENABLE_THREADS}
                    -DENABLE_CUDA=${ENABLE_CUDA}
@@ -133,9 +136,11 @@ if( BUILD_UPSTREAM_LIBS )
   
   # Build ExprLib
   file( MAKE_DIRECTORY ${TPL_DIR}/build/exprlib )
-  execute_process( COMMAND ${GIT_EXECUTABLE} clone --depth 1 https://software.crsim.utah.edu:8443/James_Research_Group/ExprLib.git
+  execute_process( COMMAND ${GIT_EXECUTABLE} clone https://software.crsim.utah.edu:8443/James_Research_Group/ExprLib.git
                    WORKING_DIRECTORY ${TPL_DIR}
                    RESULT_VARIABLE result )
+  execute_process( COMMAND ${GIT_EXECUTABLE} reset --hard f79d0577fdb9a6d1d4d3b61233937e2b83b4de36
+                   WORKING_DIRECTORY ${TPL_DIR}/ExprLib )
   execute_process( COMMAND ${CMAKE_COMMAND}
                    -DENABLE_TESTS=OFF
                    -DSpatialOps_DIR=${TPL_DIR}/share
