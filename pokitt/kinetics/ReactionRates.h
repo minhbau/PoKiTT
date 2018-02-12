@@ -503,7 +503,7 @@ evaluate()
         case ONE_TWO:     kr <<= kr *         C_P(0) * square( C_P(1) );         break;
         default:
           for( int i = 0; i != products.size(); ++i){
-            switch( products[i].stoich ){ // I think this is a bug - products[i].stoich gives a negative value (why? I don't know) so this switch-case doesn't do anything
+            switch( std::abs(products[i].stoich) ){
               case 1: kr <<= kr *         C_P(i)  ; break;
               case 2: kr <<= kr * square( C_P(i) ); break;
               case 3: kr <<= kr * cube(   C_P(i) ); break;
