@@ -520,7 +520,7 @@ evaluate_rates_and_jacobian( SpatialOps::FieldMatrix<FieldT>& primitiveSensitivi
         case ONE_TWO:     Rr <<= kr *         C_P(0) * square( C_P(1) );         break;
         default:
           for( int i = 0; i != products.size(); ++i){
-            switch( products[i].stoich ){
+            switch( std::abs(products[i].stoich) ){
               case 1: Rr <<= kr *         C_P(i)  ; break;
               case 2: Rr <<= kr * square( C_P(i) ); break;
               case 3: Rr <<= kr * cube(   C_P(i) ); break;
@@ -591,7 +591,7 @@ evaluate_rates_and_jacobian( SpatialOps::FieldMatrix<FieldT>& primitiveSensitivi
                                     case 2: nsTmp <<= nsTmp * square( C_P(i) ); break;
                                     case 3: nsTmp <<= nsTmp * cube(   C_P(i) ); break;
                                     default:
-                                      nsTmp <<= nsTmp * pow( C_P(i), products[i].stoich );
+                                      nsTmp <<= nsTmp * pow( C_P(i), std::abs(products[i].stoich) );
                                       break;
                                   }
                                   break;
@@ -707,32 +707,33 @@ evaluate_rates_and_jacobian( SpatialOps::FieldMatrix<FieldT>& primitiveSensitivi
         break;
           case LINDEMANN:
             flfConc <<= baseEff * ct;
-            for( int i=0; i<thdBodies.size(); ++i )
+            for (size_t i = 0; i < thdBodies.size(); ++i)
               flfConc <<= flfConc + rho * THD_BDY(i);
 
-            pr    <<= ARRHENIUS( kPCoefs ) / kf * flfConc;
-            Ctbaf <<= 1 / ( 1 + 1 / pr );
+            pr <<= ARRHENIUS(kPCoefs) / kf * flfConc;
 
-            pr         <<= pr / ( square( 1 + pr ) ) / flfConc;
-            dCtbafdT   <<= pr * flfConc * ( ARRHENIUS_SENS_TEMP( kPCoefs ) - ARRHENIUS_SENS_TEMP( kCoefs ) );
-            dCtbafdrho <<= pr * ( baseEff * invM );
-            for( int i=1; i<thdBodies.size(); ++i )
-              dCtbafdrho <<= dCtbafdrho + pr * THD_BDY(i);
+            Ctbaf <<= pr / (1. + pr);
 
-            for( size_t s=0; s<ns-1; ++s )
-              *dCtbafdYPtr[s] <<= pr * baseEff * rho * ( invMsp[s] - invMsp[ns-1] );
+            dCtbafdT <<= Ctbaf / (1. + pr) * (ARRHENIUS_SENS_TEMP(kPCoefs) - ARRHENIUS_SENS_TEMP(kCoefs));
 
-            for( int i=0; i<thdBodies.size(); ++i )
-              *dCtbafdYPtr[thdBodies[i].index] <<= *dCtbafdYPtr[thdBodies[i].index] + pr * rho * THD_BDY_NOY(i);
+            nsTmp <<= Ctbaf / (1. + pr) / flfConc;
+            dCtbafdrho <<= nsTmp * baseEff * invM;
 
-
+            for (size_t s = 0; s < ns; ++s) {
+              *dCtbafdYPtr[s] <<= nsTmp * baseEff * rho * invMsp[s];
+            }
+            for (size_t i = 0; i < thdBodies.size(); ++i){
+              dCtbafdrho <<= dCtbafdrho + nsTmp * THD_BDY(i);
+              *dCtbafdYPtr[thdBodies[i].index] <<= *dCtbafdYPtr[thdBodies[i].index] + nsTmp * rho * THD_BDY_NOY(i);
+            }
+            break;
 
             // stage 2 to correct for ns-th species as a third-body
             for( size_t s=0; s<thdBodies.size(); ++s ){
               size_t idx = thdBodies[s].index;
               if( idx == ns-1 ){
                 for( size_t ss=0; ss<ns-1; ++ss ){
-                  *dCtbafdYPtr[ss] <<= *dCtbafdYPtr[ss] - pr * rho * ( THD_BDY_NOY(s) );
+                  *dCtbafdYPtr[ss] <<= *dCtbafdYPtr[ss] - nsTmp * rho * ( THD_BDY_NOY(s) );
                 }
               }
             }
