@@ -275,7 +275,8 @@ Setup( const std::string transName,
 
 CanteraObjects::CanteraObjects()
   : gasConstant_( Cantera::GasConstant ),
-    hasBeenSetup_( false )
+    hasBeenSetup_( false ),
+    hasTransport_( true ) // set to false if no transport is found
 {}
 
 //--------------------------------------------------------------------
@@ -292,13 +293,17 @@ CanteraObjects::self()
 
 CanteraObjects::~CanteraObjects()
 {
-  while( !available_.empty() ){
-    std::pair<IdealGas*,Trans*> p = available_.front();
-    delete p.first;
-    delete p.second;
-    available_.pop();
+  while( !gas_.empty() ){
+    IdealGas* g = gas_.front();
+    gas_.pop();
+    delete g;
   }
-  gtm_.clear();
+  while( !trans_.empty() ){
+    Trans* t = trans_.front();
+    trans_.pop();
+    delete t;
+  }
+
   hasBeenSetup_ = false;
 }
 
@@ -306,35 +311,54 @@ CanteraObjects::~CanteraObjects()
 
 void
 CanteraObjects::setup_cantera( const Setup& options,
-			       const int ncopies )
+                               const int ncopies )
 {
   CanteraObjects& co = CanteraObjects::self();
   assert( !co.hasBeenSetup_ );
   co.options_ = options;
-  for( int i=0; i<ncopies; ++i ) co.build_new();
+  for( int i=0; i<ncopies; ++i ){
+    co.build_new_gas();
+    co.build_new_transport();
+  }
   co.extract_thermo_data();
   co.extract_kinetics_data();
-  co.extract_mix_transport_data();
+
+  if( co.hasTransport_ ) co.extract_mix_transport_data();
+
   co.hasBeenSetup_ = true;
 }
 
 //--------------------------------------------------------------------
 
 void
-CanteraObjects::build_new()
+CanteraObjects::build_new_gas()
 {
-  Cantera::IdealGasMix * gas   = NULL;
-  Cantera::Transport       * trans = NULL;
   try{
-    gas = new Cantera::IdealGasMix( options_.inputFile, options_.inputGroup ) ;
-    trans = Cantera::TransportFactory::factory()->newTransport( options_.transportName, gas );
+    gas_.push( new Cantera::IdealGasMix( options_.inputFile, options_.inputGroup ) );
   }
   catch( Cantera::CanteraError& ){
     Cantera::showErrors();
     throw std::runtime_error("Error initializing cantera.  Check for proper location of input files.\n");
   }
-  available_.push( std::make_pair(gas,trans) );
-  gtm_.left.insert( GasTransMap::left_value_type( gas, trans ) );
+}
+
+//-------------------------------------------------------------------
+
+void
+CanteraObjects::build_new_transport()
+{
+  if( hasTransport_ ){
+    try{
+      build_new_gas();
+      IdealGas* g = gas_.front();
+      gas_.pop();
+      trans_.push( Cantera::TransportFactory::factory()->newTransport( options_.transportName, g ));
+    }
+    catch( Cantera::CanteraError& ){
+      Cantera::showErrors( transportErrorMessage_ );
+      hasTransport_ = false;
+    }
+  }
 }
 
 //--------------------------------------------------------------------
@@ -343,9 +367,9 @@ void
 CanteraObjects::extract_thermo_data()
 {
   assert( !hasBeenSetup_ );
-  IdealGas* gas = available_.front().first;
-  phaseName_ = gas->name();
-  numSpecies_ = gas->nSpecies();
+  IdealGas* const gas = gas_.front();
+  phaseName_        = gas->name();
+  numSpecies_       = gas->nSpecies();
   molecularWeights_ = gas->molecularWeights();
   speciesNames_.clear();
   const Cantera::SpeciesThermo& spThermo = gas->speciesThermo();
@@ -362,7 +386,7 @@ void
 CanteraObjects::extract_kinetics_data()
 {
   assert( !hasBeenSetup_ );
-  IdealGas* gas = available_.front().first;
+  IdealGas* gas = gas_.front();
 
   const std::vector< Cantera::shared_ptr<Cantera::Reaction> >& rxnVec = gas->getReactionData(); // contains kinetics data for each reaction
   numRxns_ = rxnVec.size();
@@ -391,7 +415,8 @@ void
 CanteraObjects::extract_mix_transport_data()
 {
   assert( !hasBeenSetup_ );
-  Trans* trans = available_.front().second;
+  assert( hasTransport_ );
+  Trans* const trans = trans_.front();
   if( trans->model() != Cantera::cMixtureAveraged){
     std::ostringstream msg;
     msg << __FILE__ << " : " << __LINE__
@@ -402,8 +427,8 @@ CanteraObjects::extract_mix_transport_data()
     throw std::runtime_error( msg.str() );
   }
   Cantera::MixTransport* mixTrans = dynamic_cast<Cantera::MixTransport*>( trans ); // cast gas transport object as mix transport
-  diffusionCoefs_ = mixTrans->getDiffusionPolyCoefficients(); // diffusion coefficient parameters
-  viscosityCoefs_ = mixTrans->getViscosityCoefficients();
+  diffusionCoefs_   = mixTrans->getDiffusionPolyCoefficients(); // diffusion coefficient parameters
+  viscosityCoefs_   = mixTrans->getViscosityCoefficients();
   thermalCondCoefs_ = mixTrans->getConductivityCoefficients();
 }
 
@@ -414,12 +439,11 @@ CanteraObjects::get_gasmix()
 {
   CanteraMutex lock;
   CanteraObjects& co = CanteraObjects::self();
-
   assert( co.hasBeenSetup_ );
-  if( co.available_.size() == 0 ) co.build_new();
-  IdealGas* ig = co.available_.front().first;
-  co.available_.pop();
-  return ig;
+  if( co.gas_.size() == 0 ) co.build_new_gas();
+  IdealGas* gas = co.gas_.front();
+  co.gas_.pop();
+  return gas;
 }
 
 //--------------------------------------------------------------------
@@ -430,10 +454,22 @@ CanteraObjects::get_transport()
   CanteraMutex lock;
   CanteraObjects& co = CanteraObjects::self();
   assert( co.hasBeenSetup_ );
-  if( co.available_.size() == 0 ) co.build_new();
-  Trans* tr = co.available_.front().second;
-  co.available_.pop();
-  return tr;
+
+  if( !co.hasTransport_ ){
+    std::ostringstream msg;
+    msg << __FILE__ << " : " << __LINE__
+        << " \n\nERROR:\n"
+        << "\tget_transport() called when no transport data was available\n"
+        << "\tThis is likely because the cantera input file lacked transport data for one or more species\n"
+        << "\tThe Cantera error message follows\n"
+        << co.transportErrorMessage_.str() << std::endl;
+    throw std::runtime_error( msg.str() );
+  }
+
+  if( co.trans_.size() == 0 ) co.build_new_transport();
+  Trans* trans = co.trans_.front();
+  co.trans_.pop();
+  return trans;
 }
 
 //--------------------------------------------------------------------
@@ -617,9 +653,8 @@ CanteraObjects::restore_transport( Cantera::Transport* const trans )
   CanteraMutex lock;
   CanteraObjects& co = CanteraObjects::self();
   assert( co.hasBeenSetup_ );
-  const GasTransMap::right_iterator itg = co.gtm_.right.find(trans);
-  assert( itg != co.gtm_.right.end() );
-  co.available_.push( std::make_pair(itg->second,itg->first) );
+  assert( co.hasTransport_ );
+  co.trans_.push( trans );
 }
 
 //--------------------------------------------------------------------
@@ -630,10 +665,7 @@ CanteraObjects::restore_gasmix( Cantera::IdealGasMix* const gas )
   CanteraMutex lock;
   CanteraObjects& co = CanteraObjects::self();
   assert( co.hasBeenSetup_ );
-  const GasTransMap::left_iterator igt = co.gtm_.left.find(gas);
-  assert( igt != co.gtm_.left.end() );
-  std::pair<IdealGas*,Trans*> pp( igt->first, igt->second );
-  co.available_.push( pp );
+  co.gas_.push( gas );
 }
 
 //--------------------------------------------------------------------

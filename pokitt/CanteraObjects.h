@@ -111,8 +111,8 @@ public:
       inputGroup;
     Setup() : transportName(""), inputFile(""), inputGroup("") {}
     Setup( const std::string transName,
-	   const std::string inputFileName,
-	   const std::string inputGroup = "" );
+           const std::string inputFileName,
+           const std::string inputGroup = "" );
   };
 
   static Cantera::IdealGasMix* get_gasmix();
@@ -149,10 +149,11 @@ private:
 
   typedef Cantera::IdealGasMix IdealGas;
   typedef Cantera::Transport   Trans;
-  typedef boost::bimap< IdealGas*, Trans* >  GasTransMap;
 
-  std::queue< std::pair<IdealGas*,Trans*> >  available_;
-  GasTransMap gtm_;
+  bool hasTransport_;
+
+  std::queue<IdealGas*> gas_;
+  std::queue<Trans*> trans_;
 
   std::string phaseName_;
   const double gasConstant_;
@@ -171,17 +172,19 @@ private:
   Setup options_;
   bool hasBeenSetup_;
 
+  std::ostringstream transportErrorMessage_;
+
   CanteraObjects();
   ~CanteraObjects();
 
   CanteraObjects( const CanteraObjects& );
   CanteraObjects& operator=( const CanteraObjects& );
 
-  void build_new();
+  void build_new_gas();
+  void build_new_transport();
   void extract_thermo_data();
   void extract_kinetics_data();
   void extract_mix_transport_data();
-
 };
 
 //====================================================================
