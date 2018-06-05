@@ -24,6 +24,12 @@ if( NOT ENABLE_CUDA )
     
     nebo_add_executable( cp_sens_test HeatCapacityCpSensitivity_test.cpp )
     target_link_libraries( cp_sens_test pokitt )
+
+    nebo_add_executable( temperature_sens_test TemperatureSensitivity_test.cpp )
+    target_link_libraries( temperature_sens_test pokitt )
+
+    nebo_add_executable( temperaturefrome0_sens_test TemperatureFromE0Sensitivity_test.cpp )
+    target_link_libraries( temperaturefrome0_sens_test pokitt )
 endif()
 
 nebo_add_executable( rxn_test ReactionRates_test.cpp )
@@ -61,9 +67,11 @@ add_test( NAME ajrates_test_h2_1atm           COMMAND aj_test                --x
 add_test( NAME ajrates_test_h2_2atm           COMMAND aj_test                --xml-input-file=h2o2.xml --pressure=202650 --rates-vs-cantera )  
 
 if( NOT ENABLE_CUDA )
-    add_test( NAME idealgas_sens_test_h2  COMMAND idealgas_sens_test )
-    add_test( NAME enthalpy_sens_test_h2  COMMAND enthalpy_sens_test )
-    add_test( NAME cp_sens_test_h2        COMMAND enthalpy_sens_test )
+    add_test( NAME idealgas_sens_test_h2                 COMMAND idealgas_sens_test          )
+    add_test( NAME enthalpy_sens_test_h2                 COMMAND enthalpy_sens_test          )
+    add_test( NAME cp_sens_test_h2                       COMMAND cp_sens_test                )
+    add_test( NAME temperature_sens_test_h2              COMMAND temperature_sens_test       )
+    add_test( NAME temperaturefrome0_sens_test_h2        COMMAND temperaturefrome0_sens_test )
 endif()
                                                                              
 add_test( NAME idealgas_test_GRI              COMMAND idealgas_test          --xml-input-file=gri30.xml    )
