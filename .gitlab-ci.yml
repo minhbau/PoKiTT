@@ -1,6 +1,6 @@
 #----------------------------------------------------------
 # to help get the yaml right, see:
-#  https://software.crsim.utah.edu:8443/ci/lint
+#  https://gitlab.multiscale.utah.edu/common/PoKiTT/-/ci/lint
 #  http://yaml-online-parser.appspot.com/
 #----------------------------------------------------------
 
@@ -15,8 +15,8 @@
 
 #--------------------------------------------------------------------
 #--------------------- Upstream library builds: ---------------------
-.clone_spatialops      : &clone_so   git clone https://software.crsim.utah.edu:8443/James_Research_Group/SpatialOps.git; cd SpatialOps; git reset --hard ab3aa3d08d94c0d1d75d6efef2e59cf61c12e917; cd ..
-.clone_exprlib         : &clone_expr git clone https://software.crsim.utah.edu:8443/James_Research_Group/ExprLib.git;    cd ExprLib;    git reset --hard d0c8352e1f651d4be30fdb4cb152c90accab9f67; cd ..
+.clone_spatialops      : &clone_so   git clone https://gitlab.multiscale.utah.edu/common/SpatialOps.git; cd SpatialOps; git reset --hard 0157fab0f389f3d4f95037e3c5eb6794426a402c; cd ..
+.clone_exprlib         : &clone_expr git clone https://gitlab.multiscale.utah.edu/common/ExprLib.git;    cd ExprLib;    git reset --hard d0c8352e1f651d4be30fdb4cb152c90accab9f67; cd ..
 
 .conf_spatialops       : &conf_so        cmake ../SpatialOps -DCMAKE_BUILD_TYPE=Release -DENABLE_TESTS=OFF -DENABLE_EXAMPLES=OFF -DCMAKE_INSTALL_PREFIX=$CI_PROJECT_DIR/install 
 .conf_spatialops_thread: &conf_so_thread cmake ../SpatialOps -DCMAKE_BUILD_TYPE=Release -DENABLE_TESTS=OFF -DENABLE_EXAMPLES=OFF -DCMAKE_INSTALL_PREFIX=$CI_PROJECT_DIR/install -DENABLE_THREADS=ON -DNTHREADS=8
@@ -62,7 +62,6 @@ stages:
 build:linux:opt:
   <<: *build_linux
   script: 
-    - module load cmake
     - mkdir build; cd build;
     - *clone_so
     - mkdir so; cd so
@@ -82,7 +81,6 @@ build:linux:opt:
 build:linux:dbg:
   <<: *build_linux
   script: 
-    - module load cmake
     - mkdir build; cd build;
     - *clone_so
     - mkdir so; cd so
@@ -102,7 +100,6 @@ build:linux:dbg:
 build:linux:threaded:opt:
   <<: *build_linux
   script: 
-    - module load cmake
     - mkdir build; cd build;
     - *clone_so
     - mkdir so; cd so
@@ -122,7 +119,6 @@ build:linux:threaded:opt:
 build:linux:threaded:dbg:
   <<: *build_linux
   script: 
-    - module load cmake
     - mkdir build; cd build;
     - *clone_so
     - mkdir so; cd so
@@ -144,7 +140,6 @@ build:linux:gpu:
   tags:
     - gpu
   script: 
-    - module load cmake
     - mkdir build; cd build;
     - *clone_so
     - mkdir so; cd so
