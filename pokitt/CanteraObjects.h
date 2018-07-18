@@ -79,7 +79,7 @@ struct RxnData
                     double mw,
                     double thdBdyEff );
     int index;
-    dobule stoich;
+    double stoich;
     double mw;
     double invMW;
     double thdBdyEff;
