@@ -73,14 +73,13 @@ namespace pokitt
 
   struct ReactionInfo{
     ReactionInfo( const RxnData& data );
+    static constexpr double rxnOrderTol = 1e-10;
     RateConstantForm kForm;
     TroeTerms troeForm;
     ReactionOrder forwardOrder;
     ReactionOrder reverseOrder;
     double sumReactantStoich;
     double sumProductStoich;
-
-    static const double rxnOrderTol = 1e-10;
   };
 
 }
