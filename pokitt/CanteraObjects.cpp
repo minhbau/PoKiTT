@@ -83,7 +83,7 @@ ThermData::ThermData( const Cantera::SpeciesThermo& spThermo, const int i )
 
 RxnData::SpeciesRxnData::
 SpeciesRxnData( int index,
-                int stoich,
+                double stoich,
                 double mw,
                 double thdBdyEff )
   : index( index ),
