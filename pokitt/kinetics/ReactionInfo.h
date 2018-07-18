@@ -77,8 +77,10 @@ namespace pokitt
     TroeTerms troeForm;
     ReactionOrder forwardOrder;
     ReactionOrder reverseOrder;
-    int sumReactantStoich;
-    int sumProductStoich;
+    double sumReactantStoich;
+    double sumProductStoich;
+
+    static const double rxnOrderTol = 1e-10;
   };
 
 }

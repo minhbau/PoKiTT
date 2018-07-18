@@ -75,11 +75,11 @@ struct RxnData
 
   struct SpeciesRxnData{
     SpeciesRxnData( int index,
-                    int stoich,
+                    double stoich,
                     double mw,
                     double thdBdyEff );
     int index;
-    int stoich;
+    dobule stoich;
     double mw;
     double invMW;
     double thdBdyEff;
@@ -95,7 +95,7 @@ struct RxnData
   double troeParams[4];
   double thdBdyDefault;
   std::map<std::string,double> tbeff;
-  int netOrder;
+  double netOrder;
   ReactionType type;
 };
 

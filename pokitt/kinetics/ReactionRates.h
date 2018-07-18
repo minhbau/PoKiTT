@@ -348,6 +348,8 @@ evaluate()
   SpatFldPtr<FieldT> krPtr   = SpatialFieldStore::get<FieldT>( t ); // reverse rate constant
   FieldT& kr = *krPtr;
 
+  const double rxnOrderTol = ReactionInfo::rxnOrderTol;
+
   for( int r=0; r<nRxns_; ++r ){
     const ReactionInfo& rxnInfo = rxnInfoVec_[r];
     const RxnData& rxnDat = *rxnDataVec_[r];
@@ -464,7 +466,7 @@ evaluate()
     } //  switch( rxnDat.type )
 
     if( rxnDat.reversible ){
-      const int netOrder = rxnDat.netOrder;
+      const double netOrder = rxnDat.netOrder;
       switch( netSpecies.size() ){
         case 3: kr <<= k * exp( netOrder * log( standardStatePressure_ * tRecip * invGasConstant_ ) - tRecip * invGasConstant_ * ( POKITT_SUM3( GIBBS ) ) ); break;
         case 2: kr <<= k * exp( netOrder * log( standardStatePressure_ * tRecip * invGasConstant_ ) - tRecip * invGasConstant_ * ( POKITT_SUM2( GIBBS ) ) ); break;
@@ -484,11 +486,11 @@ evaluate()
       case ONE_TWO:     k <<= k  *         C_R(0)   * square( C_R(1) );         break;
       default:
         for( int i = 0; i != reactants.size(); ++i){
-          switch( reactants[i].stoich ){
-            case 1: k <<= k *         C_R(i)  ; break;
-            case 2: k <<= k * square( C_R(i) ); break;
-            case 3: k <<= k * cube(   C_R(i) ); break;
-          }
+          const double stoich = reactants[i].stoich;
+          if     ( fabs( stoich - 1 ) < rxnOrderTol ) k <<= k *         C_R(i)          ;
+          else if( fabs( stoich - 2 ) < rxnOrderTol ) k <<= k * square( C_R(i)         );
+          else if( fabs( stoich - 3 ) < rxnOrderTol ) k <<= k * cube  ( C_R(i)         );
+          else                                                      k <<= k * pow   ( C_R(i), stoich );
         }
         break;
     }
@@ -503,11 +505,11 @@ evaluate()
         case ONE_TWO:     kr <<= kr *         C_P(0) * square( C_P(1) );         break;
         default:
           for( int i = 0; i != products.size(); ++i){
-            switch( std::abs(products[i].stoich) ){
-              case 1: kr <<= kr *         C_P(i)  ; break;
-              case 2: kr <<= kr * square( C_P(i) ); break;
-              case 3: kr <<= kr * cube(   C_P(i) ); break;
-            }
+            const double stoich = std::abs( products[i].stoich );
+            if     ( fabs( stoich - 1 ) < rxnOrderTol ) kr <<= kr *         C_P(i)          ;
+            else if( fabs( stoich - 2 ) < rxnOrderTol ) kr <<= kr * square( C_P(i)         );
+            else if( fabs( stoich - 3 ) < rxnOrderTol ) kr <<= kr * cube  ( C_P(i)         );
+            else                                        kr <<= kr * pow   ( C_P(i), stoich );
           }
           break;
       }

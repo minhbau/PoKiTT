@@ -31,20 +31,43 @@ namespace pokitt{
     const SpecDataVecT& rxts = dat.reactants;
     switch( rxts.size() ){
       case 1:
-        if(      rxts[0].stoich == 1 ) forwardOrder = ONE;
-        else if( rxts[0].stoich == 2 ) forwardOrder = TWO;
-        else                           forwardOrder = OTHER;
+        if(      fabs( rxts[0].stoich - 1 ) < rxnOrderTol )
+          forwardOrder = ONE;
+
+        else if( fabs( rxts[0].stoich - 2 ) < rxnOrderTol )
+          forwardOrder = TWO;
+
+        else
+          forwardOrder = OTHER;
         break;
+
       case 2:
-        if(      rxts[0].stoich == 1 && rxts[1].stoich == 1 ) forwardOrder = ONE_ONE;
-        else if( rxts[0].stoich == 1 && rxts[1].stoich == 2 ) forwardOrder = ONE_TWO;
-        else if( rxts[0].stoich == 2 && rxts[1].stoich == 1 ) forwardOrder = TWO_ONE;
-        else                                                  forwardOrder = OTHER;
+        if(      fabs( rxts[0].stoich - 1 ) < rxnOrderTol &&
+                 fabs( rxts[1].stoich - 1 ) < rxnOrderTol )
+          forwardOrder = ONE_ONE;
+
+        else if( fabs( rxts[0].stoich - 1 ) < rxnOrderTol &&
+                 fabs( rxts[1].stoich - 2 ) < rxnOrderTol )
+          forwardOrder = ONE_TWO;
+
+        else if( fabs( rxts[0].stoich - 2 ) < rxnOrderTol &&
+                 fabs( rxts[1].stoich - 1 ) < rxnOrderTol )
+          forwardOrder = TWO_ONE;
+
+        else
+          forwardOrder = OTHER;
         break;
+
       case 3:
-        if( rxts[0].stoich == 1 && rxts[1].stoich == 1 && rxts[2].stoich == 1 ) forwardOrder = ONE_ONE_ONE;
-        else                                                                    forwardOrder = OTHER;
+        if( fabs( rxts[0].stoich - 1 ) < rxnOrderTol &&
+            fabs( rxts[1].stoich - 1 ) < rxnOrderTol &&
+            fabs( rxts[2].stoich - 1 ) < rxnOrderTol )
+          forwardOrder = ONE_ONE_ONE;
+
+        else
+          forwardOrder = OTHER;
         break;
+
       default:
         forwardOrder = OTHER;
     }
@@ -55,24 +78,48 @@ namespace pokitt{
 
     const SpecDataVecT& prods = dat.products;
     switch( prods.size() ){
-      case 1:
-        if(      prods[0].stoich == -1 ) reverseOrder = ONE;
-        else if( prods[0].stoich == -2 ) reverseOrder = TWO;
-        else                             reverseOrder = OTHER;
-        break;
-      case 2:
-        if(      prods[0].stoich == -1 && prods[1].stoich == -1 ) reverseOrder = ONE_ONE;
-        else if( prods[0].stoich == -1 && prods[1].stoich == -2 ) reverseOrder = ONE_TWO;
-        else if( prods[0].stoich == -2 && prods[1].stoich == -1 ) reverseOrder = TWO_ONE;
-        else                                                      reverseOrder = OTHER;
-        break;
-      case 3:
-        if( prods[0].stoich == -1 && prods[1].stoich == -1 && prods[2].stoich == -1 ) reverseOrder = ONE_ONE_ONE;
-        else                                                                          reverseOrder = OTHER;
-        break;
-      default:
-        reverseOrder = OTHER;
-    }
+          case 1:
+            if(      fabs( prods[0].stoich - 1 ) < rxnOrderTol )
+              reverseOrder = ONE;
+
+            else if( fabs( prods[0].stoich - 2 ) < rxnOrderTol )
+              reverseOrder = TWO;
+
+            else
+              reverseOrder = OTHER;
+            break;
+
+          case 2:
+            if(      fabs( prods[0].stoich - 1 ) < rxnOrderTol &&
+                     fabs( prods[1].stoich - 1 ) < rxnOrderTol )
+              reverseOrder = ONE_ONE;
+
+            else if( fabs( prods[0].stoich - 1 ) < rxnOrderTol &&
+                     fabs( prods[1].stoich - 2 ) < rxnOrderTol )
+              reverseOrder = ONE_TWO;
+
+            else if( fabs( prods[0].stoich - 2 ) < rxnOrderTol &&
+                     fabs( prods[1].stoich - 1 ) < rxnOrderTol )
+              reverseOrder = TWO_ONE;
+
+            else
+              reverseOrder = OTHER;
+            break;
+
+          case 3:
+            if( fabs( prods[0].stoich - 1 ) < rxnOrderTol &&
+                fabs( prods[1].stoich - 1 ) < rxnOrderTol &&
+                fabs( prods[2].stoich - 1 ) < rxnOrderTol )
+              reverseOrder = ONE_ONE_ONE;
+
+            else
+              reverseOrder = OTHER;
+            break;
+
+          default:
+            reverseOrder = OTHER;
+        }
+
     sumProductStoich = 0;
     for( size_t s=0; s<prods.size(); ++s ){
       sumProductStoich += std::abs( prods[s].stoich );

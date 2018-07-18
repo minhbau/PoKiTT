@@ -181,16 +181,7 @@ RxnData::RxnData( const Cantera::IdealGasMix& gas,
     const size_t spIx = gas.speciesIndex(spNam);
     const double stoich = reactant.second;
     const int istoich = int(stoich);
-    if(      fabs( stoich - 1 ) < 1e-10 ) reactants.push_back( SpeciesRxnData( spIx, 1, MW[spIx], thdBdyDefault ) );
-    else if( fabs( stoich - 2 ) < 1e-10 ) reactants.push_back( SpeciesRxnData( spIx, 2, MW[spIx], thdBdyDefault ) );
-    else if( fabs( stoich - 3 ) < 1e-10 ) reactants.push_back( SpeciesRxnData( spIx, 3, MW[spIx], thdBdyDefault ) );
-    else{
-      std::ostringstream msg;
-      msg << "Error in " __FILE__ << " : " << __LINE__ << std::endl
-          <<" Non-integer reactant stoichiometric coefficient (" << stoich << ") on species " << spNam<< std::endl
-          <<" in reaction: " << rxn.equation()  << "\n\n";
-      throw std::runtime_error( msg.str() );
-    }
+    reactants.push_back( SpeciesRxnData( spIx, stoich, MW[spIx], thdBdyDefault ) );
   }
   if( reactants.size() < 1 || reactants.size() > 3 ){
     std::ostringstream msg;
@@ -206,16 +197,7 @@ RxnData::RxnData( const Cantera::IdealGasMix& gas,
     const size_t spIx = gas.speciesIndex(spNam);
     const double stoich = prod.second;
     const int istoich = int(stoich);
-    if(      fabs( stoich - 1 ) < 1e-10 ) products.push_back( SpeciesRxnData( spIx, -1, MW[spIx], thdBdyDefault ) );
-    else if( fabs( stoich - 2 ) < 1e-10 ) products.push_back( SpeciesRxnData( spIx, -2, MW[spIx], thdBdyDefault ) );
-    else if( fabs( stoich - 3 ) < 1e-10 ) products.push_back( SpeciesRxnData( spIx, -3, MW[spIx], thdBdyDefault ) );
-    else{
-      std::ostringstream msg;
-      msg << "Error in " __FILE__ << " : " << __LINE__ << std::endl
-          <<" Non-integer product stoichiometric coefficient" << std::endl
-          <<" Stoichiometric coefficient = " << istoich << std::endl;
-      throw std::runtime_error( msg.str() );
-    }
+    products.push_back( SpeciesRxnData( spIx, -stoich, MW[spIx], thdBdyDefault ) );
   }
   if( rxn.products.size() < 1 || rxn.products.size() > 3 ){
     std::ostringstream msg;
