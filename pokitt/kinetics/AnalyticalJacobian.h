@@ -357,11 +357,11 @@ evaluate_rates_and_jacobian( SpatialOps::FieldMatrix<FieldT>& primitiveSensitivi
       default:
         Rnet <<= kf;
         for( int i = 0; i != reactants.size(); ++i){
-          const double rStoich = reactants[i].stoich;
-          if     ( fabs( rStoich - 1 ) < rxnOrderTol ) Rnet <<= Rnet *         C_R(i)           ;
-          else if( fabs( rStoich - 2 ) < rxnOrderTol ) Rnet <<= Rnet * square( C_R(i)          );
-          else if( fabs( rStoich - 3 ) < rxnOrderTol ) Rnet <<= Rnet * cube  ( C_R(i)          );
-          else                                         Rnet <<= Rnet * pow   ( C_R(i), rStoich );
+          const double rStoich_i = reactants[i].stoich;
+          if     ( fabs( rStoich_i - 1 ) < rxnOrderTol ) Rnet <<= Rnet *         C_R(i)             ;
+          else if( fabs( rStoich_i - 2 ) < rxnOrderTol ) Rnet <<= Rnet * square( C_R(i)            );
+          else if( fabs( rStoich_i - 3 ) < rxnOrderTol ) Rnet <<= Rnet * cube  ( C_R(i)            );
+          else                                           Rnet <<= Rnet * pow   ( C_R(i), rStoich_i );
         }
         break;
     }
@@ -412,18 +412,18 @@ evaluate_rates_and_jacobian( SpatialOps::FieldMatrix<FieldT>& primitiveSensitivi
                         break;
                           default:
                             *dRnetdYPtr[s] <<= kf * rho * invMsp[s];
-                            const double pStoich = std::abs( products[sridx].stoich );
-                            // we don't need to do anything if pStoich == 1 (within the specified tolerance)
-                            if     ( fabs( pStoich - 2 ) < rxnOrderTol ) *dRnetdYPtr[s] <<= *dRnetdYPtr[s] * 2       *         C_R(sridx)             ;
-                            else if( fabs( pStoich - 3 ) < rxnOrderTol ) *dRnetdYPtr[s] <<= *dRnetdYPtr[s] * 3       * square( C_R(sridx)            );
-                            else                                         *dRnetdYPtr[s] <<= *dRnetdYPtr[s] * pStoich * pow   ( C_R(sridx), pStoich-1 );
+                            const double rStoich_s = reactants[sridx].stoich;
+                            // we don't need to do anything if rStoich_s == 1 (within the specified tolerance)
+                            if     ( fabs( rStoich_s - 2 ) < rxnOrderTol ) *dRnetdYPtr[s] <<= *dRnetdYPtr[s] * 2         *         C_R(sridx)               ;
+                            else if( fabs( rStoich_s - 3 ) < rxnOrderTol ) *dRnetdYPtr[s] <<= *dRnetdYPtr[s] * 3         * square( C_R(sridx)              );
+                            else                                           *dRnetdYPtr[s] <<= *dRnetdYPtr[s] * rStoich_s * pow   ( C_R(sridx), rStoich_s-1 );
                             for( int i = 0; i != reactants.size(); ++i){
                               if( !( i==sridx ) ){
-                                const double rStoich = reactants[i].stoich;
-                                if     ( fabs( rStoich - 1 ) < rxnOrderTol ) *dRnetdYPtr[s] <<= *dRnetdYPtr[s] *         C_R(i)           ;
-                                else if( fabs( rStoich - 2 ) < rxnOrderTol ) *dRnetdYPtr[s] <<= *dRnetdYPtr[s] * square( C_R(i)          );
-                                else if( fabs( rStoich - 3 ) < rxnOrderTol ) *dRnetdYPtr[s] <<= *dRnetdYPtr[s] * cube  ( C_R(i)          );
-                                else                                         *dRnetdYPtr[s] <<= *dRnetdYPtr[s] * pow   ( C_R(i), rStoich );
+                                const double rStoich_i = reactants[i].stoich;
+                                if     ( fabs( rStoich_i - 1 ) < rxnOrderTol ) *dRnetdYPtr[s] <<= *dRnetdYPtr[s] *         C_R(i)            ;
+                                else if( fabs( rStoich_i - 2 ) < rxnOrderTol ) *dRnetdYPtr[s] <<= *dRnetdYPtr[s] * square( C_R(i)            );
+                                else if( fabs( rStoich_i - 3 ) < rxnOrderTol ) *dRnetdYPtr[s] <<= *dRnetdYPtr[s] * cube  ( C_R(i)            );
+                                else                                           *dRnetdYPtr[s] <<= *dRnetdYPtr[s] * pow   ( C_R(i), rStoich_i );
                               }
                             }
         }
@@ -469,17 +469,18 @@ evaluate_rates_and_jacobian( SpatialOps::FieldMatrix<FieldT>& primitiveSensitivi
                       break;
                         default:
                           nsTmp <<= kf * rho * invMsp[ns-1];
-                          const double rStoich = reactants[nsReactantIdx].stoich;
-                          // we don't need to do anything if rStoich == 1 (within the specified tolerance)
-                          if     ( fabs( rStoich - 2 ) < rxnOrderTol ) nsTmp <<= nsTmp * 2       *         C_R(nsReactantIdx)           ;
-                          else if( fabs( rStoich - 3 ) < rxnOrderTol ) nsTmp <<= nsTmp * 3       * square( C_R(nsReactantIdx)          );
-                          else                                         nsTmp <<= nsTmp * rStoich * pow   ( C_R(nsReactantIdx), rStoich );
+                          const double rStoich_n = reactants[nsReactantIdx].stoich;
+                          // we don't need to do anything if rStoich_n == 1 (within the specified tolerance)
+                          if     ( fabs( rStoich_n - 2 ) < rxnOrderTol ) nsTmp <<= nsTmp * 2         *         C_R(nsReactantIdx)             ;
+                          else if( fabs( rStoich_n - 3 ) < rxnOrderTol ) nsTmp <<= nsTmp * 3         * square( C_R(nsReactantIdx)            );
+                          else                                           nsTmp <<= nsTmp * rStoich_n * pow   ( C_R(nsReactantIdx), rStoich_n );
                           for( int i = 0; i != reactants.size(); ++i){
                             if( !( i==nsReactantIdx ) ){
-                              if     ( fabs( rStoich - 1 ) < rxnOrderTol ) nsTmp <<= nsTmp *         C_R(i)           ;
-                              else if( fabs( rStoich - 2 ) < rxnOrderTol ) nsTmp <<= nsTmp * square( C_R(i)          );
-                              else if( fabs( rStoich - 3 ) < rxnOrderTol ) nsTmp <<= nsTmp * cube  ( C_R(i)          );
-                              else                                         nsTmp <<= nsTmp * pow   ( C_R(i), rStoich );
+                              const double rStoich_i = reactants[i].stoich;
+                              if     ( fabs( rStoich_i - 1 ) < rxnOrderTol ) nsTmp <<= nsTmp *         C_R(i)             ;
+                              else if( fabs( rStoich_i - 2 ) < rxnOrderTol ) nsTmp <<= nsTmp * square( C_R(i)            );
+                              else if( fabs( rStoich_i - 3 ) < rxnOrderTol ) nsTmp <<= nsTmp * cube  ( C_R(i)            );
+                              else                                           nsTmp <<= nsTmp * pow   ( C_R(i), rStoich_i );
                             }
                           }
       }
@@ -520,11 +521,11 @@ evaluate_rates_and_jacobian( SpatialOps::FieldMatrix<FieldT>& primitiveSensitivi
         case ONE_TWO:     Rr <<= kr *         C_P(0) * square( C_P(1) );         break;
         default:
           for( int i = 0; i != products.size(); ++i){
-            const double pStoich = std::abs( products[i].stoich );
-            if     ( fabs( pStoich - 1 ) < ReactionInfo::rxnOrderTol ) Rr <<= kr *         C_P(i)           ;
-            else if( fabs( pStoich - 2 ) < ReactionInfo::rxnOrderTol ) Rr <<= kr * square( C_P(i)          );
-            else if( fabs( pStoich - 3 ) < ReactionInfo::rxnOrderTol ) Rr <<= kr * cube  ( C_P(i)          );
-            else                                                       Rr <<= kr * pow   ( C_P(i), pStoich );
+            const double pStoich_i = std::abs( products[i].stoich );
+            if     ( fabs( pStoich_i - 1 ) < ReactionInfo::rxnOrderTol ) Rr <<= kr *         C_P(i)             ;
+            else if( fabs( pStoich_i - 2 ) < ReactionInfo::rxnOrderTol ) Rr <<= kr * square( C_P(i)            );
+            else if( fabs( pStoich_i - 3 ) < ReactionInfo::rxnOrderTol ) Rr <<= kr * cube  ( C_P(i)            );
+            else                                                         Rr <<= kr * pow   ( C_P(i), pStoich_i );
           }
           break;
       }
@@ -576,18 +577,19 @@ evaluate_rates_and_jacobian( SpatialOps::FieldMatrix<FieldT>& primitiveSensitivi
                           break;
                             default:
                               nsTmp <<= - kr * rho * invMsp[s];
-                              const double pStoich = std::abs( products[sridx].stoich );
-                              // we don't need to do anything if pStoich == 1 (within the specified tolerance)
-                              if     ( fabs( pStoich - 2 ) < rxnOrderTol ) nsTmp <<= nsTmp * 2       *         C_P(sridx)             ;
-                              else if( fabs( pStoich - 3 ) < rxnOrderTol ) nsTmp <<= nsTmp * 3       * square( C_P(sridx)            );
-                              else                                         nsTmp <<= nsTmp * pStoich * pow   ( C_P(sridx), pStoich-1 );
+                              const double pStoich_s = std::abs( products[sridx].stoich );
+                              // we don't need to do anything if pStoich_s == 1 (within the specified tolerance)
+                              if     ( fabs( pStoich_s - 2 ) < rxnOrderTol ) nsTmp <<= nsTmp * 2         *         C_P(sridx)              ;
+                              else if( fabs( pStoich_s - 3 ) < rxnOrderTol ) nsTmp <<= nsTmp * 3         * square( C_P(sridx)              );
+                              else                                           nsTmp <<= nsTmp * pStoich_s * pow   ( C_P(sridx), pStoich_s-1 );
 
                               for( int i = 0; i != products.size(); ++i){
                                 if( !( i==sridx ) ){
-                                  if     ( fabs( pStoich - 1 ) < rxnOrderTol ) nsTmp <<= nsTmp * C_P(i)                   ;
-                                  else if( fabs( pStoich - 2 ) < rxnOrderTol ) nsTmp <<= nsTmp * square( C_P(i)          );
-                                  else if( fabs( pStoich - 3 ) < rxnOrderTol ) nsTmp <<= nsTmp * cube  ( C_P(i)          );
-                                  else                                         nsTmp <<= nsTmp * pow   ( C_P(i), pStoich );
+                                  const double pStoich_i = std::abs( products[i].stoich );
+                                  if     ( fabs( pStoich_i - 1 ) < rxnOrderTol ) nsTmp <<= nsTmp         * C_P(i)             ;
+                                  else if( fabs( pStoich_i - 2 ) < rxnOrderTol ) nsTmp <<= nsTmp * square( C_P(i)            );
+                                  else if( fabs( pStoich_i - 3 ) < rxnOrderTol ) nsTmp <<= nsTmp * cube  ( C_P(i)            );
+                                  else                                           nsTmp <<= nsTmp * pow   ( C_P(i), pStoich_i );
 
                                   break;
                                 }
@@ -636,17 +638,18 @@ evaluate_rates_and_jacobian( SpatialOps::FieldMatrix<FieldT>& primitiveSensitivi
                         break;
                           default:
                             nsTmp <<= kr * rho * invMsp[ns-1];
-                            const double pStoich = std::abs( products[nsReactantIdx].stoich );
-                            // we don't need to do anything if pStoich == 1 (within the specified tolerance)
-                            if     ( fabs( pStoich - 2 ) < rxnOrderTol ) nsTmp <<= nsTmp * 2       *         C_P(nsReactantIdx)             ;
-                            else if( fabs( pStoich - 3 ) < rxnOrderTol ) nsTmp <<= nsTmp * 3       * square( C_P(nsReactantIdx)            );
-                            else                                         nsTmp <<= nsTmp * pStoich * pow   ( C_P(nsReactantIdx), pStoich-1 );
+                            const double pStoich_n = std::abs( products[nsReactantIdx].stoich );
+                            // we don't need to do anything if pStoich_n == 1 (within the specified tolerance)
+                            if     ( fabs( pStoich_n - 2 ) < rxnOrderTol ) nsTmp <<= nsTmp * 2         *         C_P(nsReactantIdx)               ;
+                            else if( fabs( pStoich_n - 3 ) < rxnOrderTol ) nsTmp <<= nsTmp * 3         * square( C_P(nsReactantIdx)              );
+                            else                                           nsTmp <<= nsTmp * pStoich_n * pow   ( C_P(nsReactantIdx), pStoich_n-1 );
                             for( int i = 0; i != products.size(); ++i){
                               if( !( i==nsReactantIdx ) ){
-                                if     ( fabs( pStoich - 1 ) < rxnOrderTol ) nsTmp <<= nsTmp *         C_P(i)           ;
-                                else if( fabs( pStoich - 2 ) < rxnOrderTol ) nsTmp <<= nsTmp * square( C_P(i)          );
-                                else if( fabs( pStoich - 3 ) < rxnOrderTol ) nsTmp <<= nsTmp * cube  ( C_P(i)          );
-                                else                                         nsTmp <<= nsTmp * pow   ( C_P(i), pStoich );
+                                const double pStoich_i = std::abs( products[i].stoich );
+                                if     ( fabs( pStoich_i - 1 ) < rxnOrderTol ) nsTmp <<= nsTmp *         C_P(i)             ;
+                                else if( fabs( pStoich_i - 2 ) < rxnOrderTol ) nsTmp <<= nsTmp * square( C_P(i)            );
+                                else if( fabs( pStoich_i - 3 ) < rxnOrderTol ) nsTmp <<= nsTmp * cube  ( C_P(i)            );
+                                else                                           nsTmp <<= nsTmp * pow   ( C_P(i), pStoich_i );
                               }
                             }
         }
