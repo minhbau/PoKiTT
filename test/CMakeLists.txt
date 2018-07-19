@@ -70,18 +70,12 @@ add_test( NAME ajrates_test_h2_1atm           COMMAND aj_test                --x
 add_test( NAME ajrates_test_h2_2atm           COMMAND aj_test                --xml-input-file=h2o2.xml --pressure=202650 --rates-vs-cantera )  
 
 if( NOT ENABLE_CUDA )
-<<<<<<< test/CMakeLists.txt
     add_test( NAME idealgas_sens_test_h2                 COMMAND idealgas_sens_test          )
     add_test( NAME enthalpy_sens_test_h2                 COMMAND enthalpy_sens_test          )
     add_test( NAME cp_sens_test_h2                       COMMAND cp_sens_test                )
     add_test( NAME temperature_sens_test_h2              COMMAND temperature_sens_test       )
     add_test( NAME temperaturefrome0_sens_test_h2        COMMAND temperaturefrome0_sens_test )
-=======
-    add_test( NAME idealgas_sens_test_h2    COMMAND idealgas_sens_test    )
-    add_test( NAME enthalpy_sens_test_h2    COMMAND enthalpy_sens_test    )
-    add_test( NAME cp_sens_test_h2          COMMAND cp_sens_test          )
     add_test( NAME thermalCond_sens_test_h2 COMMAND thermalCond_sens_test )
->>>>>>> test/CMakeLists.txt
 endif()
                                                                              
 add_test( NAME idealgas_test_GRI              COMMAND idealgas_test          --xml-input-file=gri30.xml    )
