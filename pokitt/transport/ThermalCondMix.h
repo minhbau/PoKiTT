@@ -101,6 +101,7 @@ public:
 
   ~ThermalConductivity();
   void evaluate();
+  void sensitivity( const Expr::Tag& );
 };
 
 
@@ -184,6 +185,75 @@ evaluate()
   }
 
   mixTCond <<= 0.5 * ( sum * mmw + 1.0 / (inverseSum * mmw) ); // mixing rule
+}
+    
+//--------------------------------------------------------------------
+
+template< typename FieldT >
+void
+ThermalConductivity<FieldT>::
+sensitivity( const Expr::Tag& var){
+  using namespace SpatialOps;
+  FieldT& dfdv = this->sensitivity_result( var );
+  if( var == this->get_tag()){
+    dfdv <<= 1.0;
+  }
+  else{
+    const FieldT& temp = temperature_->field_ref();
+    const FieldT& mmw = mmw_->field_ref();
+
+    // pre-compute powers of temperature used in polynomial evaluations
+    SpatFldPtr <FieldT> sqrtTPtr;  // may be used later on
+    SpatFldPtr <FieldT> logtPtr = SpatialFieldStore::get<FieldT>( temp ); // log(t)
+
+    FieldT& logt = *logtPtr;
+    logt <<= log( temp );
+
+    SpatFldPtr <FieldT> speciesTCondPtr    = SpatialFieldStore::get<FieldT>( temp ); // temporary to store the thermal conductivity for an individual species
+    SpatFldPtr <FieldT> dspeciesTConddvPtr = SpatialFieldStore::get<FieldT>( temp ); // sensitivity of the thermal conductivity for an individual species
+    SpatFldPtr <FieldT> sumPtr             = SpatialFieldStore::get<FieldT>(temp); // for mixing rule
+    SpatFldPtr <FieldT> inverseSumPtr      = SpatialFieldStore::get<FieldT>( temp ); // 1/sum()
+    SpatFldPtr <FieldT> dsumdvPtr          = SpatialFieldStore::get<FieldT>( temp ); // sensitivity of sum for mixing rule
+    SpatFldPtr <FieldT> dinverseSumdvPtr   = SpatialFieldStore::get<FieldT>( temp ); // sensitivity of `1/sum()` for mixing rule
+
+    FieldT& speciesTCond    = *speciesTCondPtr;
+    FieldT& dspeciesTConddv = *dspeciesTConddvPtr;
+    FieldT& sum             = *sumPtr;
+    FieldT& inverseSum      = *inverseSumPtr;
+    FieldT& dsumdv          = *dsumdvPtr;
+    FieldT& dinverseSumdv   = *dinverseSumdvPtr;
+
+    sum <<= 0.0; // set sum to 0 before loop
+    inverseSum <<= 0.0; // set inverse sum to 0 before loop
+    dsumdv <<= 0.0; // set sensitivity of sum to 0 before loop
+    dinverseSumdv <<= 0.0; // set sensitivity of inverse sum to 0 before loop
+
+    sqrtTPtr = SpatialFieldStore::get<FieldT>( temp );
+    *sqrtTPtr <<= sqrt( temp );
+
+    for( size_t n = 0;n < nSpec_;++n ){
+      const FieldT& yi = massFracs_[n]->field_ref();
+      const std::vector<double>& tCondCoefs = tCondCoefs_[n];
+      speciesTCond <<= *sqrtTPtr * ( tCondCoefs[0] + logt * ( tCondCoefs[1] + logt * ( tCondCoefs[2] + logt * ( tCondCoefs[3] + logt * tCondCoefs[4] ))));
+
+    }
+
+    for( size_t n = 0;n < nSpec_;++n ){
+      const FieldT& yi     = massFracs_[n]->field_ref();
+      const FieldT& dyidv  = massFracs_[n]->sens_field_ref( var );
+      const FieldT& dTdv   = temperature_->sens_field_ref( var );
+      const std::vector<double>& tCondCoefs = tCondCoefs_[n];
+      speciesTCond <<= *sqrtTPtr * ( tCondCoefs[0] + logt * ( tCondCoefs[1] + logt * ( tCondCoefs[2] + logt * ( tCondCoefs[3] + logt * tCondCoefs[4] ))));
+      dspeciesTConddv <<= (( tCondCoefs[0] + logt * ( tCondCoefs[1] + logt * ( tCondCoefs[2] + logt * ( tCondCoefs[3] + logt * tCondCoefs[4] )))) / 2
+                           + ( tCondCoefs[1] + logt * ( 2 * tCondCoefs[2] + logt * ( 3 * tCondCoefs[3] + logt * 4 * tCondCoefs[4] )))) * dTdv / *sqrtTPtr;
+      dsumdv        <<= dsumdv + ( dyidv * speciesTCond + yi * dspeciesTConddv ) * molecularWeightsInv_[n];
+      dinverseSumdv <<= dinverseSumdv + ( dyidv / speciesTCond - yi * dspeciesTConddv / square( speciesTCond )) * molecularWeightsInv_[n];
+      sum           <<= sum        + yi * speciesTCond * molecularWeightsInv_[n];
+      inverseSum    <<= inverseSum + yi / speciesTCond * molecularWeightsInv_[n];
+    }
+    const FieldT& dmmwdv = mmw_->sens_field_ref( var );
+    dfdv <<= 0.5 * ( dsumdv * mmw + sum * dmmwdv - 1/(square(inverseSum * mmw)) * (dinverseSumdv * mmw + inverseSum * dmmwdv) );
+  }
 }
 
 //--------------------------------------------------------------------
