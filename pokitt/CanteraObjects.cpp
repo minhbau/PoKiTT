@@ -183,14 +183,6 @@ RxnData::RxnData( const Cantera::IdealGasMix& gas,
     const int istoich = int(stoich);
     reactants.push_back( SpeciesRxnData( spIx, stoich, MW[spIx], thdBdyDefault ) );
   }
-  if( reactants.size() < 1 || reactants.size() > 3 ){
-    std::ostringstream msg;
-    msg << "Error in " __FILE__ << " : " << __LINE__ << std::endl
-        << "In reaction: " << rxn.equation() << std::endl
-        <<" Number of reactants must be 1 <= n <= 3 " << std::endl
-        <<" Number of reactants n = " << reactants.size() << std::endl << std::endl;
-    throw std::runtime_error( msg.str() );
-  }
 
   BOOST_FOREACH( const Cantera::Composition::value_type& prod, rxn.products ){
     const std::string& spNam = prod.first;
@@ -198,13 +190,6 @@ RxnData::RxnData( const Cantera::IdealGasMix& gas,
     const double stoich = prod.second;
     const int istoich = int(stoich);
     products.push_back( SpeciesRxnData( spIx, -stoich, MW[spIx], thdBdyDefault ) );
-  }
-  if( rxn.products.size() < 1 || rxn.products.size() > 3 ){
-    std::ostringstream msg;
-    msg << "Error in " __FILE__ << " : " << __LINE__ << std::endl
-        <<" Number of products must be 1 <= n <= 3 " << std::endl
-        <<" Number of products n = " << products.size() << std::endl;
-    throw std::runtime_error( msg.str() );
   }
 
   netOrder = 0; // difference of forward and reverse rxn orders, used for equilibrium K
