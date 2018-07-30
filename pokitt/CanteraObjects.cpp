@@ -216,14 +216,6 @@ RxnData::RxnData( const Cantera::IdealGasMix& gas,
     netSpecies.push_back( iNet->second );
   }
 
-  if( netSpecies.size() < 2 || netSpecies.size() > 5 ){
-    std::ostringstream msg;
-    msg << "Error in " __FILE__ << " : " << __LINE__ << std::endl
-        <<" The number of reacting species must be 2 <= n <= 5 " << std::endl
-        <<" Number of active species n = " << netSpecies.size() << std::endl;
-    throw std::runtime_error( msg.str() );
-  }
-
 }
 
 //====================================================================
