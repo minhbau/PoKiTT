@@ -585,11 +585,12 @@ evaluate_rates_and_jacobian( SpatialOps::FieldMatrix<FieldT>& primitiveSensitivi
 
                               for( int i = 0; i != products.size(); ++i){
                                 if( !( i==sridx ) ){
-                                  const double pStoich_i = std::abs( products[sridx].stoich );
-                                  if     ( fabs( pStoich_i - 1 ) < rxnOrderTol ) nsTmp <<= nsTmp         * C_P(i)             ;
-                                  else if( fabs( pStoich_i - 2 ) < rxnOrderTol ) nsTmp <<= nsTmp * square( C_P(i)            );
-                                  else if( fabs( pStoich_i - 3 ) < rxnOrderTol ) nsTmp <<= nsTmp * cube  ( C_P(i)            );
-                                  else                                           nsTmp <<= nsTmp * pow   ( C_P(i), pStoich_i );
+                                  const double pStoich_t = std::abs( products[sridx].stoich );
+                                  if     ( fabs( pStoich_t - 1 ) < rxnOrderTol ) nsTmp <<= nsTmp *         C_P(i)             ;
+                                  else if( fabs( pStoich_t - 2 ) < rxnOrderTol ) nsTmp <<= nsTmp * square( C_P(i)            );
+                                  else if( fabs( pStoich_t - 3 ) < rxnOrderTol ) nsTmp <<= nsTmp * cube  ( C_P(i)            );
+                                  else                                           nsTmp <<= nsTmp * pow   ( C_P(i), std::abs( products[i].stoich ) );
+                                  // todo: make sure the second argument of pow (just above this comment) is correct.
 
                                   break;
                                 }
@@ -640,7 +641,7 @@ evaluate_rates_and_jacobian( SpatialOps::FieldMatrix<FieldT>& primitiveSensitivi
                             nsTmp <<= kr * rho * invMsp[ns-1];
                             const double pStoich_n = std::abs( products[nsReactantIdx].stoich );
                             if     ( fabs( pStoich_n - 1 ) < rxnOrderTol ) continue                                                               ;
-                            if     ( fabs( pStoich_n - 2 ) < rxnOrderTol ) nsTmp <<= nsTmp * 2         *         C_P(nsReactantIdx)               ;
+                            else if( fabs( pStoich_n - 2 ) < rxnOrderTol ) nsTmp <<= nsTmp * 2         *         C_P(nsReactantIdx)               ;
                             else if( fabs( pStoich_n - 3 ) < rxnOrderTol ) nsTmp <<= nsTmp * 3         * square( C_P(nsReactantIdx)              );
                             else                                           nsTmp <<= nsTmp * pStoich_n * pow   ( C_P(nsReactantIdx), pStoich_n-1 );
                             for( int i = 0; i != products.size(); ++i){
