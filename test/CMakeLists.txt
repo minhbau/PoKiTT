@@ -33,6 +33,9 @@ if( NOT ENABLE_CUDA )
 
     nebo_add_executable( thermalCond_sens_test ThermalCondMixSensitivity_test.cpp )
     target_link_libraries( thermalCond_sens_test pokitt )
+
+    nebo_add_executable( mixturemoleweight_sens_test MixtureMolWeightSensitivity_test.cpp )
+    target_link_libraries( mixturemoleweight_sens_test pokitt )
 endif()
 
 nebo_add_executable( rxn_test ReactionRates_test.cpp )
@@ -75,7 +78,8 @@ if( NOT ENABLE_CUDA )
     add_test( NAME cp_sens_test_h2                       COMMAND cp_sens_test                )
     add_test( NAME temperature_sens_test_h2              COMMAND temperature_sens_test       )
     add_test( NAME temperaturefrome0_sens_test_h2        COMMAND temperaturefrome0_sens_test )
-    add_test( NAME thermalCond_sens_test_h2 COMMAND thermalCond_sens_test )
+    add_test( NAME thermalCond_sens_test_h2              COMMAND thermalCond_sens_test       )
+    add_test( NAME mixturemoleweight_sens_test_h2        COMMAND mixturemoleweight_sens_test )
 endif()
                                                                              
 add_test( NAME idealgas_test_GRI              COMMAND idealgas_test          --xml-input-file=gri30.xml    )
