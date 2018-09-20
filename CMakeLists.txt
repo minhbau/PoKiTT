@@ -171,7 +171,7 @@ find_path( Cantera_INCLUDE_DIR NAMES IdealGasMix.h PATHS ${Cantera_DIR}/include 
 if( ${Cantera_INCLUDE_DIR} STREQUAL Cantera_INCLUDE_DIR-NOTFOUND )
   message( WARNING "Could not find Cantera in suggested location ${Cantera_DIR}. Looking in other locations\n" )
   # try other locations
-  find_library( Cantera_LIBRARIES NAMES cantera PATHS /usr/local PATH_SUFFIXES cantera )
+  find_library( Cantera_LIBRARIES NAMES cantera PATHS /usr/local /usr/local/cantera PATH_SUFFIXES lib cantera )
   find_path( Cantera_INCLUDE_DIR NAMES IdealGasMix.h PATHS /usr/local/include /usr/local/cantera/include PATH_SUFFIXES cantera )
   if( ${Cantera_INCLUDE_DIR} STREQUAL Cantera_INCLUDE_DIR-NOTFOUND )
     message( FATAL_ERROR "Could not find Cantera\n" )
