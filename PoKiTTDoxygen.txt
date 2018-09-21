@@ -11,7 +11,7 @@ nonreacting flows.
 \section download Downloading the source code
  The source may be obtained via git:
  \verbatim
- git clone https://software.crsim.utah.edu:8443/James_Research_Group/PoKiTT.git [destination path]
+ git clone https://gitlab.multiscale.utah.edu/common/PoKiTT.git [destination path]
  \endverbatim
  
 
@@ -20,7 +20,7 @@ nonreacting flows.
 \subsection simple-build A simple CPU-Only Build
 
 \verbatim
-git clone https://software.crsim.utah.edu:8443/James_Research_Group/PoKiTT.git
+git clone https://gitlab.multiscale.utah.edu/common/PoKiTT.git
 cd PoKiTT; mkdir build; cd build
 cmake .. \
   -DBUILD_UPSTREAM_LIBS=ON
@@ -40,8 +40,8 @@ git clone https://software.crsim.utah.edu:8443/James_Research_Group/PoKiTT.git .
 cd $BUILD_DIR
 
 mkdir tpl; cd tpl;
-git clone --depth=1 https://software.crsim.utah.edu:8443/James_Research_Group/SpatialOps.git src/SpatialOps
-git clone --depth=1 https://software.crsim.utah.edu:8443/James_Research_Group/ExprLib.git src/ExprLib
+git clone --depth=1 https://gitlab.multiscale.utah.edu/common/SpatialOps.git src/SpatialOps
+git clone --depth=1 https://gitlab.multiscale.utah.edu/common/ExprLib.git src/ExprLib
  
 mkdir so; cd so;
 cmake $BUILD_DIR/tpl/src/SpatialOps -DENABLE_CUDA=ON -DENABLE_TESTS=OFF -DENABLE_THREADS=OFF -DENABLE_EXAMPLES=OFF -DCMAKE_INSTALL_PREFIX=${BUILD_DIR}/tpl
