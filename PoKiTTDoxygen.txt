@@ -35,7 +35,7 @@ This assumes that you are building in a directory defined by the variable
 `BUILD_DIR` and that the source is in a directory defined by the variable `SRC_DIR`
 \verbatim
 cd $SRC_DIR
-git clone https://software.crsim.utah.edu:8443/James_Research_Group/PoKiTT.git .
+git clone https://gitlab.multiscale.utah.edu/common/PoKiTT.git .
 
 cd $BUILD_DIR
 
