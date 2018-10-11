@@ -226,54 +226,58 @@ evaluate_rates_and_jacobian( SpatialOps::FieldMatrix<FieldT>& primitiveSensitivi
                              const std::vector< const FieldT* >& YPtr,
                              const FieldT& Mmix ) const
 {
+  using SpatialOps::SpatialFieldStore;
+
+  typedef SpatialOps::SpatFldPtr<FieldT> FieldPtr;
+
   // scratch fields - scalars
-  SpatialOps::SpatFldPtr<FieldT> invTPtr        = SpatialOps::SpatialFieldStore::get<FieldT>( T ); FieldT& invT        = *invTPtr;        // inverse of temperature
-  SpatialOps::SpatFldPtr<FieldT> lnTPtr         = SpatialOps::SpatialFieldStore::get<FieldT>( T ); FieldT& lnT         = *lnTPtr;         // natural logarithm of temperature
-  SpatialOps::SpatFldPtr<FieldT> ctPtr          = SpatialOps::SpatialFieldStore::get<FieldT>( T ); FieldT& ct          = *ctPtr;          // molar density
-  SpatialOps::SpatFldPtr<FieldT> invMPtr        = SpatialOps::SpatialFieldStore::get<FieldT>( T ); FieldT& invM        = *invMPtr;        // inverse of mixture molecular weight
-  SpatialOps::SpatFldPtr<FieldT> kfPtr          = SpatialOps::SpatialFieldStore::get<FieldT>( T ); FieldT& kf          = *kfPtr;          // forward rate constant
-  SpatialOps::SpatFldPtr<FieldT> KcPtr          = SpatialOps::SpatialFieldStore::get<FieldT>( T ); FieldT& Kc          = *KcPtr;          // equilibrium constant
-  SpatialOps::SpatFldPtr<FieldT> krPtr          = SpatialOps::SpatialFieldStore::get<FieldT>( T ); FieldT& kr          = *krPtr;          // reverse rate constant
-  SpatialOps::SpatFldPtr<FieldT> RrPtr          = SpatialOps::SpatialFieldStore::get<FieldT>( T ); FieldT& Rr          = *RrPtr;          // reverse mass action rate
-  SpatialOps::SpatFldPtr<FieldT> RnetPtr        = SpatialOps::SpatialFieldStore::get<FieldT>( T ); FieldT& Rnet        = *RnetPtr;        // net mass action rate
-  SpatialOps::SpatFldPtr<FieldT> qPtr           = SpatialOps::SpatialFieldStore::get<FieldT>( T ); FieldT& q           = *qPtr;           // rate of progress, q = Rnet * C
-  SpatialOps::SpatFldPtr<FieldT> CtbafPtr       = SpatialOps::SpatialFieldStore::get<FieldT>( T ); FieldT& Ctbaf       = *CtbafPtr;       // third body and falloff modifier
-  SpatialOps::SpatFldPtr<FieldT> prPtr          = SpatialOps::SpatialFieldStore::get<FieldT>( T ); FieldT& pr          = *prPtr;          // falloff reduced pressure
-  SpatialOps::SpatFldPtr<FieldT> fCentPtr       = SpatialOps::SpatialFieldStore::get<FieldT>( T ); FieldT& fCent       = *fCentPtr;       // Fcent (Troe falloff)
-  SpatialOps::SpatFldPtr<FieldT> flfConcPtr     = SpatialOps::SpatialFieldStore::get<FieldT>( T ); FieldT& flfConc     = *flfConcPtr;     // falloff third-body concentration
-  SpatialOps::SpatFldPtr<FieldT> fTroePtr       = SpatialOps::SpatialFieldStore::get<FieldT>( T ); FieldT& fTroe       = *fTroePtr;       // falloff blending factor for Troe reactions
-  SpatialOps::SpatFldPtr<FieldT> gTroePtr       = SpatialOps::SpatialFieldStore::get<FieldT>( T ); FieldT& gTroe       = *gTroePtr;       // piece of the blending factor for Troe reactions
-  SpatialOps::SpatFldPtr<FieldT> dRnetdrhoPtr   = SpatialOps::SpatialFieldStore::get<FieldT>( T ); FieldT& dRnetdrho   = *dRnetdrhoPtr;   // \pder{R_net}{\rho}
-  SpatialOps::SpatFldPtr<FieldT> dRnetdTPtr     = SpatialOps::SpatialFieldStore::get<FieldT>( T ); FieldT& dRnetdT     = *dRnetdTPtr;     // \pder{R_net}{T}
-  SpatialOps::SpatFldPtr<FieldT> dKcdToverKcPtr = SpatialOps::SpatialFieldStore::get<FieldT>( T ); FieldT& dKcdToverKc = *dKcdToverKcPtr; // \pder{K_c}{T}
-  SpatialOps::SpatFldPtr<FieldT> dCtbafdrhoPtr  = SpatialOps::SpatialFieldStore::get<FieldT>( T ); FieldT& dCtbafdrho  = *dCtbafdrhoPtr;  // \pder{Ctbaf}{\rho}
-  SpatialOps::SpatFldPtr<FieldT> dCtbafdTPtr    = SpatialOps::SpatialFieldStore::get<FieldT>( T ); FieldT& dCtbafdT    = *dCtbafdTPtr;    // \pder{Ctbaf}{T}
-  SpatialOps::SpatFldPtr<FieldT> dqdrhoPtr      = SpatialOps::SpatialFieldStore::get<FieldT>( T ); FieldT& dqdrho      = *dqdrhoPtr;      // \pder{q}{\rho}
-  SpatialOps::SpatFldPtr<FieldT> dqdTPtr        = SpatialOps::SpatialFieldStore::get<FieldT>( T ); FieldT& dqdT        = *dqdTPtr;        // \pder{q}{T}
-  SpatialOps::SpatFldPtr<FieldT> dfTroedrhoPtr  = SpatialOps::SpatialFieldStore::get<FieldT>( T ); FieldT& dfTroedrho  = *dfTroedrhoPtr;  // \pder{fTroe}{\rho}
-  SpatialOps::SpatFldPtr<FieldT> dfTroedTPtr    = SpatialOps::SpatialFieldStore::get<FieldT>( T ); FieldT& dfTroedT    = *dfTroedTPtr;    // \pder{fTroe}{T}
-  SpatialOps::SpatFldPtr<FieldT> dfCentdTPtr    = SpatialOps::SpatialFieldStore::get<FieldT>( T ); FieldT& dfCentdT    = *dfCentdTPtr;    // \pder{fCent}{T}
-  SpatialOps::SpatFldPtr<FieldT> aTroePtr       = SpatialOps::SpatialFieldStore::get<FieldT>( T ); FieldT& aTroe       = *aTroePtr;       // Troe A, part of the blending factor
-  SpatialOps::SpatFldPtr<FieldT> bTroePtr       = SpatialOps::SpatialFieldStore::get<FieldT>( T ); FieldT& bTroe       = *bTroePtr;       // Troe B, part of the blending factor
-  SpatialOps::SpatFldPtr<FieldT> nsTmpPtr       = SpatialOps::SpatialFieldStore::get<FieldT>( T ); FieldT& nsTmp       = *nsTmpPtr;       // temporary for nth-species calculations
+  FieldPtr invTPtr        = SpatialFieldStore::get<FieldT>( T );   FieldT& invT        = *invTPtr;        // inverse of temperature
+  FieldPtr lnTPtr         = SpatialFieldStore::get<FieldT>( T );   FieldT& lnT         = *lnTPtr;         // natural logarithm of temperature
+  FieldPtr ctPtr          = SpatialFieldStore::get<FieldT>( T );   FieldT& ct          = *ctPtr;          // molar density
+  FieldPtr invMPtr        = SpatialFieldStore::get<FieldT>( T );   FieldT& invM        = *invMPtr;        // inverse of mixture molecular weight
+  FieldPtr kfPtr          = SpatialFieldStore::get<FieldT>( T );   FieldT& kf          = *kfPtr;          // forward rate constant
+  FieldPtr KcPtr          = SpatialFieldStore::get<FieldT>( T );   FieldT& Kc          = *KcPtr;          // equilibrium constant
+  FieldPtr krPtr          = SpatialFieldStore::get<FieldT>( T );   FieldT& kr          = *krPtr;          // reverse rate constant
+  FieldPtr RrPtr          = SpatialFieldStore::get<FieldT>( T );   FieldT& Rr          = *RrPtr;          // reverse mass action rate
+  FieldPtr RnetPtr        = SpatialFieldStore::get<FieldT>( T );   FieldT& Rnet        = *RnetPtr;        // net mass action rate
+  FieldPtr qPtr           = SpatialFieldStore::get<FieldT>( T );   FieldT& q           = *qPtr;           // rate of progress, q = Rnet * C
+  FieldPtr CtbafPtr       = SpatialFieldStore::get<FieldT>( T );   FieldT& Ctbaf       = *CtbafPtr;       // third body and falloff modifier
+  FieldPtr prPtr          = SpatialFieldStore::get<FieldT>( T );   FieldT& pr          = *prPtr;          // falloff reduced pressure
+  FieldPtr fCentPtr       = SpatialFieldStore::get<FieldT>( T );   FieldT& fCent       = *fCentPtr;       // Fcent (Troe falloff)
+  FieldPtr flfConcPtr     = SpatialFieldStore::get<FieldT>( T );   FieldT& flfConc     = *flfConcPtr;     // falloff third-body concentration
+  FieldPtr fTroePtr       = SpatialFieldStore::get<FieldT>( T );   FieldT& fTroe       = *fTroePtr;       // falloff blending factor for Troe reactions
+  FieldPtr gTroePtr       = SpatialFieldStore::get<FieldT>( T );   FieldT& gTroe       = *gTroePtr;       // piece of the blending factor for Troe reactions
+  FieldPtr dRnetdrhoPtr   = SpatialFieldStore::get<FieldT>( T );   FieldT& dRnetdrho   = *dRnetdrhoPtr;   // \pder{R_net}{\rho}
+  FieldPtr dRnetdTPtr     = SpatialFieldStore::get<FieldT>( T );   FieldT& dRnetdT     = *dRnetdTPtr;     // \pder{R_net}{T}
+  FieldPtr dKcdToverKcPtr = SpatialFieldStore::get<FieldT>( T );   FieldT& dKcdToverKc = *dKcdToverKcPtr; // \pder{K_c}{T}
+  FieldPtr dCtbafdrhoPtr  = SpatialFieldStore::get<FieldT>( T );   FieldT& dCtbafdrho  = *dCtbafdrhoPtr;  // \pder{Ctbaf}{\rho}
+  FieldPtr dCtbafdTPtr    = SpatialFieldStore::get<FieldT>( T );   FieldT& dCtbafdT    = *dCtbafdTPtr;    // \pder{Ctbaf}{T}
+  FieldPtr dqdrhoPtr      = SpatialFieldStore::get<FieldT>( T );   FieldT& dqdrho      = *dqdrhoPtr;      // \pder{q}{\rho}
+  FieldPtr dqdTPtr        = SpatialFieldStore::get<FieldT>( T );   FieldT& dqdT        = *dqdTPtr;        // \pder{q}{T}
+  FieldPtr dfTroedrhoPtr  = SpatialFieldStore::get<FieldT>( T );   FieldT& dfTroedrho  = *dfTroedrhoPtr;  // \pder{fTroe}{\rho}
+  FieldPtr dfTroedTPtr    = SpatialFieldStore::get<FieldT>( T );   FieldT& dfTroedT    = *dfTroedTPtr;    // \pder{fTroe}{T}
+  FieldPtr dfCentdTPtr    = SpatialFieldStore::get<FieldT>( T );   FieldT& dfCentdT    = *dfCentdTPtr;    // \pder{fCent}{T}
+  FieldPtr aTroePtr       = SpatialFieldStore::get<FieldT>( T );   FieldT& aTroe       = *aTroePtr;       // Troe A, part of the blending factor
+  FieldPtr bTroePtr       = SpatialFieldStore::get<FieldT>( T );   FieldT& bTroe       = *bTroePtr;       // Troe B, part of the blending factor
+  FieldPtr nsTmpPtr       = SpatialFieldStore::get<FieldT>( T );   FieldT& nsTmp       = *nsTmpPtr;       // temporary for nth-species calculations
 
   // scratch fields - vectors
-  std::vector< SpatialOps::SpatFldPtr<FieldT> > specGPtr;    // gibbs energy for each species, g_i = h_i - Ts_i, a vector of ns quantities
-  std::vector< SpatialOps::SpatFldPtr<FieldT> > dBdTSpecPtr; // \pder{B_i}{T}                , used in dKc/dT  , a vector of ns quantities
-  std::vector< SpatialOps::SpatFldPtr<FieldT> > dCtbafdYPtr; // \pder{Ctbaf}{Y_i}                              , a vector of ns quantities
-  std::vector< SpatialOps::SpatFldPtr<FieldT> > dfTroedYPtr; // \pder{fTroe}{Y_i}                              , a vector of ns quantities
-  std::vector< SpatialOps::SpatFldPtr<FieldT> > dRnetdYPtr;  // \pder{Rnet}{Y_i}                               , a vector of ns-1 quantities
-  std::vector< SpatialOps::SpatFldPtr<FieldT> > dqdYPtr;     // \pder{q}{Y_i}                                  , a vector of ns-1 quantities
+  std::vector< FieldPtr > specGPtr;    // gibbs energy for each species, g_i = h_i - Ts_i, a vector of ns quantities
+  std::vector< FieldPtr > dBdTSpecPtr; // \pder{B_i}{T}                , used in dKc/dT  , a vector of ns quantities
+  std::vector< FieldPtr > dCtbafdYPtr; // \pder{Ctbaf}{Y_i}                              , a vector of ns quantities
+  std::vector< FieldPtr > dfTroedYPtr; // \pder{fTroe}{Y_i}                              , a vector of ns quantities
+  std::vector< FieldPtr > dRnetdYPtr;  // \pder{Rnet}{Y_i}                               , a vector of ns-1 quantities
+  std::vector< FieldPtr > dqdYPtr;     // \pder{q}{Y_i}                                  , a vector of ns-1 quantities
 
   for( size_t i=0; i<ns-1; ++i ){ // vectors with (ns-1) x 1 values
-    dRnetdYPtr .push_back( SpatialOps::SpatialFieldStore::get<FieldT>( T ) ); *dRnetdYPtr[i] <<= 0.0;
-    dqdYPtr    .push_back( SpatialOps::SpatialFieldStore::get<FieldT>( T ) ); *dqdYPtr[i]    <<= 0.0;
+    dRnetdYPtr .push_back( SpatialFieldStore::get<FieldT>( T ) ); *dRnetdYPtr[i] <<= 0.0;
+    dqdYPtr    .push_back( SpatialFieldStore::get<FieldT>( T ) ); *dqdYPtr[i]    <<= 0.0;
   }
   for( size_t i=0; i<ns; ++i ){   // vectors with ns x 1 values
-    dCtbafdYPtr  .push_back( SpatialOps::SpatialFieldStore::get<FieldT>( T ) ); *dCtbafdYPtr[i] <<= 0.0;
-    dfTroedYPtr  .push_back( SpatialOps::SpatialFieldStore::get<FieldT>( T ) ); *dfTroedYPtr[i] <<= 0.0;
-    specGPtr     .push_back( SpatialOps::SpatialFieldStore::get<FieldT>( T ) );
-    dBdTSpecPtr  .push_back( SpatialOps::SpatialFieldStore::get<FieldT>( T ) );
+    dCtbafdYPtr  .push_back( SpatialFieldStore::get<FieldT>( T ) ); *dCtbafdYPtr[i] <<= 0.0;
+    dfTroedYPtr  .push_back( SpatialFieldStore::get<FieldT>( T ) ); *dfTroedYPtr[i] <<= 0.0;
+    specGPtr     .push_back( SpatialFieldStore::get<FieldT>( T ) );
+    dBdTSpecPtr  .push_back( SpatialFieldStore::get<FieldT>( T ) );
   }
 
   invT <<= 1 / T;

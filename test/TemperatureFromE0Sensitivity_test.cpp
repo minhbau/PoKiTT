@@ -158,38 +158,27 @@ for( int i=0; i<nSpec; ++i ){
   CellFieldT& epdTMix = fml.field_ref<CellFieldT>( offsetEgyTag );
   CellFieldT& cv = fml.field_ref<CellFieldT>( cvTag );
 
-
   TestHelper fullTest( true );
 
   TestHelper mixture( false );
   CellFieldPtrT dTdePtr = so::SpatialFieldStore::get<CellFieldT>( T );
   *dTdePtr <<= ( TpdT - T ) / ( epdTMix -eMix );
-  mixture( so::field_equal( *dTdePtr, fml.field_ref<CellFieldT>( Expr::Tag( "T_sens_e", Expr::STATE_NONE ) ), 1e-4 ), "T_sens_e" );
+  mixture( so::field_equal( *dTdePtr, fml.field_ref<CellFieldT>( Expr::sens_tag( tempTag, egyTag ) ), 1e-4 ), "T_sens_e" );
 
   for( int i=0; i<nSpec-1; ++i ){
     CellFieldPtrT dTdYi = so::SpatialFieldStore::get<CellFieldT>( T );
     *dTdYi <<= -(fml.field_ref<CellFieldT>( specEgyTags[i] ) - fml.field_ref<CellFieldT>( specEgyTags[nSpec-1] ))/cv;
 
-    const std::string sensStr = tempTag.name() + "_sens_" + massTags[i].name();
-    const Expr::Tag sensTag( sensStr, Expr::STATE_NONE );
-
-    mixture( so::field_equal( *dTdYi, fml.field_ref<CellFieldT>( sensTag ), 1e-5 ), sensStr );
+    const Expr::Tag sensTag = Expr::sens_tag( tempTag, massTags[i] );
+    mixture( so::field_equal( *dTdYi, fml.field_ref<CellFieldT>( sensTag ), 1e-5 ), sensTag.name() );
   }
   fullTest( mixture.ok(), "mixture enthalpy" );
-
 
   if( fullTest.ok() ){
     std::cout << "\nPASS\n";
     return 0;
   }
-  else{
-    std::cout << "\nFAIL\n";
-    return -1;
-  }
 
+  std::cout << "\nFAIL\n";
+  return -1;
 }
-
-
-
-
-

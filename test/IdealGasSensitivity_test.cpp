@@ -162,17 +162,14 @@ int main()
     TestHelper varToVar( false );
 
     for( const auto& f : sensVarTags ){
-      const std::string fName = f.name();
       for( const auto& v : sensVarTags ){
-        const std::string vName = v.name();
-        const std::string ddName = fName + "_sens_" + vName;
-        const Expr::Tag ddTag( ddName, Expr::STATE_NONE );
+        const Expr::Tag ddTag = sens_tag( f, v );
 
         if( f == v ){
-          varToVar( so::field_equal( 1.0, fml.field_ref<CellFieldT>( ddTag ) ), ddName + " = 1.0" );
+          varToVar( so::field_equal( 1.0, fml.field_ref<CellFieldT>( ddTag ) ), ddTag.name() + " = 1.0" );
         }
         else{
-          varToVar( so::field_equal( 0.0, fml.field_ref<CellFieldT>( ddTag ) ), ddName + " = 0.0" );
+          varToVar( so::field_equal( 0.0, fml.field_ref<CellFieldT>( ddTag ) ), ddTag.name() + " = 0.0" );
         }
       }
     }
@@ -188,48 +185,49 @@ int main()
     CellFieldPtrT drhodT = so::SpatialFieldStore::get<CellFieldT>( rhoField );
 
     TestHelper nthSpecies( false );
-    const std::string yNsName = massTags[nSpec-1].name();
+    const Expr::Tag& yNsTag = massTags[nSpec-1];
+    const std::string& yNsName = yNsTag.name();
     for( int i=0; i<nSpec-1; ++i ){
-      const std::string yNsSensName = yNsName + "_sens_" + massTags[i].name();
+      const Expr::Tag yNsSensTag = Expr::sens_tag( yNsTag, massTags[i] );
 
       CellFieldPtrT dYnsdYi = so::SpatialFieldStore::get<CellFieldT>( rhoField );
       *dYnsdYi <<= -1.0;
 
-      nthSpecies( so::field_equal( *dYnsdYi, fml.field_ref<CellFieldT>( Expr::Tag( yNsSensName, Expr::STATE_NONE ) ), 1e-8 ), yNsSensName );
+      nthSpecies( so::field_equal( *dYnsdYi, fml.field_ref<CellFieldT>( yNsSensTag ), 1e-8 ), yNsSensTag.name() );
     }
-    nthSpecies( so::field_equal( 0.0, fml.field_ref<CellFieldT>( Expr::Tag( yNsName + "_sens_p", Expr::STATE_NONE ) ), 1e-8 ), yNsName + "_sens_p" );
-    nthSpecies( so::field_equal( 0.0, fml.field_ref<CellFieldT>( Expr::Tag( yNsName + "_sens_T", Expr::STATE_NONE ) ), 1e-8 ), yNsName + "_sens_T" );
+    nthSpecies( so::field_equal( 0.0, fml.field_ref<CellFieldT>( Expr::sens_tag( yNsTag, presTag ) ), 1e-8 ), yNsName + "__sens_p" );
+    nthSpecies( so::field_equal( 0.0, fml.field_ref<CellFieldT>( Expr::sens_tag( yNsTag, tempTag ) ), 1e-8 ), yNsName + "_sens_T" );
     allSens( nthSpecies.ok(), "n-th species" );
 
 
     TestHelper mixMolWeight( false );
     for( int i=0; i<nSpec-1; ++i ){
-      const std::string mmwSensName = "mmw_sens_" + massTags[i].name();
+      const Expr::Tag mmwSensTag = Expr::sens_tag( mmwTag, massTags[i] );
 
       CellFieldPtrT dmmwdYi = so::SpatialFieldStore::get<CellFieldT>( rhoField );
       *dmmwdYi <<= - ( 1.0 / mwVec[i] - 1.0 / mwVec[nSpec-1] ) * mmwField * mmwField;
 
-      mixMolWeight( so::field_equal( *dmmwdYi, fml.field_ref<CellFieldT>( Expr::Tag( mmwSensName, Expr::STATE_NONE ) ), 1e-8 ), mmwSensName );
+      mixMolWeight( so::field_equal( *dmmwdYi, fml.field_ref<CellFieldT>( mmwSensTag ), 1e-8 ), mmwSensTag.name() );
     }
-    mixMolWeight( so::field_equal( 0.0, fml.field_ref<CellFieldT>( Expr::Tag( "mmw_sens_p", Expr::STATE_NONE ) ), 1e-8 ), "mmw_sens_p" );
-    mixMolWeight( so::field_equal( 0.0, fml.field_ref<CellFieldT>( Expr::Tag( "mmw_sens_T", Expr::STATE_NONE ) ), 1e-8 ), "mmw_sens_T" );
+    mixMolWeight( so::field_equal( 0.0, fml.field_ref<CellFieldT>( Expr::sens_tag( mmwTag, presTag ) ), 1e-8 ), "mmw_sens_p" );
+    mixMolWeight( so::field_equal( 0.0, fml.field_ref<CellFieldT>( Expr::sens_tag( mmwTag, tempTag ) ), 1e-8 ), "mmw_sens_T" );
     allSens( mixMolWeight.ok(), "mixture molecular weight" );
 
 
     TestHelper density( false );
     for( int i=0; i<nSpec-1; ++i ){
-      const std::string rhoSensName = "rho_sens_" + massTags[i].name();
-      const std::string mmwSensName = "mmw_sens_" + massTags[i].name();
+      const Expr::Tag rhoSensTag = Expr::sens_tag( rhoTag, massTags[i] );
+      const Expr::Tag mmwSensTag = Expr::sens_tag( mmwTag, massTags[i] );
 
       CellFieldPtrT drhodYi = so::SpatialFieldStore::get<CellFieldT>( rhoField );
-      *drhodYi <<= rhoField / mmwField * fml.field_ref<CellFieldT>( Expr::Tag( mmwSensName, Expr::STATE_NONE ) );
+      *drhodYi <<= rhoField / mmwField * fml.field_ref<CellFieldT>( mmwSensTag );
 
-      density( so::field_equal( *drhodYi, fml.field_ref<CellFieldT>( Expr::Tag( rhoSensName, Expr::STATE_NONE ) ), 1e-8 ), rhoSensName );
+      density( so::field_equal( *drhodYi, fml.field_ref<CellFieldT>( rhoSensTag ), 1e-8 ), rhoSensTag.name() );
     }
     *drhodp <<= rhoField / pField;
     *drhodT <<= - rhoField / TField;
-    density( so::field_equal( *drhodp, fml.field_ref<CellFieldT>( Expr::Tag( "rho_sens_p", Expr::STATE_NONE ) ), 1e-8 ), "rho_sens_p" );
-    density( so::field_equal( *drhodT, fml.field_ref<CellFieldT>( Expr::Tag( "rho_sens_T", Expr::STATE_NONE ) ), 1e-8 ), "rho_sens_T" );
+    density( so::field_equal( *drhodp, fml.field_ref<CellFieldT>( Expr::sens_tag( rhoTag, presTag ) ), 1e-8 ), "rho_sens_p" );
+    density( so::field_equal( *drhodT, fml.field_ref<CellFieldT>( Expr::sens_tag( rhoTag, tempTag ) ), 1e-8 ), "rho_sens_T" );
     allSens( density.ok(), "density" );
     allVarSets( allSens.ok(), "set pressure" );
   }
@@ -306,22 +304,18 @@ int main()
     TestHelper varToVar( false );
 
     for( const auto& f : sensVarTags ){
-      const std::string fName = f.name();
       for( const auto& v : sensVarTags ){
-        const std::string vName = v.name();
-        const std::string ddName = fName + "_sens_" + vName;
-        const Expr::Tag ddTag( ddName, Expr::STATE_NONE );
+        const Expr::Tag ddTag = Expr::sens_tag( f, v  );
 
         if( f == v ){
-          varToVar( so::field_equal( 1.0, fml.field_ref<CellFieldT>( ddTag ) ), ddName + " = 1.0" );
+          varToVar( so::field_equal( 1.0, fml.field_ref<CellFieldT>( ddTag ) ), ddTag.name() + " = 1.0" );
         }
         else{
-          varToVar( so::field_equal( 0.0, fml.field_ref<CellFieldT>( ddTag ) ), ddName + " = 0.0" );
+          varToVar( so::field_equal( 0.0, fml.field_ref<CellFieldT>( ddTag ) ), ddTag.name() + " = 0.0" );
         }
       }
     }
     allSens( varToVar.ok(), "variable-to-variable identity matrix" );
-
 
     CellFieldT& rhoField = fml.field_ref<CellFieldT>( rhoTag );
     CellFieldT& pField   = fml.field_ref<CellFieldT>( presTag );
@@ -332,48 +326,44 @@ int main()
     CellFieldPtrT dpdT   = so::SpatialFieldStore::get<CellFieldT>( rhoField );
 
     TestHelper nthSpecies( false );
-    const std::string yNsName = massTags[nSpec-1].name();
+    const Expr::Tag& yNsTag = massTags[nSpec-1];
     for( int i=0; i<nSpec-1; ++i ){
-      const std::string yNsSensName = yNsName + "_sens_" + massTags[i].name();
-
       CellFieldPtrT dYnsdYi = so::SpatialFieldStore::get<CellFieldT>( rhoField );
       *dYnsdYi <<= -1.0;
-
-      nthSpecies( so::field_equal( *dYnsdYi, fml.field_ref<CellFieldT>( Expr::Tag( yNsSensName, Expr::STATE_NONE ) ), 1e-8 ), yNsSensName );
+      const Expr::Tag& yNsSensyi = Expr::sens_tag( yNsTag, massTags[i] );
+      nthSpecies( so::field_equal( *dYnsdYi, fml.field_ref<CellFieldT>( yNsSensyi ), 1e-8 ), yNsSensyi.name() );
     }
-    nthSpecies( so::field_equal( 0.0, fml.field_ref<CellFieldT>( Expr::Tag( yNsName + "_sens_rho", Expr::STATE_NONE ) ), 1e-8 ), yNsName + "_sens_rho" );
-    nthSpecies( so::field_equal( 0.0, fml.field_ref<CellFieldT>( Expr::Tag( yNsName + "_sens_T", Expr::STATE_NONE ) ), 1e-8 ), yNsName + "_sens_T" );
+    nthSpecies( so::field_equal( 0.0, fml.field_ref<CellFieldT>( Expr::sens_tag( yNsTag, rhoTag  ) ), 1e-8 ), yNsTag.name() + "_sens_rho" );
+    nthSpecies( so::field_equal( 0.0, fml.field_ref<CellFieldT>( Expr::sens_tag( yNsTag, tempTag ) ), 1e-8 ), yNsTag.name() + "_sens_T" );
     allSens( nthSpecies.ok(), "n-th species" );
 
 
     TestHelper mixMolWeight( false );
     for( int i=0; i<nSpec-1; ++i ){
-      const std::string mmwSensName = "mmw_sens_" + massTags[i].name();
-
       CellFieldPtrT dmmwdYi = so::SpatialFieldStore::get<CellFieldT>( rhoField );
       *dmmwdYi <<= - ( 1.0 / mwVec[i] - 1.0 / mwVec[nSpec-1] ) * mmwField * mmwField;
-
-      mixMolWeight( so::field_equal( *dmmwdYi, fml.field_ref<CellFieldT>( Expr::Tag( mmwSensName, Expr::STATE_NONE ) ), 1e-8 ), mmwSensName );
+      const Expr::Tag mwSensYi = Expr::sens_tag( mmwTag, massTags[i] );
+      mixMolWeight( so::field_equal( *dmmwdYi, fml.field_ref<CellFieldT>( mwSensYi ), 1e-8 ), mwSensYi.name() );
     }
-    mixMolWeight( so::field_equal( 0.0, fml.field_ref<CellFieldT>( Expr::Tag( "mmw_sens_rho", Expr::STATE_NONE ) ), 1e-8 ), "mmw_sens_rho" );
-    mixMolWeight( so::field_equal( 0.0, fml.field_ref<CellFieldT>( Expr::Tag( "mmw_sens_T", Expr::STATE_NONE ) ), 1e-8 ), "mmw_sens_T" );
+    mixMolWeight( so::field_equal( 0.0, fml.field_ref<CellFieldT>( Expr::sens_tag( mmwTag, rhoTag ) ), 1e-8 ), "mmw_sens_rho" );
+    mixMolWeight( so::field_equal( 0.0, fml.field_ref<CellFieldT>( Expr::sens_tag( mmwTag, tempTag) ), 1e-8 ), "mmw_sens_T" );
     allSens( mixMolWeight.ok(), "mixture molecular weight" );
 
 
     TestHelper pressure( false );
     for( int i=0; i<nSpec-1; ++i ){
-      const std::string pSensName   = "p_sens_" + massTags[i].name();
-      const std::string mmwSensName = "mmw_sens_" + massTags[i].name();
+      const Expr::Tag pSensTag   = Expr::sens_tag( presTag, massTags[i] );
+      const Expr::Tag mmwSensTag = Expr::sens_tag( mmwTag,  massTags[i] );
 
       CellFieldPtrT dpdYi = so::SpatialFieldStore::get<CellFieldT>( rhoField );
-      *dpdYi <<= -pField / mmwField * fml.field_ref<CellFieldT>( Expr::Tag( mmwSensName, Expr::STATE_NONE ) );
+      *dpdYi <<= -pField / mmwField * fml.field_ref<CellFieldT>( mmwSensTag );
 
-      pressure( so::field_equal( *dpdYi, fml.field_ref<CellFieldT>( Expr::Tag( pSensName, Expr::STATE_NONE ) ), 1e-8 ), pSensName );
+      pressure( so::field_equal( *dpdYi, fml.field_ref<CellFieldT>( pSensTag ), 1e-8 ), pSensTag.name() );
     }
     *dpdrho <<= pField / rhoField;
     *dpdT <<= pField / TField;
-    pressure( so::field_equal( *dpdrho, fml.field_ref<CellFieldT>( Expr::Tag( "p_sens_rho", Expr::STATE_NONE ) ), 1e-8 ), "p_sens_rho" );
-    pressure( so::field_equal( *dpdT  , fml.field_ref<CellFieldT>( Expr::Tag( "p_sens_T", Expr::STATE_NONE ) ), 1e-8 ), "p_sens_T" );
+    pressure( so::field_equal( *dpdrho, fml.field_ref<CellFieldT>( Expr::sens_tag( presTag, rhoTag ) ), 1e-8 ), "p_sens_rho" );
+    pressure( so::field_equal( *dpdT  , fml.field_ref<CellFieldT>( Expr::sens_tag( presTag, tempTag) ), 1e-8 ), "p_sens_T" );
     allSens( pressure.ok(), "pressure" );
     allVarSets( allSens.ok(), "set density" );
   }
@@ -382,10 +372,6 @@ int main()
     std::cout << "\nPASS\n";
     return 0;
   }
-  else{
-    std::cout << "\nFAIL\n";
-    return -1;
-  }
-
-
+  std::cout << "\nFAIL\n";
+  return -1;
 }
