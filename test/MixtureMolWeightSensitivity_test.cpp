@@ -166,9 +166,8 @@ int main()
     CellFieldPtrT dmmwdYi = so::SpatialFieldStore::get<CellFieldT>( massFracField );
     *dmmwdYi <<= ( mmwOffsetField - mmwField ) / ( massFracOffsetField - massFracField);
 
-    const std::string sensStr = mmwTag.name() + "_sens_" + massTags[i].name();
-    const Expr::Tag sensTag( sensStr, Expr::STATE_NONE );
-    MassFractionSens( so::field_equal( *dmmwdYi, fml.field_ref<CellFieldT>( sensTag ), 1e-3 ), sensStr );
+    const Expr::Tag sensTag = Expr::sens_tag( mmwTag, massTags[i] );
+    MassFractionSens( so::field_equal( *dmmwdYi, fml.field_ref<CellFieldT>( sensTag ), 1e-3 ), sensTag.name() );
     fullTest( MassFractionSens.ok(), "mixture molar weight sensitivity to species mass fraction" );
   }
 
@@ -242,9 +241,8 @@ int main()
     CellFieldPtrT dmmwdYi = so::SpatialFieldStore::get<CellFieldT>( moleFracField );
     *dmmwdYi <<= ( mmwOffsetField - mmwField ) / ( moleFracOffsetField - moleFracField);
 
-    const std::string sensStr = mmwTag.name() + "_sens_" + moleTags[i].name();
-    const Expr::Tag sensTag( sensStr, Expr::STATE_NONE );
-    MoleFractionSens( so::field_equal( *dmmwdYi, fml.field_ref<CellFieldT>( sensTag ), 1e-3 ), sensStr );
+    const Expr::Tag sensTag = Expr::sens_tag( mmwTag, moleTags[i] );
+    MoleFractionSens( so::field_equal( *dmmwdYi, fml.field_ref<CellFieldT>( sensTag ), 1e-3 ), sensTag.name() );
     fullTest( MoleFractionSens.ok(), "mixture molar weight sensitivity to species mole fraction" );
   }
 
@@ -252,9 +250,7 @@ int main()
     std::cout << "\nPASS\n";
     return 0;
   }
-  else{
-    std::cout << "\nFAIL\n";
-    return -1;
-  }
 
+  std::cout << "\nFAIL\n";
+  return -1;
 }

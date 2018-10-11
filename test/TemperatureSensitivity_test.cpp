@@ -115,6 +115,11 @@ int main()
     tree.insert_tree( factory.register_expression( new SpecEnthT( specEnthTags[i], tempTag, i ) ) );
   }
 
+  {
+    std::ofstream tGraph( "temperature_sens.dot" );
+    tree.write_tree( tGraph,false,true );
+  }
+
   Expr::TagList sensFxnTags = tag_list( tempTag );
   Expr::TagList sensVarTags = tag_list( enthTag);
   for (int i=0; i<nSpec-1; ++i){
@@ -159,16 +164,15 @@ for( int i=0; i<nSpec; ++i ){
   TestHelper mixture( false );
   CellFieldPtrT dTdHPtr = so::SpatialFieldStore::get<CellFieldT>( T );
   *dTdHPtr <<= ( TpdT - T ) / ( hpdTMix - hMix );
-  mixture( so::field_equal( *dTdHPtr, fml.field_ref<CellFieldT>( Expr::Tag( "T_sens_h", Expr::STATE_NONE ) ), 1e-4 ), "T_sens_h" );
+  mixture( so::field_equal( *dTdHPtr, fml.field_ref<CellFieldT>( Expr::sens_tag( tempTag, enthTag ) ), 1e-4 ), "T_sens_h" );
 
   for( int i=0; i<nSpec-1; ++i ){
     CellFieldPtrT dTdYi = so::SpatialFieldStore::get<CellFieldT>( T );
     *dTdYi <<= -(fml.field_ref<CellFieldT>( specEnthTags[i] ) - fml.field_ref<CellFieldT>( specEnthTags[nSpec-1] ))/cp;
 
-    const std::string sensStr = tempTag.name() + "_sens_" + massTags[i].name();
-    const Expr::Tag sensTag( sensStr, Expr::STATE_NONE );
+    const Expr::Tag sensTag = Expr::sens_tag( tempTag, massTags[i] );
 
-    mixture( so::field_equal( *dTdYi, fml.field_ref<CellFieldT>( sensTag ), 1e-5 ), sensStr );
+    mixture( so::field_equal( *dTdYi, fml.field_ref<CellFieldT>( sensTag ), 1e-5 ), sensTag.name() );
   }
   fullTest( mixture.ok(), "mixture enthalpy" );
 

@@ -147,7 +147,6 @@ for( int i=0; i<nSpec; ++i ){
   CellFieldT& cPMix = fml.field_ref<CellFieldT>( CpTag );
   CellFieldT& cPpdTMix = fml.field_ref<CellFieldT>( offsetCpTag );
 
-
   TestHelper fullTest( true );
 
   TestHelper species( false );
@@ -157,41 +156,29 @@ for( int i=0; i<nSpec; ++i ){
     CellFieldPtrT dCPdTPtr = so::SpatialFieldStore::get<CellFieldT>( T );
     *dCPdTPtr <<= ( cPpdT - cP ) / ( TpdT - T );
 
-    const std::string sensStr = specCpTags[i].name() + "_sens_" + tempTag.name();
-    const Expr::Tag sensTag( sensStr, Expr::STATE_NONE );
-
-    species( so::field_equal( *dCPdTPtr, fml.field_ref<CellFieldT>( sensTag ), 1e-2 ), sensStr );
+    const Expr::Tag sensTag = Expr::sens_tag( specCpTags[i], tempTag );
+    species( so::field_equal( *dCPdTPtr, fml.field_ref<CellFieldT>( sensTag ), 1e-2 ), sensTag.name() );
   }
   fullTest( species.ok(), "species heat capacities" );
-
 
   TestHelper mixture( false );
   CellFieldPtrT dHdTPtr = so::SpatialFieldStore::get<CellFieldT>( T );
   *dHdTPtr <<= ( cPpdTMix - cPMix ) / ( TpdT - T );
-  mixture( so::field_equal( *dHdTPtr, fml.field_ref<CellFieldT>( Expr::Tag( "Cp_sens_T", Expr::STATE_NONE ) ), 1e-4 ), "Cp_sens_T" );
+  mixture( so::field_equal( *dHdTPtr, fml.field_ref<CellFieldT>( Expr::sens_tag( CpTag, tempTag ) ), 1e-4 ), "Cp_sens_T" );
 
   for( int i=0; i<nSpec-1; ++i ){
     CellFieldPtrT dCPdYi = so::SpatialFieldStore::get<CellFieldT>( T );
     *dCPdYi <<= fml.field_ref<CellFieldT>( specCpTags[i] ) - fml.field_ref<CellFieldT>( specCpTags[nSpec-1] );
 
-    const std::string sensStr = CpTag.name() + "_sens_" + massTags[i].name();
-    const Expr::Tag sensTag( sensStr, Expr::STATE_NONE );
-
-    mixture( so::field_equal( *dCPdYi, fml.field_ref<CellFieldT>( sensTag ), 1e-8 ), sensStr );
+    const Expr::Tag sensTag = Expr::sens_tag( CpTag, massTags[i] );
+    mixture( so::field_equal( *dCPdYi, fml.field_ref<CellFieldT>( sensTag ), 1e-8 ), sensTag.name() );
   }
   fullTest( mixture.ok(), "mixture heat capacity" );
-
 
   if( fullTest.ok() ){
     std::cout << "\nPASS\n";
     return 0;
   }
-  else{
-    std::cout << "\nFAIL\n";
-    return -1;
-  }
-
+  std::cout << "\nFAIL\n";
+  return -1;
 }
-
-
-

@@ -158,25 +158,22 @@ int main()
 
     TestHelper tempSens( true );
 
-    CellFieldT& TField = fml.field_ref<CellFieldT>( tempTag );
-    CellFieldT& TOffsetField = fml.field_ref<CellFieldT>( tempOffsetTag );
-    CellFieldT& thermalCondField = fml.field_ref<CellFieldT>( thermalcondTag );
+    CellFieldT& TField                 = fml.field_ref<CellFieldT>( tempTag );
+    CellFieldT& TOffsetField           = fml.field_ref<CellFieldT>( tempOffsetTag );
+    CellFieldT& thermalCondField       = fml.field_ref<CellFieldT>( thermalcondTag );
     CellFieldT& thermalCondOffsetField = fml.field_ref<CellFieldT>( thermalcondOffsetTag );
-    CellFieldPtrT dthermalConddT = so::SpatialFieldStore::get<CellFieldT>( TField );
+    CellFieldPtrT dthermalConddT       = so::SpatialFieldStore::get<CellFieldT>( TField );
 
     *dthermalConddT <<= ( thermalCondOffsetField - thermalCondField ) / ( TOffsetField - TField );
 
-    const std::string sensStr = thermalcondTag.name() + "_sens_" + tempTag.name();
-    const Expr::Tag sensTag( sensStr, Expr::STATE_NONE );
-
-    tempSens( so::field_equal( *dthermalConddT, fml.field_ref<CellFieldT>( sensTag ), 1e-2 ), sensStr );
+    const Expr::Tag sensTag = Expr::sens_tag( thermalcondTag, tempTag );
+    tempSens( so::field_equal( *dthermalConddT, fml.field_ref<CellFieldT>( sensTag ), 1e-2 ), sensTag.name() );
 
     fullTest( tempSens.ok(), "sensitivity to temperature" );
   }
 
   /* check d\lambda/dYi */
-  for( int i = 0;i < nSpec - 1;++i )
-  {
+  for( int i = 0;i < nSpec - 1;++i ){
 
     Expr::ExpressionFactory factory;
     Expr::ExpressionTree tree( factory, 0, "tree" );
@@ -254,9 +251,8 @@ int main()
     CellFieldPtrT dthermalConddYi = so::SpatialFieldStore::get<CellFieldT>( massFracField );
     *dthermalConddYi <<= ( thermalCondOffsetField - thermalCondField ) / ( massFracOffsetField - massFracField);
 
-    const std::string sensStr = thermalcondTag.name() + "_sens_" + massTags[i].name();
-    const Expr::Tag sensTag( sensStr, Expr::STATE_NONE );
-    SpeciesSens( so::field_equal( *dthermalConddYi, fml.field_ref<CellFieldT>( sensTag ), 1e-3 ), sensStr );
+    const Expr::Tag sensTag = Expr::sens_tag( thermalcondTag, massTags[i] );
+    SpeciesSens( so::field_equal( *dthermalConddYi, fml.field_ref<CellFieldT>( sensTag ), 1e-3 ), sensTag.name() );
     fullTest( SpeciesSens.ok(), "sensitivity to species mass fraction" );
   }
 
