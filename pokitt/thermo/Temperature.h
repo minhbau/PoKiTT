@@ -51,7 +51,7 @@ namespace pokitt{
  * \f]
  *
  * Newton's method is used to solve this non-linear equation. For a
- * given h_0 and an initial guess \f$ T_i \f$ Newton's method calculates
+ * given \f$ h_0 \f$ and an initial guess \f$ T_i \f$ Newton's method calculates
  * a new guess,
  *
  * \f[
@@ -66,14 +66,15 @@ namespace pokitt{
  *
  * Sensitivity:
  * \f[
- * dT = dh/cp - \sum_{i=1}^{i=nspec-1} (hi-hn)/cp * dYi
+ * dT = dh/cp - \sum_{i=1}^{i=nspec-1} (h_i-h_{nspec})/cp * dY_i
  * \f]
- * In our present codes, ie, Zodiac, ODT, we choose $\rho$, $T$, and $Yi$ as the primitive variables. As a result, we want $dT/dYi=0$ and $dT/d\rho=0$,
- * and we do not want to use chain rule based on the tree to get $dT/dYi = - \sum_{i=1}^{i=nspec-1} (hi-hn)/cp$.
- * Therefore, override_sensitivity is used here. If the sensitivity variable is $T$, the sensitivity is set to be one $dT/dT = 1$.
- * If the sensitivity variable is $h$, the sensitivity is $dT/dh = 1/cp$.
- * Otherwise, the sensitivity is set to be zero. $dT/d\rho = 0$. $dT/dYi = 0$.
- * For some other sensitivities, like $dT/d(\rho h)$, it needs to be given directly by hand, not by this class.
+ * Here, \f$nspec \f$ is the number of species.
+ * In our present codes, e.g., Zodiac, ODT, we choose \f$\rho \f$, \f$T \f$, and \f$Y_i \f$ as the primitive variables. As a result, we want \f$dT/dY_i=0 \f$ and \f$dT/d\rho=0 \f$,
+ * and we do not want to use chain rule based on the tree to get \f$dT/dY_i = - \sum_{i=1}^{i=nspec-1} (h_i-h_{nspec})/cp \f$.
+ * Therefore, override_sensitivity is used here. If the sensitivity variable is \f$T \f$, the sensitivity is set to be one \f$dT/dT = 1 \f$.
+ * If the sensitivity variable is \f$h \f$, the sensitivity is \f$dT/dh = 1/cp \f$.
+ * Otherwise, the sensitivity is set to be zero. \f$dT/d\rho = 0 \f$. \f$dT/dY_i = 0 \f$.
+ * For some other sensitivities, like \f$dT/d(\rho h) \f$, it needs to be given directly by hand, not by this class.
  */
 
 template< typename FieldT >
@@ -177,7 +178,7 @@ public:
  * \f]
  *
  * Newton's method is used to solve this non-linear equation. For a
- * given e_0 and an initial guess \f$ T_i \f$ Newton's method calculates
+ * given \f$ e_0 \f$ and an initial guess \f$ T_i \f$ Newton's method calculates
  * a new guess,
  *
  * \f[
@@ -192,14 +193,15 @@ public:
  *
  * Sensitivity:
  * \f[
- * dT = de/cv - \sum_{i=1}^{i=nspec-1} (ei-en)/cv * dYi
+ * dT = de/cv - \sum_{i=1}^{i=nspec-1} (e_i-e_{nspec})/cv * dY_i
  * \f]
- * In our present codes, ie, Zodiac, ODT, we choose $\rho$, $T$, and $Yi$ as the primitive variables. As a result, we want $dT/dYi=0$ and $dT/d\rho=0$,
- * and we do not want to use chain rule based on the tree to get $dT/dYi = - \sum_{i=1}^{i=nspec-1} (hi-hn)/cp$.
- * Therefore, override_sensitivity is used here. If the sensitivity variable is $T$, the sensitivity is set to be one $dT/dT = 1$.
- * If the sensitivity variable is $h$, the sensitivity is $dT/dh = 1/cp$.
- * Otherwise, the sensitivity is set to be zero. $dT/d\rho = 0$. $dT/dYi = 0$.
- * For some other sensitivities, like $dT/d(\rho e)$, it needs to be given directly by hand, not by this class.
+ * Here, \f$nspec \f$ is the number of species.
+ * In our present codes, e.g., Zodiac, ODT, we choose \f$\rho \f$, \f$T \f$, and \f$Y_i \f$ as the primitive variables. As a result, we want \f$dT/dY_i=0 \f$ and \f$dT/d\rho=0 \f$,
+ * and we do not want to use chain rule based on the tree to get \f$dT/dY_i = - \sum_{i=1}^{i=nspec-1} (e_i-e_{nspec})/cv \f$.
+ * Therefore, override_sensitivity is used here. If the sensitivity variable is \f$T \f$, the sensitivity is set to be one \f$dT/dT = 1 \f$.
+ * If the sensitivity variable is \f$e \f$, the sensitivity is \f$dT/de = 1/cv \f$.
+ * Otherwise, the sensitivity is set to be zero. \f$dT/d\rho = 0 \f$. \f$dT/dY_i = 0 \f$.
+ * For some other sensitivities, like \f$dT/d(\rho e) \f$, it needs to be given directly by hand, not by this class.
  */
 
 template< typename FieldT >
@@ -1031,4 +1033,5 @@ find_bad_points( std::ostringstream& msg, const FieldT& badField, const double b
 } // namespace pokitt
 
 #endif // Temperature_Expr_h
+
 
