@@ -51,7 +51,7 @@ namespace pokitt{
  * \f]
  *
  * Newton's method is used to solve this non-linear equation. For a
- * given h_0 and an initial guess \f$ T_i \f$ Newton's method calculates
+ * given \f$ h_0 \f$ and an initial guess \f$ T_i \f$ Newton's method calculates
  * a new guess,
  *
  * \f[
@@ -66,8 +66,15 @@ namespace pokitt{
  *
  * Sensitivity:
  * \f[
- * dT = dh/cp - \sum_{i=1}^{i=nspec-1} (hi-hn)/cp * dYi
+ * dT = dh/cp - \sum_{i=1}^{i=nspec-1} (h_i-h_{nspec})/cp * dY_i
  * \f]
+ * Here, \f$nspec \f$ is the number of species.
+ * In our present codes, e.g., Zodiac, ODT, we choose \f$\rho \f$, \f$T \f$, and \f$Y_i \f$ as the primitive variables. As a result, we want \f$dT/dY_i=0 \f$ and \f$dT/d\rho=0 \f$,
+ * and we do not want to use chain rule based on the tree to get \f$dT/dY_i = - \sum_{i=1}^{i=nspec-1} (h_i-h_{nspec})/cp \f$.
+ * Therefore, override_sensitivity is used here. If the sensitivity variable is \f$T \f$, the sensitivity is set to be one \f$dT/dT = 1 \f$.
+ * If the sensitivity variable is \f$h \f$, the sensitivity is \f$dT/dh = 1/cp \f$.
+ * Otherwise, the sensitivity is set to be zero. \f$dT/d\rho = 0 \f$. \f$dT/dY_i = 0 \f$.
+ * For some other sensitivities, like \f$dT/d(\rho h) \f$, it needs to be given directly by hand, not by this class.
  */
 
 template< typename FieldT >
@@ -148,6 +155,7 @@ public:
 
   ~Temperature(){}
   void evaluate();
+  bool override_sensitivity() const{return true;}
   void sensitivity( const Expr::Tag& );
   void find_bad_points( std::ostringstream& msg, const FieldT& badField, const double badValue, const bool checkBelow );
 };
@@ -170,7 +178,7 @@ public:
  * \f]
  *
  * Newton's method is used to solve this non-linear equation. For a
- * given e_0 and an initial guess \f$ T_i \f$ Newton's method calculates
+ * given \f$ e_0 \f$ and an initial guess \f$ T_i \f$ Newton's method calculates
  * a new guess,
  *
  * \f[
@@ -185,8 +193,15 @@ public:
  *
  * Sensitivity:
  * \f[
- * dT = de/cv - \sum_{i=1}^{i=nspec-1} (ei-en)/cv * dYi
+ * dT = de/cv - \sum_{i=1}^{i=nspec-1} (e_i-e_{nspec})/cv * dY_i
  * \f]
+ * Here, \f$nspec \f$ is the number of species.
+ * In our present codes, e.g., Zodiac, ODT, we choose \f$\rho \f$, \f$T \f$, and \f$Y_i \f$ as the primitive variables. As a result, we want \f$dT/dY_i=0 \f$ and \f$dT/d\rho=0 \f$,
+ * and we do not want to use chain rule based on the tree to get \f$dT/dY_i = - \sum_{i=1}^{i=nspec-1} (e_i-e_{nspec})/cv \f$.
+ * Therefore, override_sensitivity is used here. If the sensitivity variable is \f$T \f$, the sensitivity is set to be one \f$dT/dT = 1 \f$.
+ * If the sensitivity variable is \f$e \f$, the sensitivity is \f$dT/de = 1/cv \f$.
+ * Otherwise, the sensitivity is set to be zero. \f$dT/d\rho = 0 \f$. \f$dT/dY_i = 0 \f$.
+ * For some other sensitivities, like \f$dT/d(\rho e) \f$, it needs to be given directly by hand, not by this class.
  */
 
 template< typename FieldT >
@@ -269,6 +284,7 @@ public:
 
   ~TemperatureFromE0(){}
   void evaluate();
+  bool override_sensitivity() const{return true;}
   void sensitivity( const Expr::Tag& );
   void find_bad_points( std::ostringstream& msg, const FieldT& badField, const double badValue, const bool checkBelow );
 };
@@ -515,131 +531,70 @@ sensitivity( const Expr::Tag& var)
     using namespace SpatialOps;
     FieldT& dfdv = this->sensitivity_result( var );
     if( var == this->get_tag() ){
-        dfdv <<= 1.0;
+      dfdv <<= 1.0;
+    }
+    else if( var == enth_->tag() ){
+      FieldT& temp = this->value();
+      SpatFldPtr <FieldT> cpPtr = SpatialFieldStore::get<FieldT>( temp ); //heat capacity of mixture
+      FieldT& cp = *cpPtr;
+      cp <<= 0.0;
+      const double maxTval = field_max_interior( temp );
+      const double minTval = field_min_interior( temp );
+      for( size_t n = 0;n < nSpec_;++n ){
+        const FieldT& yi = massFracs_[n]->field_ref();
+        const ThermData& specTherm = specThermVec_[n];
+        const ThermoPoly type = specTherm.type;
+        const std::vector<double>& c = specTherm.coefficients;
+        const double minT = specTherm.minTemp;
+        const double maxT = specTherm.maxTemp;
+#     ifndef ENABLE_CUDA // optimization benefits only the CPU - cond performs betters with if/else than with if/elif/elif/else
+        if( maxTval <= maxT && minTval >= minT ){ // if true, temperature can only be either high or low
+          switch( type ){
+            case CONST_POLY: // constant cp
+              cp <<= cp + yi * c[3];
+              break;
+            case NASA_POLY:
+              cp <<= cp + yi
+                          * cond( temp <= c[0], c[8] + temp * ( c[9] + temp * ( c[10] + temp * ( c[11] + temp * c[12] ))))   // if low temp
+                                ( c[1] + temp * ( c[2] + temp * ( c[3] + temp * ( c[4] + temp * c[5] ))));  // else if high temp
+              break;
+            default:{
+              std::ostringstream msg;
+              msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_.str();
+              throw std::runtime_error( msg.str());
+            }
+          } // switch( type )
+        }
+        else
+#     endif
+        {
+          /* else temperature can be out of bounds low, low temp, high temp, or out of bounds high
+           * if out of bounds, properties are keeped to the same as that for min or max temp
+           */
+          switch( type ){
+            case CONST_POLY: // constant cp
+              cp <<= cp + yi * c[3];
+              break;
+            case NASA_POLY:
+              cp <<= cp + yi
+                          * cond( temp <= c[0] && temp >= minT, c[8] + temp * ( c[9] + temp * ( c[10] + temp * ( c[11] + temp * c[12] ))))  // if low temp
+                                ( temp > c[0] && temp <= maxT, c[1] + temp * ( c[2] + temp * ( c[3] + temp * ( c[4] + temp * c[5] ))))  // else if high temp
+                                ( temp < minT, c[8] + minT * ( c[9] + minT * ( c[10] + minT * ( c[11] + minT * c[12] ))))  // else if out of bounds - low
+                                ( c[1] + maxT * ( c[2] + maxT * ( c[3] + maxT * ( c[4] + maxT * c[5] )))); // else out of bounds - high
+
+              break;
+            default:{
+              std::ostringstream msg;
+              msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_.str();
+              throw std::runtime_error( msg.str());
+            }
+          } // switch( type )
+        }
+      } // species loop
+      dfdv <<= 1 / cp;
     }
     else{
-        FieldT& temp = this->value();
-        SpatFldPtr<FieldT> cpPtr  = SpatialFieldStore::get<FieldT>(temp); //heat capacity of mixture
-        FieldT& cp = *cpPtr;
-        cp <<= 0.0;
-        const double maxTval = field_max_interior(temp);
-        const double minTval = field_min_interior(temp);
-        for( size_t n=0; n<nSpec_; ++n ){
-            const FieldT& yi = massFracs_[n]->field_ref();
-            const ThermData& specTherm = specThermVec_[n];
-            const ThermoPoly type = specTherm.type;
-            const std::vector<double>& c = specTherm.coefficients;
-            const double minT = specTherm.minTemp;
-            const double maxT = specTherm.maxTemp;
-            #     ifndef ENABLE_CUDA // optimization benefits only the CPU - cond performs betters with if/else than with if/elif/elif/else
-            if( maxTval <= maxT && minTval >= minT){ // if true, temperature can only be either high or low
-                switch ( type ) {
-                    case CONST_POLY: // constant cp
-                        cp <<= cp + yi * c[3];
-                        break;
-                    case NASA_POLY:
-                        cp <<= cp + yi
-                        * cond( temp <= c[0], c[8] + temp * ( c[9] + temp * ( c[10] + temp * ( c[11] + temp * c[12] ))))   // if low temp
-                              (               c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * ( c[ 4] + temp * c[ 5] ))));  // else if high temp
-                        break;
-                    default: {
-                        std::ostringstream msg;
-                        msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_.str();
-                        throw std::runtime_error( msg.str() );
-                    }
-                } // switch( type )
-            }
-            else
-            #     endif
-            {
-                /* else temperature can be out of bounds low, low temp, high temp, or out of bounds high
-                 * if out of bounds, properties are keeped to the same as that for min or max temp
-                 */
-                switch ( type ){
-                    case CONST_POLY: // constant cp
-                        cp <<= cp + yi * c[3];
-                        break;
-                    case NASA_POLY:
-                        cp <<= cp + yi
-                        * cond( temp <= c[0] && temp >= minT, c[8] + temp * ( c[9] + temp * ( c[10] + temp * ( c[11] + temp * c[12] ))))  // if low temp
-                              ( temp >  c[0] && temp <= maxT, c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * ( c[ 4] + temp * c[ 5] ))))  // else if high temp
-                              ( temp < minT,                  c[8] + minT * ( c[9] + minT * ( c[10] + minT * ( c[11] + minT * c[12] ))))  // else if out of bounds - low
-                              (                               c[1] + maxT * ( c[2] + maxT * ( c[ 3] + maxT * ( c[ 4] + maxT * c[ 5] )))); // else out of bounds - high
-                        
-                        break;
-                    default: {
-                        std::ostringstream msg;
-                        msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_.str();
-                        throw std::runtime_error( msg.str() );
-                    }
-                } // switch( type )
-            }
-        } // species loop
-        dfdv <<= 1/cp * enth_->sens_field_ref( var );
-
-        for( size_t n=0; n<nSpec_-1; ++n ){
-          const ThermData& specTherm   = specThermVec_[n];
-          const ThermData& specTherm_n = specThermVec_[nSpec_-1];
-          const ThermoPoly type = specTherm.type;
-          const std::vector<double>& c   = specTherm.coefficients;
-          const std::vector<double>& c_n = specTherm_n.coefficients;
-          const std::vector<double>& cFrac   = cFracVec_[n];
-          const std::vector<double>& cFrac_n = cFracVec_[nSpec_-1];
-          const double minT   = specTherm.minTemp;
-          const double maxT   = specTherm.maxTemp;
-          const double minT_n = specTherm_n.minTemp;
-          const double maxT_n = specTherm_n.maxTemp;
-          #     ifndef ENABLE_CUDA // optimization benefits only the CPU - cond performs betters with if/else than with if/elif/elif/else
-          if( maxTval <= std::min(maxT,maxT_n) && minTval >= std::max(minT,minT_n)){ // if true, temperature can only be either high or low
-             switch ( type ) {
-                  case CONST_POLY: // constant cp
-                    dfdv <<= dfdv - ( ( c[1] + c[3]*(temp-c[0]) ) - ( c_n[1] + c_n[3]*(temp-c_n[0]) ) )/cp * massFracs_[n]->sens_field_ref( var );
-                  break;
-                  case NASA_POLY:
-                    dfdv <<= dfdv - (
-                         ( cond( temp <= c[0], c[13] + temp * ( c[8] + temp * ( cFrac[9] + temp * ( cFrac[10] + temp * ( cFrac[11] + temp * cFrac[12] )))) )  // if low temp
-                               (               c[ 6] + temp * ( c[1] + temp * ( cFrac[2] + temp * ( cFrac[ 3] + temp * ( cFrac[ 4] + temp * cFrac[ 5] )))) ) )  // else if high temp
-                        -( cond( temp <= c_n[0], c_n[13] + temp * ( c_n[8] + temp * ( cFrac_n[9] + temp * ( cFrac_n[10] + temp * ( cFrac_n[11] + temp * cFrac_n[12] )))) )  // if low temp
-                               (                 c_n[ 6] + temp * ( c_n[1] + temp * ( cFrac_n[2] + temp * ( cFrac_n[ 3] + temp * ( cFrac_n[ 4] + temp * cFrac_n[ 5] )))) )  ) // else if high temp
-                         )/cp * massFracs_[n]->sens_field_ref( var );
-                    break;
-                  default: {
-                      std::ostringstream msg;
-                      msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_.str();
-                      throw std::runtime_error( msg.str() );
-                  }
-              } // switch( type )
-          }
-          else
-          #     endif
-          {
-              /* else temperature can be out of bounds low, low temp, high temp, or out of bounds high
-               * if out of bounds, properties are interpolated from min or max temp using a constant cp
-               */
-              switch ( type ){
-                  case CONST_POLY: // constant cp
-                      dfdv<<= dfdv - ( ( c[1] + c[3]*(temp-c[0]) ) - ( c_n[1] + c_n[3]*(temp-c_n[0]) ) )/cp * massFracs_[n]->sens_field_ref( var );
-                      break;
-                  case NASA_POLY:
-                     dfdv <<= dfdv - (
-                        ( cond( temp <= c[0] && temp >= minT, c[13] + temp * ( c[8] + temp * ( cFrac[9] + temp * ( cFrac[10] + temp * ( cFrac[11] + temp * cFrac[12] )))) )  // if low temp
-                              ( temp >  c[0] && temp <= maxT, c[ 6] + temp * ( c[1] + temp * ( cFrac[2] + temp * ( cFrac[ 3] + temp * ( cFrac[ 4] + temp * cFrac[ 5] )))) )  // else if high temp
-                              ( temp < minT,                  c[13] + c[8] * temp + minT * ( c[9] * temp + minT * ( c[10] * temp - cFrac[9] + minT * ( c[11] * temp - 2*cFrac[10] + minT * ( c[12] * temp - 3*cFrac[11] + minT * -4*cFrac[12] )))) )  // else if out of bounds - low
-                              (                               c[ 6] + c[1] * temp + maxT * ( c[2] * temp + maxT * ( c[ 3] * temp - cFrac[2] + maxT * ( c[ 4] * temp - 2*cFrac[ 3] + maxT * ( c[ 5] * temp - 3*cFrac[ 4] + maxT * -4*cFrac[ 5] )))) )) // else out of bounds - high
-                      - ( cond( temp <= c_n[0] && temp >= minT_n, c_n[13] + temp * ( c_n[8] + temp * ( cFrac_n[9] + temp * ( cFrac_n[10] + temp * ( cFrac_n[11] + temp * cFrac_n[12] )))) )  // if low temp
-                              ( temp >  c_n[0] && temp <= maxT_n, c_n[ 6] + temp * ( c_n[1] + temp * ( cFrac_n[2] + temp * ( cFrac_n[ 3] + temp * ( cFrac_n[ 4] + temp * cFrac_n[ 5] )))) )  // else if high temp
-                              ( temp < minT_n,                    c_n[13] + c_n[8] * temp + minT_n * ( c_n[9] * temp + minT_n * ( c_n[10] * temp - cFrac_n[9] + minT_n * ( c_n[11] * temp - 2*cFrac_n[10] + minT_n * ( c_n[12] * temp - 3*cFrac_n[11] + minT_n * -4*cFrac_n[12] )))) )  // else if out of bounds - low
-                              (                                   c_n[ 6] + c_n[1] * temp + maxT_n * ( c_n[2] * temp + maxT_n * ( c_n[ 3] * temp - cFrac_n[2] + maxT_n * ( c_n[ 4] * temp - 2*cFrac_n[ 3] + maxT_n * ( c_n[ 5] * temp - 3*cFrac_n[ 4] + maxT_n * -4*cFrac_n[ 5] )))) )) // else out of bounds - high
-                        )/cp * massFracs_[n]->sens_field_ref( var );
-                      break;
-                  default: {
-                      std::ostringstream msg;
-                      msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_.str();
-                      throw std::runtime_error( msg.str() );
-                  }
-              } // switch( type )
-          }
-      } // species loop
+      dfdv <<= 0.0;
     }
 }
 
@@ -947,130 +902,70 @@ sensitivity( const Expr::Tag& var)
     using namespace SpatialOps;
     FieldT& dfdv = this->sensitivity_result( var );
     if( var == this->get_tag() ){
-        dfdv <<= 1.0;
+      dfdv <<= 1.0;
+    }
+    else if( var == e0_->tag()){
+      FieldT& temp = this->value();
+      SpatFldPtr<FieldT> cvPtr  = SpatialFieldStore::get<FieldT>(temp); //heat capacity of mixture
+      FieldT& cv = *cvPtr;
+      cv <<= 0.0;
+      const double maxTval = field_max_interior(temp);
+      const double minTval = field_min_interior(temp);
+      for( size_t n=0; n<nSpec_; ++n ){
+          const FieldT& yi = massFracs_[n]->field_ref();
+          const ThermData& specTherm = specThermVec_[n];
+          const ThermoPoly type = specTherm.type;
+          const std::vector<double>& c = specTherm.coefficients;
+          const double minT = specTherm.minTemp;
+          const double maxT = specTherm.maxTemp;
+          #     ifndef ENABLE_CUDA // optimization benefits only the CPU - cond performs betters with if/else than with if/elif/elif/else
+          if( maxTval <= maxT && minTval >= minT){ // if true, temperature can only be either high or low
+              switch ( type ) {
+                  case CONST_POLY: // constant cp
+                      cv <<= cv + yi * c[3];
+                      break;
+                  case NASA_POLY:
+                      cv <<= cv + yi
+                      * cond( temp <= c[0], c[8] + temp * ( c[9] + temp * ( c[10] + temp * ( c[11] + temp * c[12] ))))   // if low temp
+                            (               c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * ( c[ 4] + temp * c[ 5] ))));  // else if high temp;
+                      break;
+                  default: {
+                      std::ostringstream msg;
+                      msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_.str();
+                      throw std::runtime_error( msg.str() );
+                  }
+              } // switch( type )
+          }
+          else
+          #     endif
+          {
+              /* else temperature can be out of bounds low, low temp, high temp, or out of bounds high
+               * if out of bounds, properties are keeped to the same as that for min or max temp
+               */
+              switch ( type ){
+                  case CONST_POLY: // constant cp
+                      cv <<= cv + yi * c[3] ;
+                      break;
+                  case NASA_POLY:
+                      cv <<= cv + yi
+                      * cond( temp <= c[0] && temp >= minT, c[8] + temp * ( c[9] + temp * ( c[10] + temp * ( c[11] + temp * c[12] ))) )  // if low temp
+                            ( temp >  c[0] && temp <= maxT, c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * ( c[ 4] + temp * c[ 5] ))) )  // else if high temp
+                            ( temp < minT,                  c[8] + minT * ( c[9] + minT * ( c[10] + minT * ( c[11] + minT * c[12] ))) )  // else if out of bounds - low
+                            (                               c[1] + maxT * ( c[2] + maxT * ( c[ 3] + maxT * ( c[ 4] + maxT * c[ 5] ))) ); // else out of bounds - high
+
+                      break;
+                  default: {
+                      std::ostringstream msg;
+                      msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_.str();
+                      throw std::runtime_error( msg.str() );
+                  }
+              } // switch( type )
+          }
+      } // species loop
+      dfdv <<= 1/cv;
     }
     else{
-        FieldT& temp = this->value();
-        SpatFldPtr<FieldT> cvPtr  = SpatialFieldStore::get<FieldT>(temp); //heat capacity of mixture
-        FieldT& cv = *cvPtr;
-        cv <<= 0.0;
-        const double maxTval = field_max_interior(temp);
-        const double minTval = field_min_interior(temp);
-        for( size_t n=0; n<nSpec_; ++n ){
-            const FieldT& yi = massFracs_[n]->field_ref();
-            const ThermData& specTherm = specThermVec_[n];
-            const ThermoPoly type = specTherm.type;
-            const std::vector<double>& c = specTherm.coefficients;
-            const double minT = specTherm.minTemp;
-            const double maxT = specTherm.maxTemp;
-            #     ifndef ENABLE_CUDA // optimization benefits only the CPU - cond performs betters with if/else than with if/elif/elif/else
-            if( maxTval <= maxT && minTval >= minT){ // if true, temperature can only be either high or low
-                switch ( type ) {
-                    case CONST_POLY: // constant cp
-                        cv <<= cv + yi * c[3];
-                        break;
-                    case NASA_POLY:
-                        cv <<= cv + yi
-                        * cond( temp <= c[0], c[8] + temp * ( c[9] + temp * ( c[10] + temp * ( c[11] + temp * c[12] ))))   // if low temp
-                              (               c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * ( c[ 4] + temp * c[ 5] ))));  // else if high temp;
-                        break;
-                    default: {
-                        std::ostringstream msg;
-                        msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_.str();
-                        throw std::runtime_error( msg.str() );
-                    }
-                } // switch( type )
-            }
-            else
-            #     endif
-            {
-                /* else temperature can be out of bounds low, low temp, high temp, or out of bounds high
-                 * if out of bounds, properties are keeped to the same as that for min or max temp
-                 */
-                switch ( type ){
-                    case CONST_POLY: // constant cp
-                        cv <<= cv + yi * c[3] ;
-                        break;
-                    case NASA_POLY:
-                        cv <<= cv + yi
-                        * cond( temp <= c[0] && temp >= minT, c[8] + temp * ( c[9] + temp * ( c[10] + temp * ( c[11] + temp * c[12] ))) )  // if low temp
-                              ( temp >  c[0] && temp <= maxT, c[1] + temp * ( c[2] + temp * ( c[ 3] + temp * ( c[ 4] + temp * c[ 5] ))) )  // else if high temp
-                              ( temp < minT,                  c[8] + minT * ( c[9] + minT * ( c[10] + minT * ( c[11] + minT * c[12] ))) )  // else if out of bounds - low
-                              (                               c[1] + maxT * ( c[2] + maxT * ( c[ 3] + maxT * ( c[ 4] + maxT * c[ 5] ))) ); // else out of bounds - high
-                        
-                        break;
-                    default: {
-                        std::ostringstream msg;
-                        msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_.str();
-                        throw std::runtime_error( msg.str() );
-                    }
-                } // switch( type )
-            }
-        } // species loop
-        dfdv <<= 1/cv * e0_->sens_field_ref( var );
-        for( size_t n=0; n<nSpec_-1; ++n ){
-            const ThermData& specTherm   = specThermVec_[n];
-            const ThermData& specTherm_n = specThermVec_[nSpec_-1];
-            const ThermoPoly type = specTherm.type;
-            const std::vector<double>& c   = specTherm.coefficients;
-            const std::vector<double>& c_n = specTherm_n.coefficients;
-            const std::vector<double>& cFrac   = cFracVec_[n];
-            const std::vector<double>& cFrac_n = cFracVec_[nSpec_-1];
-            const double minT   = specTherm.minTemp;
-            const double maxT   = specTherm.maxTemp;
-            const double minT_n = specTherm_n.minTemp;
-            const double maxT_n = specTherm_n.maxTemp;
-            #     ifndef ENABLE_CUDA // optimization benefits only the CPU - cond performs betters with if/else than with if/elif/elif/else
-            if( maxTval <= std::min(maxT,maxT_n) && minTval >= std::max(minT,minT_n)){ // if true, temperature can only be either high or low
-                switch ( type ) {
-                    case CONST_POLY: // constant cp
-                        dfdv <<= dfdv - ( ( c[1] + c[3]*(temp-c[0]) ) - ( c_n[1] + c_n[3]*(temp-c_n[0]) ) )/cv * massFracs_[n]->sens_field_ref( var );
-                        break;
-                    case NASA_POLY:
-                        dfdv <<= dfdv - (
-                                         ( cond( temp <= c[0], c[13] + temp * ( c[8] + temp * ( cFrac[9] + temp * ( cFrac[10] + temp * ( cFrac[11] + temp * cFrac[12] )))) )  // if low temp
-                                               (               c[ 6] + temp * ( c[1] + temp * ( cFrac[2] + temp * ( cFrac[ 3] + temp * ( cFrac[ 4] + temp * cFrac[ 5] )))) ) )  // else if high temp
-                                         -( cond( temp <= c_n[0], c_n[13] + temp * ( c_n[8] + temp * ( cFrac_n[9] + temp * ( cFrac_n[10] + temp * ( cFrac_n[11] + temp * cFrac_n[12] )))) )  // if low temp
-                                                (               c_n[ 6] + temp * ( c_n[1] + temp * ( cFrac_n[2] + temp * ( cFrac_n[ 3] + temp * ( cFrac_n[ 4] + temp * cFrac_n[ 5] )))) )  ) // else if high temp
-                                         )/cv * massFracs_[n]->sens_field_ref( var );
-                        break;
-                    default: {
-                        std::ostringstream msg;
-                        msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_.str();
-                        throw std::runtime_error( msg.str() );
-                    }
-                } // switch( type )
-            }
-            else
-            #     endif
-            {
-                /* else temperature can be out of bounds low, low temp, high temp, or out of bounds high
-                 * if out of bounds, properties are interpolated from min or max temp using a constant cp
-                 */
-                switch ( type ){
-                    case CONST_POLY: // constant cp
-                        dfdv<<=dfdv - ( ( c[1] + c[3]*(temp-c[0]) ) - ( c_n[1] + c_n[3]*(temp-c_n[0]) ) )/cv * massFracs_[n]->sens_field_ref( var );
-                        break;
-                    case NASA_POLY:
-                        dfdv <<= dfdv - (
-                                         ( cond( temp <= c[0] && temp >= minT, c[13] + temp * ( c[8] + temp * ( cFrac[9] + temp * ( cFrac[10] + temp * ( cFrac[11] + temp * cFrac[12] )))) )  // if low temp
-                                               ( temp >  c[0] && temp <= maxT, c[ 6] + temp * ( c[1] + temp * ( cFrac[2] + temp * ( cFrac[ 3] + temp * ( cFrac[ 4] + temp * cFrac[ 5] )))) )  // else if high temp
-                                               ( temp < minT,                  c[13] + c[8] * temp + minT * ( c[9] * temp + minT * ( c[10] * temp - cFrac[9] + minT * ( c[11] * temp - 2*cFrac[10] + minT * ( c[12] * temp - 3*cFrac[11] + minT * -4*cFrac[12] )))) )  // else if out of bounds - low
-                                               (                               c[ 6] + c[1] * temp + maxT * ( c[2] * temp + maxT * ( c[ 3] * temp - cFrac[2] + maxT * ( c[ 4] * temp - 2*cFrac[ 3] + maxT * ( c[ 5] * temp - 3*cFrac[ 4] + maxT * -4*cFrac[ 5] )))) )) // else out of bounds - high
-                                         - ( cond( temp <= c_n[0] && temp >= minT_n, c_n[13] + temp * ( c_n[8] + temp * ( cFrac_n[9] + temp * ( cFrac_n[10] + temp * ( cFrac_n[11] + temp * cFrac_n[12] )))) )  // if low temp
-                                                 ( temp >  c_n[0] && temp <= maxT_n, c_n[ 6] + temp * ( c_n[1] + temp * ( cFrac_n[2] + temp * ( cFrac_n[ 3] + temp * ( cFrac_n[ 4] + temp * cFrac_n[ 5] )))) )  // else if high temp
-                                                 ( temp < minT_n,                    c_n[13] + c_n[8] * temp + minT_n * ( c_n[9] * temp + minT_n * ( c_n[10] * temp - cFrac_n[9] + minT_n * ( c_n[11] * temp - 2*cFrac_n[10] + minT_n * ( c_n[12] * temp - 3*cFrac_n[11] + minT_n * -4*cFrac_n[12] )))) )  // else if out of bounds - low
-                                                 (                                   c_n[ 6] + c_n[1] * temp + maxT_n * ( c_n[2] * temp + maxT_n * ( c_n[ 3] * temp - cFrac_n[2] + maxT_n * ( c_n[ 4] * temp - 2*cFrac_n[ 3] + maxT_n * ( c_n[ 5] * temp - 3*cFrac_n[ 4] + maxT_n * -4*cFrac_n[ 5] )))) )) // else out of bounds - high
-                                         )/cv * massFracs_[n]->sens_field_ref( var );
-                        break;
-                    default: {
-                        std::ostringstream msg;
-                        msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_.str();
-                        throw std::runtime_error( msg.str() );
-                    }
-                } // switch( type )
-            }
-        } // species loop
+      dfdv <<= 0.0;
     }
 }
 
@@ -1138,4 +1033,5 @@ find_bad_points( std::ostringstream& msg, const FieldT& badField, const double b
 } // namespace pokitt
 
 #endif // Temperature_Expr_h
+
 
