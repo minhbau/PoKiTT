@@ -528,74 +528,71 @@ void
 Temperature<FieldT>::
 sensitivity( const Expr::Tag& var)
 {
-    using namespace SpatialOps;
-    FieldT& dfdv = this->sensitivity_result( var );
-    if( var == this->get_tag() ){
-      dfdv <<= 1.0;
-    }
-    else if( var == enth_->tag() ){
-      FieldT& temp = this->value();
-      SpatFldPtr <FieldT> cpPtr = SpatialFieldStore::get<FieldT>( temp ); //heat capacity of mixture
-      FieldT& cp = *cpPtr;
-      cp <<= 0.0;
-      const double maxTval = field_max_interior( temp );
-      const double minTval = field_min_interior( temp );
-      for( size_t n = 0;n < nSpec_;++n ){
-        const FieldT& yi = massFracs_[n]->field_ref();
-        const ThermData& specTherm = specThermVec_[n];
-        const ThermoPoly type = specTherm.type;
-        const std::vector<double>& c = specTherm.coefficients;
-        const double minT = specTherm.minTemp;
-        const double maxT = specTherm.maxTemp;
+  using namespace SpatialOps;
+  FieldT& dfdv = this->sensitivity_result( var );
+  if( var == enth_->tag() ){
+    FieldT& temp = this->value();
+    SpatFldPtr <FieldT> cpPtr = SpatialFieldStore::get<FieldT>( temp ); //heat capacity of mixture
+    FieldT& cp = *cpPtr;
+    cp <<= 0.0;
+    const double maxTval = field_max_interior( temp );
+    const double minTval = field_min_interior( temp );
+    for( size_t n = 0;n < nSpec_;++n ){
+      const FieldT& yi = massFracs_[n]->field_ref();
+      const ThermData& specTherm = specThermVec_[n];
+      const ThermoPoly type = specTherm.type;
+      const std::vector<double>& c = specTherm.coefficients;
+      const double minT = specTherm.minTemp;
+      const double maxT = specTherm.maxTemp;
 #     ifndef ENABLE_CUDA // optimization benefits only the CPU - cond performs betters with if/else than with if/elif/elif/else
-        if( maxTval <= maxT && minTval >= minT ){ // if true, temperature can only be either high or low
-          switch( type ){
-            case CONST_POLY: // constant cp
-              cp <<= cp + yi * c[3];
-              break;
-            case NASA_POLY:
-              cp <<= cp + yi
-                          * cond( temp <= c[0], c[8] + temp * ( c[9] + temp * ( c[10] + temp * ( c[11] + temp * c[12] ))))   // if low temp
-                                ( c[1] + temp * ( c[2] + temp * ( c[3] + temp * ( c[4] + temp * c[5] ))));  // else if high temp
-              break;
-            default:{
-              std::ostringstream msg;
-              msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_.str();
-              throw std::runtime_error( msg.str());
-            }
-          } // switch( type )
-        }
-        else
+      if( maxTval <= maxT && minTval >= minT ){ // if true, temperature can only be either high or low
+        switch( type ){
+          case CONST_POLY: // constant cp
+            cp <<= cp + yi * c[3];
+            break;
+          case NASA_POLY:
+            cp <<= cp + yi
+                        * cond( temp <= c[0], c[8] + temp * ( c[9] + temp * ( c[10] + temp * ( c[11] + temp * c[12] ))))   // if low temp
+                              ( c[1] + temp * ( c[2] + temp * ( c[3] + temp * ( c[4] + temp * c[5] ))));  // else if high temp
+            break;
+          default:{
+            std::ostringstream msg;
+            msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_.str();
+            throw std::runtime_error( msg.str());
+          }
+        } // switch( type )
+      }
+      else
 #     endif
-        {
-          /* else temperature can be out of bounds low, low temp, high temp, or out of bounds high
-           * if out of bounds, properties are keeped to the same as that for min or max temp
-           */
-          switch( type ){
-            case CONST_POLY: // constant cp
-              cp <<= cp + yi * c[3];
-              break;
-            case NASA_POLY:
-              cp <<= cp + yi
-                          * cond( temp <= c[0] && temp >= minT, c[8] + temp * ( c[9] + temp * ( c[10] + temp * ( c[11] + temp * c[12] ))))  // if low temp
-                                ( temp > c[0] && temp <= maxT, c[1] + temp * ( c[2] + temp * ( c[3] + temp * ( c[4] + temp * c[5] ))))  // else if high temp
-                                ( temp < minT, c[8] + minT * ( c[9] + minT * ( c[10] + minT * ( c[11] + minT * c[12] ))))  // else if out of bounds - low
-                                ( c[1] + maxT * ( c[2] + maxT * ( c[3] + maxT * ( c[4] + maxT * c[5] )))); // else out of bounds - high
+      {
+        /* else temperature can be out of bounds low, low temp, high temp, or out of bounds high
+         * if out of bounds, properties are keeped to the same as that for min or max temp
+         */
+        switch( type ){
+          case CONST_POLY: // constant cp
+            cp <<= cp + yi * c[3];
+            break;
+          case NASA_POLY:
+            cp <<= cp + yi
+                        * cond( temp <= c[0] && temp >= minT, c[8] + temp * ( c[9] + temp * ( c[10] + temp * ( c[11] + temp * c[12] ))))  // if low temp
+                              ( temp > c[0] && temp <= maxT, c[1] + temp * ( c[2] + temp * ( c[3] + temp * ( c[4] + temp * c[5] ))))  // else if high temp
+                              ( temp < minT, c[8] + minT * ( c[9] + minT * ( c[10] + minT * ( c[11] + minT * c[12] ))))  // else if out of bounds - low
+                              ( c[1] + maxT * ( c[2] + maxT * ( c[3] + maxT * ( c[4] + maxT * c[5] )))); // else out of bounds - high
 
-              break;
-            default:{
-              std::ostringstream msg;
-              msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_.str();
-              throw std::runtime_error( msg.str());
-            }
-          } // switch( type )
-        }
-      } // species loop
-      dfdv <<= 1 / cp;
-    }
-    else{
-      dfdv <<= 0.0;
-    }
+            break;
+          default:{
+            std::ostringstream msg;
+            msg << __FILE__ << " : " << __LINE__ << "\n Error for spec n = " << n << exceptionMsg_.str();
+            throw std::runtime_error( msg.str());
+          }
+        } // switch( type )
+      }
+    } // species loop
+    dfdv <<= 1 / cp;
+  }
+  else{
+    dfdv <<= 0.0;
+  }
 }
 
 //--------------------------------------------------------------------

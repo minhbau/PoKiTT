@@ -137,14 +137,9 @@ Pressure<FieldT>::
 sensitivity( const Expr::Tag& var )
 {
   using namespace SpatialOps;
-  if( var == this->get_tag() ){
-    this->sensitivity_result( var ) <<= 1.0;
-  }
-  else{
-    this->sensitivity_result( var ) <<= this->value() * ( rho_->sens_field_ref( var ) / rho_->field_ref() +
-                                                          t_  ->sens_field_ref( var ) / t_  ->field_ref() - /* yes, this is a minus */
-                                                          mmw_->sens_field_ref( var ) / mmw_->field_ref() );
-  }
+  this->sensitivity_result( var ) <<= this->value() * ( rho_->sens_field_ref( var ) / rho_->field_ref() +
+                                                        t_  ->sens_field_ref( var ) / t_  ->field_ref() - /* yes, this is a minus */
+                                                        mmw_->sens_field_ref( var ) / mmw_->field_ref() );
 }
 
 //--------------------------------------------------------------------

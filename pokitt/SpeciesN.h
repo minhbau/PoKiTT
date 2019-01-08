@@ -141,14 +141,9 @@ public:
   void sensitivity( const Expr::Tag& var )
   {
     FieldT& dfdv = this->sensitivity_result( var );
-    if( var == this->get_tag() ){
-      dfdv <<= 1.0;
-    }
-    else{
-      dfdv <<= - species_[0]->sens_field_ref( var );
-      for( size_t i=1; i<species_.size(); ++i ){
-        dfdv <<= dfdv - species_[i]->sens_field_ref( var );
-      }
+    dfdv <<= - species_[0]->sens_field_ref( var );
+    for( size_t i=1; i<species_.size(); ++i ){
+      dfdv <<= dfdv - species_[i]->sens_field_ref( var );
     }
   }
 

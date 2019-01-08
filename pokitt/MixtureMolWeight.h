@@ -160,23 +160,19 @@ sensitivity( const Expr::Tag& var )
 {
   FieldT& mixMW = this->value();
   FieldT& dfdv = this->sensitivity_result( var );
-  if( var == this->get_tag() ){
-    dfdv <<= 1.0;
+
+  if( fracType_ == MOLE ){
+    dfdv <<= fracs_[0]->sens_field_ref( var ) * (molecularWeights_[0] - molecularWeights_[nSpec_-1]);
+    for( size_t n=1; n<nSpec_-1; ++n ){
+      dfdv <<= dfdv + fracs_[n]->sens_field_ref( var ) * (molecularWeights_[n] - molecularWeights_[nSpec_-1]);
+    }
   }
   else{
-    if( fracType_ == MOLE ){
-      dfdv <<= fracs_[0]->sens_field_ref( var ) * (molecularWeights_[0] - molecularWeights_[nSpec_-1]);
-      for( size_t n=1; n<nSpec_-1; ++n ){
-        dfdv <<= dfdv + fracs_[n]->sens_field_ref( var ) * (molecularWeights_[n] - molecularWeights_[nSpec_-1]);
-      }
+    dfdv <<= fracs_[0]->sens_field_ref( var ) * (molecularWeightsInv_[0]- molecularWeightsInv_[nSpec_-1]);
+    for( size_t n=1; n<nSpec_-1; ++n ){
+      dfdv <<= dfdv + fracs_[n]->sens_field_ref( var ) * (molecularWeightsInv_[n] - molecularWeightsInv_[nSpec_-1]);
     }
-    else{
-      dfdv <<= fracs_[0]->sens_field_ref( var ) * (molecularWeightsInv_[0]- molecularWeightsInv_[nSpec_-1]);
-      for( size_t n=1; n<nSpec_-1; ++n ){
-        dfdv <<= dfdv + fracs_[n]->sens_field_ref( var ) * (molecularWeightsInv_[n] - molecularWeightsInv_[nSpec_-1]);
-      }
-      dfdv <<= - mixMW * mixMW * dfdv;
-    }
+    dfdv <<= - mixMW * mixMW * dfdv;
   }
 }
 

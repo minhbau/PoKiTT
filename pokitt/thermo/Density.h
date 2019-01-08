@@ -145,14 +145,9 @@ Density<FieldT>::
 sensitivity( const Expr::Tag& var )
 {
   using namespace SpatialOps;
-  if( var == this->get_tag() ){
-    this->sensitivity_result( var ) <<= 1.0;
-  }
-  else{
-    this->sensitivity_result( var ) <<= this->value() * ( p_  ->sens_field_ref( var ) / p_  ->field_ref() +
-                                                          mmw_->sens_field_ref( var ) / mmw_->field_ref() - /* yes, this is a minus */
-                                                          t_  ->sens_field_ref( var ) / t_  ->field_ref() );
-  }
+  this->sensitivity_result( var ) <<= this->value() * ( p_  ->sens_field_ref( var ) / p_  ->field_ref() +
+                                                        mmw_->sens_field_ref( var ) / mmw_->field_ref() - /* yes, this is a minus */
+                                                        t_  ->sens_field_ref( var ) / t_  ->field_ref() );
 }
 
 //--------------------------------------------------------------------

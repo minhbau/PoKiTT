@@ -166,19 +166,14 @@ for( int i=0; i<nSpec; ++i ){
   CellFieldPtrT dTdHPtr = so::SpatialFieldStore::get<CellFieldT>( T );
   *dTdHPtr <<= ( TpdT - T ) / ( hpdTMix - hMix );
   mixture( so::field_equal( *dTdHPtr, fml.field_ref<CellFieldT>( Expr::sens_tag( tempTag, enthTag ) ), 1e-4 ), "T_sens_h" );
-  std::cout << std::scientific << std::setprecision( 3 ) << so::nebo_max( fml.field_ref<CellFieldT>( Expr::sens_tag( tempTag, enthTag ) )) << "   " << std::endl;
-  std::cout << std::scientific << std::setprecision( 3 ) << so::nebo_max( *dTdHPtr ) << "   " << std::endl;
+//  std::cout << std::scientific << std::setprecision( 3 ) << so::nebo_max( fml.field_ref<CellFieldT>( Expr::sens_tag( tempTag, enthTag ) )) << "   " << std::endl;
+//  std::cout << std::scientific << std::setprecision( 3 ) << so::nebo_max( *dTdHPtr ) << "   " << std::endl;
 
   for( int i=0; i<nSpec-1; ++i ){
-    CellFieldPtrT dTdYi = so::SpatialFieldStore::get<CellFieldT>( T );
-    *dTdYi <<= 0.0;
-
     const Expr::Tag sensTag = Expr::sens_tag( tempTag, massTags[i] );
-
-    mixture( so::field_equal( *dTdYi, fml.field_ref<CellFieldT>( sensTag ), 1e-5 ), sensTag.name() );
+    mixture( so::field_equal( 0.0, fml.field_ref<CellFieldT>( sensTag ), 1e-5 ), sensTag.name() );
   }
   fullTest( mixture.ok(), "mixture enthalpy" );
-
 
   if( fullTest.ok() ){
     std::cout << "\nPASS\n";
