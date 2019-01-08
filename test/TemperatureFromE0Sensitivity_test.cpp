@@ -105,7 +105,6 @@ int main()
   tree.insert_tree( factory.register_expression( new LinearT( egyTag, gridTag, rightEgy-leftEgy, leftEgy ) ) );
   tree.insert_tree( factory.register_expression( new LinearT( offsetEgyTag, gridTag, rightEgy-leftEgy, leftEgy+offset ) ) );
 
-
   for( int i=0; i<nSpec-1; ++i ){
     tree.insert_tree( factory.register_expression( new ConstantT( massTags[i], massFracs[i] ) ) );
   }
@@ -124,7 +123,7 @@ int main()
   for (int i=0; i<nSpec-1; ++i){
     sensVarTags.push_back( massTags[i] );
   }
-  sensVarTags.push_back( tempTag );
+
   tree.compute_sensitivities( sensFxnTags, sensVarTags );
 
   tree.register_fields( fml );
@@ -165,10 +164,6 @@ for( int i=0; i<nSpec; ++i ){
   CellFieldPtrT dTdePtr = so::SpatialFieldStore::get<CellFieldT>( T );
   *dTdePtr <<= ( TpdT - T ) / ( epdTMix -eMix );
   mixture( so::field_equal( *dTdePtr, fml.field_ref<CellFieldT>( Expr::sens_tag( tempTag, egyTag ) ), 1e-4 ), "T_sens_e" );
-
-  CellFieldPtrT dTdTPtr = so::SpatialFieldStore::get<CellFieldT>( T );
-  *dTdTPtr <<= 1.0;
-  mixture( so::field_equal( *dTdTPtr, fml.field_ref<CellFieldT>( Expr::sens_tag( tempTag, tempTag ) ), 1e-4 ), "T_sens_T" );
 
   for( int i=0; i<nSpec-1; ++i ){
     CellFieldPtrT dTdYi = so::SpatialFieldStore::get<CellFieldT>( T );

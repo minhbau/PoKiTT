@@ -64,7 +64,7 @@ using SpeciesNT = pokitt::SpeciesN<CellFieldT>::Builder;
 
 int main()
 {
-  std::string inputFileName = "h2-burke.xml";
+  const std::string inputFileName = "h2-burke.xml";
 
   const CanteraObjects::Setup setup( "Mix", inputFileName );
   CanteraObjects::setup_cantera( setup );
@@ -111,9 +111,15 @@ int main()
 
   Expr::TagList sensFxnTags = specEnthTags;
   sensFxnTags.push_back( enthTag );
-  Expr::TagList sensVarTags = massTags;
+  Expr::TagList sensVarTags;
+  for( auto i=0; i<nSpec-1; ++i ) sensVarTags.push_back( massTags[i] );
   sensVarTags.push_back( tempTag );
   tree.compute_sensitivities( sensFxnTags, sensVarTags );
+
+  {
+    std::ofstream fout("enth_sens.dot");
+    tree.write_tree(fout,false,true);
+  }
 
   tree.register_fields( fml );
   tree.bind_fields( fml );
@@ -142,11 +148,10 @@ for( int i=0; i<nSpec; ++i ){
 #   endif
 // need to do add_device on all sensitivity fields but this won't work until GPU sensitivity support is in ExprLib
 
-  CellFieldT& T = fml.field_ref<CellFieldT>( tempTag );
-  CellFieldT& TpdT = fml.field_ref<CellFieldT>( offsetTempTag );
-  CellFieldT& hMix = fml.field_ref<CellFieldT>( enthTag );
+  CellFieldT& T       = fml.field_ref<CellFieldT>( tempTag );
+  CellFieldT& TpdT    = fml.field_ref<CellFieldT>( offsetTempTag );
+  CellFieldT& hMix    = fml.field_ref<CellFieldT>( enthTag );
   CellFieldT& hpdTMix = fml.field_ref<CellFieldT>( offsetEnthTag );
-
 
   TestHelper fullTest( true );
 
@@ -168,12 +173,14 @@ for( int i=0; i<nSpec; ++i ){
   *dHdTPtr <<= ( hpdTMix - hMix ) / ( TpdT - T );
   mixture( so::field_equal( *dHdTPtr, fml.field_ref<CellFieldT>( Expr::sens_tag( enthTag, tempTag ) ), 1e-4 ), "h_sens_T" );
 
+  const CellFieldT& hn = fml.field_ref<CellFieldT>( specEnthTags[nSpec-1] );
   for( int i=0; i<nSpec-1; ++i ){
     CellFieldPtrT dHdYi = so::SpatialFieldStore::get<CellFieldT>( T );
-    *dHdYi <<= fml.field_ref<CellFieldT>( specEnthTags[i] ) - fml.field_ref<CellFieldT>( specEnthTags[nSpec-1] );
+    *dHdYi <<= fml.field_ref<CellFieldT>( specEnthTags[i] ) - hn;
 
     const Expr::Tag sensTag = Expr::sens_tag( enthTag, massTags[i] );
     mixture( so::field_equal( *dHdYi, fml.field_ref<CellFieldT>( sensTag ), 1e-8 ), sensTag.name() );
+//    std::cout << "\t Expected: " << (*dHdYi)[0] << ", found: " << fml.field_ref<CellFieldT>( sensTag )[0] << std::endl;
   }
   fullTest( mixture.ok(), "mixture enthalpy" );
 

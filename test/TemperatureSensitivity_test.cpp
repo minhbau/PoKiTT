@@ -122,10 +122,10 @@ int main()
 
   Expr::TagList sensFxnTags = tag_list( tempTag );
   Expr::TagList sensVarTags = tag_list( enthTag);
-  for (int i=0; i<nSpec-1; ++i){
+  for( auto i=0; i<nSpec-1; ++i){
     sensVarTags.push_back( massTags[i] );
   }
-  sensVarTags.push_back( tempTag );
+
   tree.compute_sensitivities( sensFxnTags, sensVarTags );
 
   tree.register_fields( fml );
@@ -168,10 +168,6 @@ for( int i=0; i<nSpec; ++i ){
   mixture( so::field_equal( *dTdHPtr, fml.field_ref<CellFieldT>( Expr::sens_tag( tempTag, enthTag ) ), 1e-4 ), "T_sens_h" );
   std::cout << std::scientific << std::setprecision( 3 ) << so::nebo_max( fml.field_ref<CellFieldT>( Expr::sens_tag( tempTag, enthTag ) )) << "   " << std::endl;
   std::cout << std::scientific << std::setprecision( 3 ) << so::nebo_max( *dTdHPtr ) << "   " << std::endl;
-
-  CellFieldPtrT dTdTPtr = so::SpatialFieldStore::get<CellFieldT>( T );
-  *dTdTPtr <<= 1.0;
-  mixture( so::field_equal( *dTdTPtr, fml.field_ref<CellFieldT>( Expr::sens_tag( tempTag, tempTag ) ), 1e-4 ), "T_sens_T" );
 
   for( int i=0; i<nSpec-1; ++i ){
     CellFieldPtrT dTdYi = so::SpatialFieldStore::get<CellFieldT>( T );

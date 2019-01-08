@@ -111,9 +111,16 @@ int main()
 
   Expr::TagList sensFxnTags = specCpTags;
   sensFxnTags.push_back( CpTag );
-  Expr::TagList sensVarTags = massTags;
+
+  Expr::TagList sensVarTags;
+  for( auto i=0; i<nSpec-1; ++i ) sensVarTags.push_back( massTags[i] );
   sensVarTags.push_back( tempTag );
   tree.compute_sensitivities( sensFxnTags, sensVarTags );
+
+  {
+    std::ofstream fout("cp_sens.dot");
+    tree.write_tree(fout,false,true);
+  }
 
   tree.register_fields( fml );
   tree.bind_fields( fml );
@@ -142,9 +149,9 @@ for( int i=0; i<nSpec; ++i ){
 #   endif
 // need to do add_device on all sensitivity fields but this won't work until GPU sensitivity support is in ExprLib
 
-  CellFieldT& T = fml.field_ref<CellFieldT>( tempTag );
-  CellFieldT& TpdT = fml.field_ref<CellFieldT>( offsetTempTag );
-  CellFieldT& cPMix = fml.field_ref<CellFieldT>( CpTag );
+  CellFieldT& T        = fml.field_ref<CellFieldT>( tempTag );
+  CellFieldT& TpdT     = fml.field_ref<CellFieldT>( offsetTempTag );
+  CellFieldT& cPMix    = fml.field_ref<CellFieldT>( CpTag );
   CellFieldT& cPpdTMix = fml.field_ref<CellFieldT>( offsetCpTag );
 
   TestHelper fullTest( true );
@@ -166,12 +173,25 @@ for( int i=0; i<nSpec; ++i ){
   *dHdTPtr <<= ( cPpdTMix - cPMix ) / ( TpdT - T );
   mixture( so::field_equal( *dHdTPtr, fml.field_ref<CellFieldT>( Expr::sens_tag( CpTag, tempTag ) ), 1e-4 ), "Cp_sens_T" );
 
+
+  { // check some intermediate sensitivities
+    TestHelper status(false);
+    for( auto i=0; i<nSpec-1; ++i ){
+      const Expr::Tag& yi = massTags[i];
+      status( SpatialOps::field_equal(  1.0, fml.field_ref<CellFieldT>( Expr::sens_tag( yi, yi ) ) ), "d" + yi.name() + "/d" + yi.name() );
+      status( SpatialOps::field_equal( -1.0, fml.field_ref<CellFieldT>( Expr::sens_tag( massTags[nSpec-1], yi ) ) ), "d" + massTags[nSpec-1].name() + "/d" + yi.name() );
+    }
+    fullTest( status.ok(), "computed fields" );
+  }
+
+  const CellFieldT& cpn = fml.field_ref<CellFieldT>( specCpTags[nSpec-1] );
   for( int i=0; i<nSpec-1; ++i ){
     CellFieldPtrT dCPdYi = so::SpatialFieldStore::get<CellFieldT>( T );
-    *dCPdYi <<= fml.field_ref<CellFieldT>( specCpTags[i] ) - fml.field_ref<CellFieldT>( specCpTags[nSpec-1] );
+    *dCPdYi <<= fml.field_ref<CellFieldT>( specCpTags[i] ) - cpn;
 
     const Expr::Tag sensTag = Expr::sens_tag( CpTag, massTags[i] );
     mixture( so::field_equal( *dCPdYi, fml.field_ref<CellFieldT>( sensTag ), 1e-8 ), sensTag.name() );
+//    std::cout << "\t Expected: " << (*dCPdYi)[0] << ", found: " << fml.field_ref<CellFieldT>( sensTag )[0] << std::endl;
   }
   fullTest( mixture.ok(), "mixture heat capacity" );
 
