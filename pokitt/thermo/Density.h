@@ -91,6 +91,7 @@ public:
 
   ~Density();
   void evaluate();
+  bool override_sensitivity() const{return true;}
   void sensitivity( const Expr::Tag& var );
 };
 
@@ -138,6 +139,14 @@ evaluate()
 }
 
 //--------------------------------------------------------------------
+/**
+ * In our present codes, e.g., Zodiac, ODT, we choose \f$\rho \f$, \f$T \f$, and \f$Y_i \f$ as the primitive variables. As a result, we want \f$d \rho/dY_i=0 \f$ and \f$d\rho/dT=0 \f$,
+ * and we do not want to use chain rule based on the tree to get \f$d \rho/dY_i \f$ and \f$d \rho/dT\f$.
+ * Therefore, override_sensitivity is used here. If the sensitivity variable is \f$ \rho\f$, the sensitivity is set to be one \f$d\rho/d\rho = 1 \f$.
+ * If the sensitivity variable is \f$p \f$, the sensitivity is \f$d\rho/dp = mmw/(RT) \f$.
+ * Otherwise, the sensitivity is set to be zero. \f$d\rho/dT = 0 \f$. \f$d\rho/dY_i = 0 \f$.
+ * For some other sensitivities, it needs to be given directly by hand, not by this class.
+ */
 
 template< typename FieldT >
 void
@@ -145,9 +154,12 @@ Density<FieldT>::
 sensitivity( const Expr::Tag& var )
 {
   using namespace SpatialOps;
-  this->sensitivity_result( var ) <<= this->value() * ( p_  ->sens_field_ref( var ) / p_  ->field_ref() +
-                                                        mmw_->sens_field_ref( var ) / mmw_->field_ref() - /* yes, this is a minus */
-                                                        t_  ->sens_field_ref( var ) / t_  ->field_ref() );
+  if( var == p_->tag() ){
+    this->sensitivity_result( var ) <<= mmw_->field_ref() / (t_ ->field_ref() * gasConstant_);
+  }
+  else{
+    this->sensitivity_result( var ) <<= 0.0;
+  }
 }
 
 //--------------------------------------------------------------------
