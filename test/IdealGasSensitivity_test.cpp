@@ -220,12 +220,12 @@ int main()
       const Expr::Tag mmwSensTag = Expr::sens_tag( mmwTag, massTags[i] );
 
       CellFieldPtrT drhodYi = so::SpatialFieldStore::get<CellFieldT>( rhoField );
-      *drhodYi <<= rhoField / mmwField * fml.field_ref<CellFieldT>( mmwSensTag );
+      *drhodYi <<= 0.0;
 
       density( so::field_equal( *drhodYi, fml.field_ref<CellFieldT>( rhoSensTag ), 1e-8 ), rhoSensTag.name() );
     }
     *drhodp <<= rhoField / pField;
-    *drhodT <<= - rhoField / TField;
+    *drhodT <<= 0.0;
     density( so::field_equal( *drhodp, fml.field_ref<CellFieldT>( Expr::sens_tag( rhoTag, presTag ) ), 1e-8 ), "rho_sens_p" );
     density( so::field_equal( *drhodT, fml.field_ref<CellFieldT>( Expr::sens_tag( rhoTag, tempTag ) ), 1e-8 ), "rho_sens_T" );
     allSens( density.ok(), "density" );
