@@ -139,6 +139,8 @@ class ReactionRates
   const Expr::Tag& tempTag_, rhoTag_;
   const Expr::TagList& yiTags_;
 
+  Expr::TagList primTags_;
+
   const bool computeJacobian_;
   const boost::shared_ptr<ChemicalSourceJacobian>& analyticalJacobian_;
 
@@ -266,6 +268,12 @@ ReactionRates( const Expr::Tag& tTag,
       }
     }
     specThermVec_.push_back( specData );
+  }
+
+  primTags_.push_back( rhoTag_ );
+  primTags_.push_back( tempTag_ );
+  for( int i=0; i<nSpec_-1; ++i ){
+    primTags_.push_back( yiTags_[i] );
   }
 }
 
@@ -543,6 +551,7 @@ ReactionRates<FieldT>::
 sensitivity( const Expr::Tag& tag )
 {
   if( computeJacobian_ ){
+    const Expr::TagList& rateTags = this->exprNames_;
     if( tag == rhoTag_ ){
       SpecT& rRates = this->get_value_vec();
       const FieldT& T = t_->field_ref();
@@ -552,19 +561,10 @@ sensitivity( const Expr::Tag& tag )
       for( int i=0; i<nSpec_; ++i ){
         Y.push_back( &( yi_[i]->field_ref() ) );
       }
-
-      const Expr::TagList& rateTags = this->exprNames_;
-      Expr::TagList primTags;
-      primTags.push_back( rhoTag_ );
-      primTags.push_back( tempTag_ );
-      for( int i=0; i<nSpec_-1; ++i ){
-        primTags.push_back( yiTags_[i] );
-      }
-
       std::vector<SpatialOps::SpatFldPtr<FieldT> > drdvPtrs;
       for( int row=0; row<nSpec_; ++row ){
         for( int col=0; col<nSpec_+1; ++col ){
-          drdvPtrs.push_back( this->sensitivity_result_ptr( rateTags[row], primTags[col] ) );
+          drdvPtrs.push_back( this->sensitivity_result_ptr( rateTags[row], primTags_[col] ) );
         }
       }
       for( int col=0; col<nSpec_+1; ++col ){
@@ -575,6 +575,11 @@ sensitivity( const Expr::Tag& tag )
       SpatialOps::FieldMatrix<FieldT> drdv( drdvPtrs );
 
       analyticalJacobian_->evaluate_rates_and_jacobian( drdv, rates, T, rho, Y, Mmix );
+    }
+    else if(std::find(primTags_.begin(), primTags_.end(), tag) == primTags_.end()){
+      for( int row=0; row<nSpec_; ++row ){
+        this->sensitivity_result( rateTags[row], tag ) <<= 0.0;
+      }
     }
   }
 }
