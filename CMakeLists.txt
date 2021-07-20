@@ -1,4 +1,6 @@
-cmake_minimum_required(VERSION 3.1)
+cmake_minimum_required( VERSION 3.10 )
+set( CMAKE_CXX_STANDARD 11 )
+
 project( PoKiTT CXX C )
 
 # warn about building in source
@@ -96,7 +98,7 @@ configure_file(
 #-------------------------------------------------------------------------------
 
 # NOTES:
-#  If we build upstream libraries, we are building the "dumb" version: no
+#  If we build upstream libraries, we are building the "basic" version: no
 #  multithreading, no GPU.
 #
 #  For more general build configurations, you should build custom versions of
@@ -154,7 +156,7 @@ if( BUILD_UPSTREAM_LIBS )
 
 else( BUILD_UPSTREAM_LIBS )
 
-  find_package( ExprLib REQUIRED )
+  find_package( ExprLib REQUIRED PATHS ${ExprLib_DIR} ${ExprLib_DIR}/share )
   
 endif( BUILD_UPSTREAM_LIBS )
 
@@ -167,12 +169,12 @@ set( TPL_LIBRARIES ${TPL_LIBRARIES} exprlib )
 #-------------------------------------------------------------------------------
 
 find_library( Cantera_LIBRARIES NAMES cantera HINTS ${Cantera_DIR}/lib NO_DEFAULT_PATH )
-find_path( Cantera_INCLUDE_DIR NAMES IdealGasMix.h PATHS ${Cantera_DIR}/include NO_DEFAULT_PATH PATH_SUFFIXES cantera )
+find_path( Cantera_INCLUDE_DIR NAMES thermo.h PATHS ${Cantera_DIR}/include NO_DEFAULT_PATH PATH_SUFFIXES cantera )
 if( ${Cantera_INCLUDE_DIR} STREQUAL Cantera_INCLUDE_DIR-NOTFOUND )
   message( WARNING "Could not find Cantera in suggested location ${Cantera_DIR}. Looking in other locations\n" )
   # try other locations
   find_library( Cantera_LIBRARIES NAMES cantera PATHS /usr/local /usr/local/cantera PATH_SUFFIXES lib cantera )
-  find_path( Cantera_INCLUDE_DIR NAMES IdealGasMix.h PATHS /usr/local/include /usr/local/cantera/include PATH_SUFFIXES cantera )
+  find_path( Cantera_INCLUDE_DIR NAMES thermo.h PATHS /usr/local/include /usr/local/cantera/include PATH_SUFFIXES cantera )
   if( ${Cantera_INCLUDE_DIR} STREQUAL Cantera_INCLUDE_DIR-NOTFOUND )
     message( FATAL_ERROR "Could not find Cantera\n" )
   endif()

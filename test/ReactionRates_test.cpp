@@ -31,11 +31,14 @@
 
 #include <numeric>
 #include <iostream>
+
 #include "TestHelper.h"
 #include "LinearMassFracs.h"
+
 #include <pokitt/MixtureMolWeight.h>
 #include <pokitt/kinetics/ReactionRates.h>
 #include <pokitt/thermo/Density.h>
+#include <pokitt/CanteraObjects.h>
 
 #include <expression/ExprLib.h>
 
@@ -44,10 +47,11 @@
 #include <spatialops/util/TimeLogger.h>
 
 #include <boost/lexical_cast.hpp>
-#include <boost/foreach.hpp>
 #include <boost/program_options.hpp>
 
-#include <cantera/IdealGasMix.h>
+#include <cantera/thermo/ThermoPhase.h>
+#include <cantera/base/Solution.h>
+#include <cantera/kinetics/Kinetics.h>
 
 namespace SO = SpatialOps;
 typedef SO::SVolField  CellField;
@@ -88,11 +92,14 @@ extract_mass_fracs( const Expr::TagList yiTags, Expr::FieldManagerList& fml ){
 const std::vector< CellFieldPtrT >
 get_cantera_results( const bool timings,
                      const size_t canteraReps,
-                     Cantera::IdealGasMix& gasMix,
                      Expr::FieldManagerList& fml,
                      const Expr::Tag& tTag,
                      const Expr::TagList& yiTags,
-                     const Expr::Tag& pTag){
+                     const Expr::Tag& pTag)
+{
+  SolnPtr soln = CanteraObjects::get_cantera_solution();
+  std::shared_ptr<Cantera::Kinetics> kinetics = soln->kinetics();
+  Cantera::ThermoPhase& gasMix = kinetics->thermo();
 
   const std::vector<double>& molecularWeights = gasMix.molecularWeights();
   const int nSpec = gasMix.nSpecies();
@@ -126,7 +133,7 @@ get_cantera_results( const bool timings,
     for( iTemp = temp.begin(); iTemp != temp.end(); ++iTemp, ++iMass, ++i){
       gasMix.setMassFractions_NoNorm( &(*iMass)[0] );
       gasMix.setState_TP( *iTemp, *iPress );
-      gasMix.getNetProductionRates(&rResult[0]);
+      kinetics->getNetProductionRates(&rResult[0]);
       for( size_t n=0; n<nSpec; ++n){
         (*canteraResults[n])[i] = rResult[n] * molecularWeights[n];
       }
@@ -144,8 +151,7 @@ bool driver( const bool timings,
              const double pressure = 101325 )
 {
   TestHelper status( !timings );
-  Cantera::IdealGasMix* const gasMix = CanteraObjects::get_gasmix();
-  const int nSpec=gasMix->nSpecies();
+  const int nSpec = CanteraObjects::number_species();
 
   const Expr::Tag xTag  ( "XCoord",      Expr::STATE_NONE );
   const Expr::Tag tTag  ( "Temperature", Expr::STATE_NONE);
@@ -271,20 +277,19 @@ bool driver( const bool timings,
 
     const std::vector< CellFieldPtrT > canteraResults = get_cantera_results( timings,
                                                                              canteraReps,
-                                                                             *gasMix,
                                                                              fml,
                                                                              tTag,
                                                                              yiTags,
                                                                              pTag );
 #   ifdef ENABLE_CUDA
-    BOOST_FOREACH( Expr::Tag rTag, rTags){
+    for( Expr::Tag& rTag: rTags){
       CellField& r = fml.field_ref< CellField >( rTag );
       r.add_device(CPU_INDEX);
     }
 #   endif
 
     std::vector< CellFieldPtrT >::const_iterator iCantera = canteraResults.begin();
-    BOOST_FOREACH( const Expr::Tag& rTag, rTags ){
+    for( const Expr::Tag& rTag: rTags ){
       CellField& r = fml.field_ref< CellField >( rTag );
       status( field_equal( r, **iCantera, 1e-8 ) || field_equal_abs( r, **iCantera, 1e-10 ), rTag.name() );
       ++iCantera;
@@ -312,8 +317,8 @@ int main( int iarg, char* carg[] )
     po::options_description desc("Supported Options");
     desc.add_options()
            ( "help", "print help message" )
-           ( "xml-input-file", po::value<std::string>(&inputFileName)->default_value("h2o2.xml"), "Cantera xml input file name" )
-           ( "phase", po::value<std::string>(&inpGroup), "name of phase in Cantera xml input file" )
+           ( "yaml-input-file", po::value<std::string>(&inputFileName)->default_value("h2o2.yaml"), "Cantera yaml input file name" )
+           ( "phase", po::value<std::string>(&inpGroup), "name of phase in Cantera yaml input file" )
            ( "timings", "Generate comparison timings between Cantera and PoKiTT across several problem sizes" )
            ( "pokitt-reps", po::value<size_t>(&pokittReps), "Repeat the PoKiTT tests and report the average execution time")
            ( "cantera-reps", po::value<size_t>(&canteraReps), "Repeat the Cantera tests and report the average execution time")
@@ -348,8 +353,8 @@ int main( int iarg, char* carg[] )
       return 0;
     }
   }
-  catch( Cantera::CanteraError& ){
-    Cantera::showErrors();
+  catch( Cantera::CanteraError& err ){
+    std::cout << err.what() << std::endl;
   }
   catch( std::exception& err ){
     std::cout << err.what() << std::endl;

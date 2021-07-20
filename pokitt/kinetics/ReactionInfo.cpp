@@ -121,7 +121,7 @@ namespace pokitt{
         msg << __FILE__ << " : " << __LINE__
             << "\n Unknown reaction type somehow evaded detection\n"
             << "This should have been caught during construction of CanteraObjects\n"
-            << "Check your xml input file to ensure it is not corrupted\n";
+            << "Check your yaml input file to ensure it is not corrupted\n";
         throw std::runtime_error( msg.str() );
       }
     } // switch( dat.type )

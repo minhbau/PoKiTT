@@ -1,7 +1,7 @@
 nebo_cuda_prep_dir()
 
-file( GLOB XML_FILES ${PROJECT_SOURCE_DIR}/test/*.xml )
-file( COPY ${XML_FILES} DESTINATION ${CMAKE_CURRENT_BINARY_DIR} )
+file( GLOB YAML_FILES ${PROJECT_SOURCE_DIR}/test/*.yaml )
+file( COPY ${YAML_FILES} DESTINATION ${CMAKE_CURRENT_BINARY_DIR} )
 
 #-------------------------------------------------------------------------------
 #--------------------------- Build examples ------------------------------------

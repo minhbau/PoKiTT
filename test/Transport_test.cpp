@@ -45,14 +45,14 @@
 #include <spatialops/util/TimeLogger.h>
 
 #include <boost/lexical_cast.hpp>
-#include <boost/foreach.hpp>
 #include <boost/program_options.hpp>
 
-#include <cantera/transport.h>
+#include <cantera/transport/MixTransport.h>
+#include <cantera/thermo/ThermoPhase.h>
 
 namespace SO = SpatialOps;
 typedef   SO::SVolField CellField;
-typedef SO::SpatFldPtr<CellField> CellFieldPtrT;
+typedef   SO::SpatFldPtr<CellField> CellFieldPtrT;
 
 namespace po = boost::program_options;
 
@@ -133,23 +133,25 @@ const std::vector< CellFieldPtrT >
 get_cantera_results( const bool timings,
                      const size_t canteraReps,
                      const TransportQuantity transportQuantity,
-                     Cantera::MixTransport& mixTrans,
                      Expr::FieldManagerList& fml,
                      const Expr::Tag& tTag,
                      const Expr::TagList& yiTags,
-                     const Expr::Tag& pTag){
-  Cantera::ThermoPhase& canteraThermo = mixTrans.thermo();
-  const std::vector<double>& molecularWeights = canteraThermo.molecularWeights();
-  const int nSpec = canteraThermo.nSpecies();
+                     const Expr::Tag& pTag)
+{
+  const std::vector<double>& molecularWeights = CanteraObjects::molecular_weights();
+  const int nSpec = CanteraObjects::number_species();
+
+  TransPtr mixTrans = CanteraObjects::get_transport();
+  Cantera::ThermoPhase& gas = mixTrans->thermo();
 
   const std::vector< std::vector<double> > massFracs = extract_mass_fracs( yiTags, fml );
 
-    CellField& temp   = fml.field_ref< CellField >( tTag );
-    CellField& press  = fml.field_ref< CellField >( pTag );
-  # ifdef ENABLE_CUDA
-    temp.set_device_as_active  ( CPU_INDEX );
-    press.set_device_as_active ( CPU_INDEX );
-  # endif
+  CellField& temp   = fml.field_ref< CellField >( tTag );
+  CellField& press  = fml.field_ref< CellField >( pTag );
+# ifdef ENABLE_CUDA
+  temp.set_device_as_active  ( CPU_INDEX );
+  press.set_device_as_active ( CPU_INDEX );
+# endif
 
   std::vector< CellFieldPtrT > canteraResults;
   switch( transportQuantity ){
@@ -179,22 +181,22 @@ get_cantera_results( const bool timings,
     iMass  = massFracs.begin();
     size_t i = 0;
     for( iTemp = temp.begin(); iTemp != temp.end(); ++iTemp, ++iPress, ++iMass, ++i){
-      canteraThermo.setMassFractions_NoNorm( &(*iMass)[0] );
-      canteraThermo.setState_TP( *iTemp, *iPress );
+      gas.setMassFractions_NoNorm( &(*iMass)[0] );
+      gas.setState_TP( *iTemp, *iPress );
       switch(transportQuantity ){
       case TCOND:
-        (*canteraResults[0])[i] = mixTrans.thermalConductivity();
+        (*canteraResults[0])[i] = mixTrans->thermalConductivity();
         break;
       case VISC:
-        (*canteraResults[0])[i] = mixTrans.viscosity();
+        (*canteraResults[0])[i] = mixTrans->viscosity();
         break;
       case DIFF_MASS:
-        mixTrans.getMixDiffCoeffsMass(&d_result[0]);
+        mixTrans->getMixDiffCoeffsMass(&d_result[0]);
         for( size_t n=0; n<nSpec; ++n)
           (*canteraResults[n])[i] = d_result[n];
         break;
       case DIFF_MOL:
-        mixTrans.getMixDiffCoeffs    (&d_result[0]);
+        mixTrans->getMixDiffCoeffs    (&d_result[0]);
         for( size_t n=0; n<nSpec; ++n)
           (*canteraResults[n])[i] = d_result[n];
         break;
@@ -217,16 +219,9 @@ bool driver( const bool timings,
 {
   TestHelper status( !timings );
 
-  Cantera::Transport* transport = CanteraObjects::get_transport();
-  Cantera::MixTransport* mixTrans;
-  if( transport->model() ==210 || transport->model()==211)
-    mixTrans = dynamic_cast<Cantera::MixTransport*>( transport );
-  else {
-    std::cout<<"error, transport not mixture\ntransport model is " << transport->model() << std::endl;
-    return -1;
-  }
-  Cantera::ThermoPhase& cThermo = mixTrans->thermo();
-  const int nSpec=cThermo.nSpecies();
+  IdealGasPtr gas = CanteraObjects::get_thermo();
+
+  const int nSpec = CanteraObjects::number_species();
 
   const Expr::Tag xTag  ( "XCoord",      Expr::STATE_NONE );
   const Expr::Tag tTag  ( "Temperature", Expr::STATE_NONE);
@@ -254,7 +249,7 @@ bool driver( const bool timings,
 
     initFactory.register_expression(       new XCoord       ( xTag )                     );
     yID = initFactory.register_expression( new MassFracs    ( yiTags, xTag )             );
-    pID = initFactory.register_expression( new Pressure     ( pTag, cThermo.pressure() ));
+    pID = initFactory.register_expression( new Pressure     ( pTag, gas->pressure() ));
     mID = initFactory.register_expression( new MixMolWeight ( mmwTag, yiTags, MASS )     );
     tID = initFactory.register_expression( new Temperature  ( tTag ,xTag, 1000, 500 )    );
     initIDs.insert( tID );
@@ -365,20 +360,19 @@ bool driver( const bool timings,
     const std::vector< CellFieldPtrT > canteraResults = get_cantera_results( timings,
                                                                              canteraReps,
                                                                              transportQuantity,
-                                                                             *mixTrans,
                                                                              fml,
                                                                              tTag,
                                                                              yiTags,
                                                                              pTag );
 #   ifdef ENABLE_CUDA
-    BOOST_FOREACH( const Expr::Tag& transportTag, transportTags){
+    for( const Expr::Tag& transportTag : transportTags){
       CellField& tran = fml.field_ref< CellField >( transportTag );
       tran.add_device(CPU_INDEX);
     }
 #   endif
 
     std::vector< CellFieldPtrT >::const_iterator iCantera = canteraResults.begin();
-    BOOST_FOREACH( const Expr::Tag& transportTag, transportTags ){
+    for( const Expr::Tag& transportTag : transportTags ){
       CellField& tran = fml.field_ref< CellField >( transportTag );
       status( field_equal( tran, **iCantera, 1e-12 ), transportTag.name() );
       ++iCantera;
@@ -406,8 +400,8 @@ int main( int iarg, char* carg[] )
     po::options_description desc("Supported Options");
     desc.add_options()
            ( "help", "print help message" )
-           ( "xml-input-file", po::value<std::string>(&inputFileName)->default_value("h2o2.xml"), "Cantera xml input file name" )
-           ( "phase", po::value<std::string>(&inpGroup), "name of phase in Cantera xml input file" )
+           ( "yaml-input-file", po::value<std::string>(&inputFileName)->default_value("h2o2.yaml"), "Cantera yaml input file name" )
+           ( "phase", po::value<std::string>(&inpGroup), "name of phase in Cantera yaml input file" )
            ( "timings", "Generate comparison timings between Cantera and PoKiTT across several problem sizes" )
            ( "pokitt-reps", po::value<size_t>(&pokittReps), "Repeat the PoKiTT tests and report the average execution time")
            ( "cantera-reps", po::value<size_t>(&canteraReps), "Repeat the Cantera tests and report the average execution time")
@@ -451,8 +445,8 @@ int main( int iarg, char* carg[] )
       return 0;
     }
   }
-  catch( Cantera::CanteraError& ){
-    Cantera::showErrors();
+  catch( Cantera::CanteraError& err ){
+    std::cout << err.what() << std::endl;
   }
   catch( std::exception& err ){
     std::cout << err.what() << std::endl;

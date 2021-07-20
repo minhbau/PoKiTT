@@ -4,8 +4,9 @@
 #include <spatialops/structured/FVStaggeredFieldTypes.h>
 #include <expression/Tag.h>
 
-#include <cantera/IdealGasMix.h>
+#include <cantera/thermo/ThermoPhase.h>
 #include <cantera/thermo/ConstCpPoly.h>
+#include <cantera/thermo/Species.h>
 
 #include "TestHelper.h"
 
@@ -20,14 +21,14 @@ bool test_mixfrac()
   TestHelper status( true );
 
   try{
-    Cantera::IdealGasMix gas;
+    IdealGasPtr gas( new Cantera::ThermoPhase() );
 
     // hard-wire some stuff for testing.  DO NOT CHANGE.
     {
-      gas.addElement("C",12.0112);
-      gas.addElement("H",1.00797);
-      gas.addElement("O",15.9994);
-      gas.addElement("N",14.0067);
+      gas->addElement("C",12.0112);
+      gas->addElement("H",1.00797);
+      gas->addElement("O",15.9994);
+      gas->addElement("N",14.0067);
 
       // junk values to allow us to create thermo objects on species.
       const double tlow  = 298;
@@ -54,36 +55,36 @@ bool test_mixfrac()
       co2->thermo = thermo;
       h2o->thermo = thermo;
 
-      gas.addSpecies( ch4 );
-      gas.addSpecies(  o2 );
-      gas.addSpecies(  n2 );
-      gas.addSpecies(  h2 );
-      gas.addSpecies( co2 );
-      gas.addSpecies( h2o );
+      gas->addSpecies( ch4 );
+      gas->addSpecies(  o2 );
+      gas->addSpecies(  n2 );
+      gas->addSpecies(  h2 );
+      gas->addSpecies( co2 );
+      gas->addSpecies( h2o );
     }
 
     // now we have set up the cantera things that are required.
     // so initialize a mixture of gases...
-    const int nspec = gas.nSpecies();
+    const int nspec = gas->nSpecies();
     vector<double> oxid(nspec,0.0);
     vector<double> fuel(nspec,0.0);
 
     // mole fractions
-    oxid[ gas.speciesIndex("O2") ] = 0.21;
+    oxid[ gas->speciesIndex("O2") ] = 0.21;
 
     // mole fractions
-    fuel[ gas.speciesIndex("CH4") ] = 0.221;
+    fuel[ gas->speciesIndex("CH4") ] = 0.221;
 
     pokitt::MixtureFraction f0( gas, oxid, fuel, false );
 
     // mole fractions
-    oxid[ gas.speciesIndex("O2") ] = 0.21;
-    oxid[ gas.speciesIndex("N2") ] = 0.79;
+    oxid[ gas->speciesIndex("O2") ] = 0.21;
+    oxid[ gas->speciesIndex("N2") ] = 0.79;
 
     // mole fractions
-    fuel[ gas.speciesIndex("CH4") ] = 0.221;
-    fuel[ gas.speciesIndex("H2")  ] = 0.332;
-    fuel[ gas.speciesIndex("N2")  ] = 0.447;
+    fuel[ gas->speciesIndex("CH4") ] = 0.221;
+    fuel[ gas->speciesIndex("H2")  ] = 0.332;
+    fuel[ gas->speciesIndex("N2")  ] = 0.447;
 
     {
       typedef pokitt::MixtureFractionToSpecies<SpatialOps::SingleValueField> Z2Y;
@@ -144,8 +145,8 @@ bool test_mixfrac()
 
     return status.ok();
   }
-  catch (Cantera::CanteraError) {
-    Cantera::showErrors(cout);
+  catch( Cantera::CanteraError& err ){
+    cout << err.what() << endl;
     return false;
   }
   catch( std::exception& err ){

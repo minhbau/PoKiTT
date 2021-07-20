@@ -1,0 +1,93 @@
+generator: ctml2yaml
+cantera-version: 2.6.0a2
+date: Tue, 13 Jul 2021 16:28:18 -0600
+input-files: [poly_tester.xml]
+
+phases:
+- name: const
+  elements: [Ar]
+  species: [const_cp]
+  thermo: ideal-gas
+  state: {T: 300.0 K, P: 1.01325e+05 Pa, X: {const_cp: 1.0}}
+- name: nasa
+  elements: [O]
+  species: [nasa]
+  thermo: ideal-gas
+  state: {T: 300.0 K, P: 1.01325e+05 Pa, X: {nasa: 1.0}}
+- name: shomate
+  elements: [N]
+  species: [shomate]
+  thermo: ideal-gas
+  state: {T: 300.0 K, P: 1.01325e+05 Pa, X: {shomate: 1.0}}
+- name: nasa_shomate
+  elements: [O, N]
+  species: [nasa, shomate]
+  thermo: ideal-gas
+  transport: mixture-averaged
+  state: {T: 300.0 K, P: 1.01325e+05 Pa, X: {nasa: 0.5, shomate: 0.5}}
+- name: nasa_const
+  elements: [O, Ar]
+  species: [nasa, const_cp]
+  thermo: ideal-gas
+  transport: mixture-averaged
+  state: {T: 300.0 K, P: 1.01325e+05 Pa, X: {nasa: 0.5, const_cp: 0.5}}
+- name: shomate_const
+  elements: [N, Ar]
+  species: [shomate, const_cp]
+  thermo: ideal-gas
+  transport: mixture-averaged
+  state: {T: 300.0 K, P: 1.01325e+05 Pa, X: {shomate: 0.5, const_cp: 0.5}}
+
+species:
+- name: const_cp
+  composition: {Ar: 1.0}
+  thermo:
+    model: constant-cp
+    T0: 298.15 K
+    h0: 6.19735e+06 J/kmol
+    s0: 1.79999e+05 J/kmol/K
+    cp0: 2.0786e+04 J/kmol/K
+    T-max: 5000.0
+  transport:
+    model: gas
+    geometry: atom
+    well-depth: 136.5
+    diameter: 3.33
+    dipole: 0.0
+    polarizability: 0.0
+    rotational-relaxation: 0.0
+- name: shomate
+  composition: {N: 2.0}
+  thermo:
+    model: Shomate
+    temperature-ranges: [100.0, 500.0, 2000.0]
+    data:
+    - [28.98641, 1.853978, -9.647459, 16.63537, 1.17e-04, -8.671914, 226.4168]
+    - [19.50583, 19.88705, -8.598535, 1.369784, 0.527601, -4.935202, 212.39]
+  transport:
+    model: gas
+    geometry: linear
+    well-depth: 97.53
+    diameter: 3.62
+    dipole: 0.0
+    polarizability: 1.76
+    rotational-relaxation: 4.0
+- name: nasa
+  composition: {O: 2.0}
+  note: TPIS89
+  thermo:
+    model: NASA7
+    temperature-ranges: [200.0, 1000.0, 3500.0]
+    data:
+    - [3.78245636, -2.99673416e-03, 9.84730201e-06, -9.68129509e-09, 3.24372837e-12,
+      -1063.94356, 3.65767573]
+    - [3.28253784, 1.48308754e-03, -7.57966669e-07, 2.09470555e-10, -2.16717794e-14,
+      -1088.45772, 5.45323129]
+  transport:
+    model: gas
+    geometry: linear
+    well-depth: 107.4
+    diameter: 3.46
+    dipole: 0.0
+    polarizability: 1.6
+    rotational-relaxation: 3.8

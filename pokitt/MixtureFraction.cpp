@@ -1,11 +1,12 @@
 #include "MixtureFraction.h"
 #include "CanteraObjects.h"
 
-#include <cantera/IdealGasMix.h>
+#include <cantera/thermo.h>
 
 #include <cassert>
 #include <string>
 #include <algorithm>
+#include <numeric>
 
 using std::vector;
 using std::string;
@@ -59,14 +60,14 @@ MixtureFraction::MixtureFraction( const std::vector<double> & oxidFrac,
                                   const std::vector<double> & fuelFrac,
                                   const bool inputMassFrac )
 {
-  Cantera::IdealGasMix* gas = CanteraObjects::get_gasmix();
-  initialize( *gas, oxidFrac, fuelFrac, inputMassFrac );
-  CanteraObjects::restore_gasmix( gas );
+  IdealGasPtr gas = CanteraObjects::get_thermo();
+  initialize( gas, oxidFrac, fuelFrac, inputMassFrac );
+  CanteraObjects::restore_thermo(gas);
 }
 
 //--------------------------------------------------------------------
 
-MixtureFraction::MixtureFraction( Cantera::IdealGasMix& gas,
+MixtureFraction::MixtureFraction( IdealGasPtr gas,
                                   const std::vector<double> & oxidFrac,
                                   const std::vector<double> & fuelFrac,
                                   const bool inputMassFrac )
@@ -82,13 +83,13 @@ MixtureFraction::~MixtureFraction()
 //--------------------------------------------------------------------
 
 void
-MixtureFraction::initialize( Cantera::IdealGasMix& gas,
+MixtureFraction::initialize( const IdealGasPtr gas,
                              const std::vector<double> & oxid,
                              const std::vector<double> & fuel,
                              const bool massFrac )
 {
-  nelem_ = gas.nElements();
-  nspec_ = gas.nSpecies();
+  nelem_ = gas->nElements();
+  nspec_ = gas->nSpecies();
 
   assert( nelem_ > 0 );
   assert( nspec_ > 0 );
@@ -103,7 +104,7 @@ MixtureFraction::initialize( Cantera::IdealGasMix& gas,
   for( size_t i=0; i<nspec_; ++i ){
     nAtom_.push_back( vector<int>(nelem_) );
     for( size_t m=0; m<nelem_; ++m )
-      nAtom_[i][m] = gas.nAtoms(i,m);
+      nAtom_[i][m] = gas->nAtoms(i,m);
   }
 
   // ensure that mass fractions sum to unity
@@ -125,11 +126,11 @@ MixtureFraction::initialize( Cantera::IdealGasMix& gas,
         
   specMolWt_.resize(nspec_);
   for( int i=0; i<nspec_; i++ )
-    specMolWt_[i] = gas.molecularWeight(i);
+    specMolWt_[i] = gas->molecularWeight(i);
         
   elemWt_.resize(nelem_);
   for( int i=0; i<nelem_; i++ )
-    elemWt_[i] = gas.atomicWeight(i);
+    elemWt_[i] = gas->atomicWeight(i);
 
   // convert to mass fractions if we got mole fractions.
   if( !massFrac ){
@@ -211,14 +212,14 @@ MixtureFraction::compute_stoich_mixfrac() const
 //--------------------------------------------------------------------
 
 void
-MixtureFraction::set_gammas( const Cantera::IdealGasMix& gas )
+MixtureFraction::set_gammas( const IdealGasPtr gas )
 {
   // set the element name vector
-  const vector<string> elemName = gas.elementNames();
+  const vector<string> elemName = gas->elementNames();
         
   // Bilger's mixture fraction
   for ( int i=0; i<nelem_; i++ ){
-    const double elemWt = gas.atomicWeight(i);
+    const double elemWt = gas->atomicWeight(i);
                 
     if( elemName[i] == "C" )
       gamma_[i] = 2.0 / elemWt;
@@ -314,14 +315,14 @@ MixtureFraction::estimate_product_comp( const double mixFrac,
   // convert to mole fractions if requested
   if( !calcMassFrac )  mass_to_mole( specMolWt_, massFrac, massFrac );
         
-  double invYsum = 1.0/accumulate( massFrac.begin(), massFrac.end(), 0.0 );
+  double invYsum = 1.0/std::accumulate( massFrac.begin(), massFrac.end(), 0.0 );
   for( int i=0; i<nspec_; i++ ) massFrac[i] *= invYsum;
   assert( invYsum < 1.001  && invYsum > 0.999 );
 }
 //--------------------------------------------------------------------
 
 void
-MixtureFraction::set_stoichiometry( const Cantera::IdealGasMix& gas )
+MixtureFraction::set_stoichiometry( const IdealGasPtr gas )
 {
   // set stoichiometric coefficients assuming that the products are
   //    CO2  H2O  N2  AR
@@ -353,28 +354,28 @@ MixtureFraction::set_stoichiometry( const Cantera::IdealGasMix& gas )
   // now we can do the elemental balances by solving a system of equations:
         
   // Carbon balance to get phi[iCO2], assuming CO2 is the only product containing C
-  const int iCO2 = gas.speciesIndex("CO2");
-  const int iC   = gas.elementIndex("C");
+  const int iCO2 = gas->speciesIndex("CO2");
+  const int iC   = gas->elementIndex("C");
   if( iCO2 >= 0 ) phiProduct[iCO2] = elemMoles_rx[iC] + phiReactant[iCO2];
         
   // Hydrogen balance to get phi[iH2O], assuming H2O is the only product containing H
-  const int iH2O = gas.speciesIndex("H2O");
-  const int iH   = gas.elementIndex("H");
+  const int iH2O = gas->speciesIndex("H2O");
+  const int iH   = gas->elementIndex("H");
   if( iH2O >= 0 )  phiProduct[iH2O] = 0.5*elemMoles_rx[iH] + phiReactant[iH2O];
         
   // N2 balance
-  const int iN2 = gas.speciesIndex("N2");
-  const int iN  = gas.elementIndex("N");
+  const int iN2 = gas->speciesIndex("N2");
+  const int iN  = gas->elementIndex("N");
   if( iN2 >= 0 ) phiProduct[iN2] = 0.5*elemMoles_rx[iN];
         
   // Sulfur balance to get phi[iSO2], assuming SO2 is the only product containing S.
-  const int iSspecies = gas.speciesIndex("S");
-  const int iSelem    = gas.elementIndex("S");
-  const int iSO2      = gas.speciesIndex("SO2");
+  const int iSspecies = gas->speciesIndex("S");
+  const int iSelem    = gas->elementIndex("S");
+  const int iSO2      = gas->speciesIndex("SO2");
   if( iSO2 >= 0 ) phiProduct[iSO2] = phiReactant[iSspecies] + elemMoles_rx[iSelem];
         
   // deal with other elements
-  const vector<string> & elementNames = gas.elementNames();
+  const vector<string> & elementNames = gas->elementNames();
   for( int ielm=0; ielm<nelem_; ielm++ ){
     const string & nam = elementNames[ielm];
     if( nam != "C" && nam != "H" && nam != "O" && nam != "N" && nam != "S" ){
@@ -396,7 +397,7 @@ MixtureFraction::set_stoichiometry( const Cantera::IdealGasMix& gas )
   // normalize phi_product so that we have the product mole fractions
   // at stoichiometric conditions for complete reaction.
   stoichProdMassFrac_ = phiProduct;
-  const double invSum = 1.0 / accumulate( stoichProdMassFrac_.begin(), stoichProdMassFrac_.end(), 0.0 );
+  const double invSum = 1.0 / std::accumulate( stoichProdMassFrac_.begin(), stoichProdMassFrac_.end(), 0.0 );
   for( vector<double>::iterator ispmf = stoichProdMassFrac_.begin();
        ispmf != stoichProdMassFrac_.end();
        ispmf++ )

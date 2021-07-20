@@ -37,10 +37,15 @@
 //====================================================================
 
 namespace Cantera{
-  class SpeciesThermo;
   class Transport;
-  class IdealGasMix;
+  class ThermoPhase;
+  class Solution;
+  class MultiSpeciesThermo;
 }
+
+typedef std::shared_ptr<Cantera::Solution   >  SolnPtr;
+typedef std::shared_ptr<Cantera::ThermoPhase>  IdealGasPtr;
+typedef std::shared_ptr<Cantera::Transport  >  TransPtr;
 
 enum ThermoPoly
 {
@@ -51,7 +56,7 @@ enum ThermoPoly
 
 struct ThermData
 {
-  ThermData( const Cantera::SpeciesThermo& spThermo, const int i );
+  ThermData( const Cantera::MultiSpeciesThermo& spThermo, const int i );
   int index;
   double minTemp;
   double maxTemp;
@@ -69,7 +74,7 @@ enum ReactionType{
 
 struct RxnData
 {
-  RxnData( const Cantera::IdealGasMix& gas,
+  RxnData( const IdealGasPtr gas,
            const Cantera::Reaction& rxn,
            const std::vector<double>& MW );
 
@@ -115,12 +120,13 @@ public:
            const std::string inputGroup = "" );
   };
 
-  static Cantera::IdealGasMix* get_gasmix();
-  static Cantera::Transport* get_transport();
+  static IdealGasPtr get_thermo();
+  static TransPtr get_transport();
+  static SolnPtr get_cantera_solution();
 
-  static void restore_transport( Cantera::Transport* const trans );
-  static void restore_gasmix( Cantera::IdealGasMix* const gas );
-
+  static void restore_soln( SolnPtr soln );
+  static void restore_transport( TransPtr trans );
+  static void restore_thermo(IdealGasPtr gas );
 
   static void setup_cantera( const Setup& options,
                              const int ncopies = 1 );
@@ -147,13 +153,11 @@ private:
 
   static CanteraObjects& self();
 
-  typedef Cantera::IdealGasMix IdealGas;
-  typedef Cantera::Transport   Trans;
-
   bool hasTransport_;
 
-  std::queue<IdealGas*> gas_;
-  std::queue<Trans*> trans_;
+  std::queue<SolnPtr> soln_;
+  std::map<IdealGasPtr,SolnPtr> gasMapper_;
+  std::map<TransPtr,SolnPtr> transMapper_;
 
   std::string phaseName_;
   const double gasConstant_;
@@ -180,8 +184,7 @@ private:
   CanteraObjects( const CanteraObjects& );
   CanteraObjects& operator=( const CanteraObjects& );
 
-  void build_new_gas();
-  void build_new_transport();
+  void build_new_soln();
   void extract_thermo_data();
   void extract_kinetics_data();
   void extract_mix_transport_data();

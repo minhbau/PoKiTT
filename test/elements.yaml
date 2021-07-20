@@ -1,0 +1,6 @@
+generator: ctml2yaml
+cantera-version: 2.6.0a2
+date: Tue, 13 Jul 2021 16:28:20 -0600
+input-files: [elements.xml]
+
+phases: []

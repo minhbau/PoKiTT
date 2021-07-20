@@ -24,17 +24,19 @@
 
 #include <stdexcept>
 #include <cassert>
+#include <iostream>
+#include <memory>
 
 #include "CanteraObjects.h"
 
-#include <cantera/transport.h>
-#include <cantera/IdealGasMix.h>
+#include <cantera/thermo.h>
+#include <cantera/base/Solution.h>
 
 #include <cantera/base/ct_defs.h>              // value of gas constant
 #include <cantera/thermo/speciesThermoTypes.h> // definitions for which polynomial is being used
-#include <cantera/kinetics/reaction_defs.h>    // reaction type definitions
-
-#include <boost/foreach.hpp>
+#include <cantera/kinetics/GasKinetics.h>
+#include <cantera/kinetics/Reaction.h>
+#include <cantera/transport/MixTransport.h>
 
 #ifdef EXPRESSION_THREADS
 
@@ -60,7 +62,7 @@ struct CanteraMutex{
 
 #endif  // EXPRESSION_THREADS
 
-ThermData::ThermData( const Cantera::SpeciesThermo& spThermo, const int i )
+ThermData::ThermData( const Cantera::MultiSpeciesThermo& spThermo, const int i )
   : index( i )
 {
   double refPressure; int cType;
@@ -93,12 +95,12 @@ SpeciesRxnData( int index,
     thdBdyEff( thdBdyEff )
 {}
 
-RxnData::RxnData( const Cantera::IdealGasMix& gas,
+RxnData::RxnData( const IdealGasPtr gas,
                   const Cantera::Reaction& rxn,
                   const std::vector<double>& MW )
   : reversible( rxn.reversible )
 {
-  const int rxnType = rxn.reaction_type;
+  const std::string rxnType = rxn.type();
 
   for( int i=0; i<3; ++i ){
     kFwdCoefs     [i] = 0.0;
@@ -107,9 +109,9 @@ RxnData::RxnData( const Cantera::IdealGasMix& gas,
   for( int i=0; i<4; ++i ) troeParams[i]=0;
 
   // ensure that the type of each reaction is supported by PoKiTT.
-  if( rxnType != Cantera::ELEMENTARY_RXN &&
-      rxnType != Cantera::THREE_BODY_RXN &&
-      rxnType != Cantera::FALLOFF_RXN )
+  if( rxnType.compare( "elementary" ) != 0 &&
+      rxnType.compare( "three-body" ) != 0 &&
+      rxnType.compare( "falloff"    ) != 0  )
   {
     std::ostringstream msg;
     msg << __FILE__ << " : " << __LINE__
@@ -118,57 +120,71 @@ RxnData::RxnData( const Cantera::IdealGasMix& gas,
     throw std::runtime_error( msg.str() );
   }
 
-  switch( rxnType ){
-    case Cantera::ELEMENTARY_RXN:{
-      const Cantera::ElementaryReaction& elemRxn = dynamic_cast<const Cantera::ElementaryReaction&>(rxn);
-      kFwdCoefs[0] = elemRxn.rate.preExponentialFactor();
-      kFwdCoefs[1] = elemRxn.rate.temperatureExponent();
-      kFwdCoefs[2] = elemRxn.rate.activationEnergy_R();
-      type = ELEMENTARY;
-      break;
+  if( rxnType.compare( "elementary" ) == 0 ){
+    const auto rate = std::dynamic_pointer_cast<Cantera::ArrheniusRate>( const_cast<Cantera::Reaction&>(rxn).rate() );
+    kFwdCoefs[0] = rate->preExponentialFactor();
+    kFwdCoefs[1] = rate->temperatureExponent();
+    kFwdCoefs[2] = rate->activationEnergy_R();
+    type = ELEMENTARY;
+  }
+  else if( rxnType.compare( "elementary-legacy" ) == 0 ){
+    const Cantera::ElementaryReaction2& elemRate = dynamic_cast<Cantera::ElementaryReaction2&>( const_cast<Cantera::Reaction&>(rxn) );
+    kFwdCoefs[0] = elemRate.rate.preExponentialFactor();
+    kFwdCoefs[1] = elemRate.rate.temperatureExponent();
+    kFwdCoefs[2] = elemRate.rate.activationEnergy_R();
+    type = ELEMENTARY;
+  }
+  else if( rxnType.compare( "falloff" ) == 0 ){
+    const Cantera::FalloffReaction& fallRxn = dynamic_cast<const Cantera::FalloffReaction&>(rxn);
+    kFwdCoefs     [0] = fallRxn.high_rate.preExponentialFactor();
+    kFwdCoefs     [1] = fallRxn.high_rate.temperatureExponent();
+    kFwdCoefs     [2] = fallRxn.high_rate.activationEnergy_R();
+    kPressureCoefs[0] = fallRxn.low_rate.preExponentialFactor();
+    kPressureCoefs[1] = fallRxn.low_rate.temperatureExponent();
+    kPressureCoefs[2] = fallRxn.low_rate.activationEnergy_R();
+    fallRxn.falloff->getParameters( troeParams );
+    thdBdyDefault = fallRxn.third_body.default_efficiency;
+    for( const Cantera::Composition::value_type& vt : fallRxn.third_body.efficiencies ){
+      const int spIx = gas->speciesIndex(vt.first);
+      thdBdySpecies.push_back( SpeciesRxnData( spIx, 0, MW[spIx], vt.second ) );
     }
-    case Cantera::FALLOFF_RXN:{
-      const Cantera::FalloffReaction& fallRxn = dynamic_cast<const Cantera::FalloffReaction&>(rxn);
-      kFwdCoefs     [0] = fallRxn.high_rate.preExponentialFactor();
-      kFwdCoefs     [1] = fallRxn.high_rate.temperatureExponent();
-      kFwdCoefs     [2] = fallRxn.high_rate.activationEnergy_R();
-      kPressureCoefs[0] = fallRxn.low_rate.preExponentialFactor();
-      kPressureCoefs[1] = fallRxn.low_rate.temperatureExponent();
-      kPressureCoefs[2] = fallRxn.low_rate.activationEnergy_R();
-      fallRxn.falloff->getParameters( troeParams );
-      thdBdyDefault = fallRxn.third_body.default_efficiency;
-      BOOST_FOREACH( const Cantera::Composition::value_type& vt, fallRxn.third_body.efficiencies ){
-        const int spIx = gas.speciesIndex(vt.first);
-        thdBdySpecies.push_back( SpeciesRxnData( spIx, 0, MW[spIx], vt.second ) );
-      }
 
-      switch( fallRxn.falloff->getType() ){
-        case Cantera::SIMPLE_FALLOFF: type = LINDEMANN; break;
-        case Cantera::TROE_FALLOFF  : type = TROE;      break;
-        case Cantera::SRI_FALLOFF   : type = TROE;      break;
-        default:{
-          std::ostringstream msg;
-          msg << __FILE__ << " : " << __LINE__
-              << "\nFalloff type not supported,\n Type = " << fallRxn.falloff->getType()
-              << "\nSee reaction_defs.h in Cantera\n";
-          throw std::runtime_error( msg.str() );
-          break;
-        }
-      }
-      break;
+    const std::string rxnType = fallRxn.falloff->type();
+    if( rxnType.compare("Lindemann") == 0 )
+      type = LINDEMANN;
+    else if( rxnType.compare("Troe") == 0 or rxnType.compare("SRI") == 0 )
+      type = TROE;
+    else{
+      std::ostringstream msg;
+      msg << __FILE__ << " : " << __LINE__
+          << "\nFalloff type not supported,\n Type = " << rxnType
+          << "\nSee reaction_defs.h in Cantera\n";
+      throw std::runtime_error( msg.str() );
     }
-    case Cantera::THREE_BODY_RXN:{
-      const Cantera::ThreeBodyReaction& tbRxn = dynamic_cast<const Cantera::ThreeBodyReaction&>(rxn);
-      kFwdCoefs[0]      = tbRxn.rate.preExponentialFactor();
-      kFwdCoefs[1]      = tbRxn.rate.temperatureExponent();
-      kFwdCoefs[2]      = tbRxn.rate.activationEnergy_R();
-      thdBdyDefault     = tbRxn.third_body.default_efficiency;
-      type              = THIRD_BODY;
-      BOOST_FOREACH( const Cantera::Composition::value_type& vt, tbRxn.third_body.efficiencies ){
-        const int spIx = gas.speciesIndex(vt.first);
-        thdBdySpecies.push_back( SpeciesRxnData( spIx, 0, MW[spIx], vt.second ) );
-      }
-      break;
+  }
+  else if( rxnType.compare( "three-body" ) == 0 ){
+    Cantera::ThreeBodyReaction3& tbRxn = dynamic_cast<Cantera::ThreeBodyReaction3&>( const_cast<Cantera::Reaction&>(rxn) );
+    const auto rate = std::dynamic_pointer_cast<Cantera::ArrheniusRate>( tbRxn.rate() );
+    kFwdCoefs[0]  = rate->preExponentialFactor();
+    kFwdCoefs[1]  = rate->temperatureExponent();
+    kFwdCoefs[2]  = rate->activationEnergy_R();
+    thdBdyDefault = tbRxn.thirdBody()->default_efficiency;
+    type          = THIRD_BODY;
+    for( const Cantera::Composition::value_type& vt : tbRxn.thirdBody()->efficiencies ){
+      const int spIx = gas->speciesIndex(vt.first);
+      thdBdySpecies.push_back( SpeciesRxnData( spIx, 0, MW[spIx], vt.second ) );
+    }
+  }
+  else if( rxnType.compare( "three-body-legacy" ) == 0 ){
+    Cantera::ThreeBodyReaction2& tbRxn = dynamic_cast<Cantera::ThreeBodyReaction2&>( const_cast<Cantera::Reaction&>(rxn) );
+    kFwdCoefs[0]  = tbRxn.rate.preExponentialFactor();
+    kFwdCoefs[1]  = tbRxn.rate.temperatureExponent();
+    kFwdCoefs[2]  = tbRxn.rate.activationEnergy_R();
+    thdBdyDefault = tbRxn.third_body.default_efficiency;
+    type          = THIRD_BODY;
+    for( const Cantera::Composition::value_type& vt : tbRxn.third_body.efficiencies ){
+      const int spIx = gas->speciesIndex(vt.first);
+      thdBdySpecies.push_back( SpeciesRxnData( spIx, 0, MW[spIx], vt.second ) );
     }
   }
 
@@ -176,9 +192,9 @@ RxnData::RxnData( const Cantera::IdealGasMix& gas,
    * This helps performance because we only support elementary reaction mechanisms
    * We also check if stoichiometry is consistent with elementary reactions
    */
-  BOOST_FOREACH( const Cantera::Composition::value_type& reactant, rxn.reactants ){
+  for( const Cantera::Composition::value_type& reactant : rxn.reactants ){
     const std::string& spNam = reactant.first;
-    const size_t spIx = gas.speciesIndex(spNam);
+    const size_t spIx = gas->speciesIndex(spNam);
     const double stoich = reactant.second;
     const int istoich = int(stoich);
     if(      fabs( stoich - 1 ) < 1e-10 ) reactants.push_back( SpeciesRxnData( spIx, 1, MW[spIx], thdBdyDefault ) );
@@ -201,9 +217,9 @@ RxnData::RxnData( const Cantera::IdealGasMix& gas,
     throw std::runtime_error( msg.str() );
   }
 
-  BOOST_FOREACH( const Cantera::Composition::value_type& prod, rxn.products ){
+  for( const Cantera::Composition::value_type& prod : rxn.products ){
     const std::string& spNam = prod.first;
-    const size_t spIx = gas.speciesIndex(spNam);
+    const size_t spIx = gas->speciesIndex(spNam);
     const double stoich = prod.second;
     const int istoich = int(stoich);
     if(      fabs( stoich - 1 ) < 1e-10 ) products.push_back( SpeciesRxnData( spIx, -1, MW[spIx], thdBdyDefault ) );
@@ -227,11 +243,11 @@ RxnData::RxnData( const Cantera::IdealGasMix& gas,
 
   netOrder = 0; // difference of forward and reverse rxn orders, used for equilibrium K
   std::map< int, SpeciesRxnData > netMap; // maps to find duplicates, we will extract non-0 entries to a vector later
-  BOOST_FOREACH( const SpeciesRxnData& srd, reactants ){
+  for( const SpeciesRxnData& srd : reactants ){
     netOrder += srd.stoich;
     netMap.insert( std::pair<int,SpeciesRxnData>(srd.index, srd) );
   }
-  BOOST_FOREACH( const SpeciesRxnData& srd, products ){
+  for( const SpeciesRxnData& srd : products ){
     netOrder += srd.stoich;
     if( netMap.find( srd.index ) == netMap.end() ){
       netMap.insert( std::pair<int,SpeciesRxnData>(srd.index, srd) );
@@ -268,8 +284,7 @@ Setup( const std::string transName,
   : transportName( transName ),
     inputFile( inputFileName ),
     inputGroup( inpGroup )
-{
-}
+{}
 
 //====================================================================
 
@@ -293,17 +308,7 @@ CanteraObjects::self()
 
 CanteraObjects::~CanteraObjects()
 {
-  while( !gas_.empty() ){
-    IdealGas* g = gas_.front();
-    gas_.pop();
-    delete g;
-  }
-  while( !trans_.empty() ){
-    Trans* t = trans_.front();
-    trans_.pop();
-    delete t;
-  }
-
+  while( ! soln_.empty() )  soln_.pop();
   hasBeenSetup_ = false;
 }
 
@@ -316,9 +321,11 @@ CanteraObjects::setup_cantera( const Setup& options,
   CanteraObjects& co = CanteraObjects::self();
   assert( !co.hasBeenSetup_ );
   co.options_ = options;
+
+  if( options.transportName.compare("Mix") != 0 ) co.hasTransport_ = false;
+
   for( int i=0; i<ncopies; ++i ){
-    co.build_new_gas();
-    co.build_new_transport();
+    co.build_new_soln();
   }
   co.extract_thermo_data();
   co.extract_kinetics_data();
@@ -331,33 +338,23 @@ CanteraObjects::setup_cantera( const Setup& options,
 //--------------------------------------------------------------------
 
 void
-CanteraObjects::build_new_gas()
+CanteraObjects::build_new_soln()
 {
   try{
-    gas_.push( new Cantera::IdealGasMix( options_.inputFile, options_.inputGroup ) );
-  }
-  catch( Cantera::CanteraError& ){
-    Cantera::showErrors();
-    throw std::runtime_error("Error initializing cantera.  Check for proper location of input files.\n");
-  }
-}
-
-//-------------------------------------------------------------------
-
-void
-CanteraObjects::build_new_transport()
-{
-  if( hasTransport_ ){
-    try{
-      build_new_gas();
-      IdealGas* g = gas_.front();
-      gas_.pop();
-      trans_.push( Cantera::TransportFactory::factory()->newTransport( options_.transportName, g ));
+    std::shared_ptr<Cantera::Solution> soln = Cantera::newSolution( options_.inputFile, options_.inputGroup, options_.transportName );
+    soln_.push( soln );
+//    gas_.push( soln->thermo() );
+    if( soln->thermo()->nSpecies() > 1 and hasTransport_ ){
+      TransPtr tp = soln->transport();
+      assert( tp->transportType().compare("CK_Mix")==0 or tp->transportType().compare("Mix")==0 );
+//      trans_.push( tp );
     }
-    catch( Cantera::CanteraError& ){
-      Cantera::showErrors( transportErrorMessage_ );
+    else{
       hasTransport_ = false;
     }
+  }
+  catch( Cantera::CanteraError& err ){
+    throw std::runtime_error("Error initializing cantera.  Check for proper location of input files.\n" + err.getMessage() );
   }
 }
 
@@ -367,12 +364,12 @@ void
 CanteraObjects::extract_thermo_data()
 {
   assert( !hasBeenSetup_ );
-  IdealGas* const gas = gas_.front();
+  const IdealGasPtr gas = soln_.front()->thermo();
   phaseName_        = gas->name();
   numSpecies_       = gas->nSpecies();
   molecularWeights_ = gas->molecularWeights();
   speciesNames_.clear();
-  const Cantera::SpeciesThermo& spThermo = gas->speciesThermo();
+  const Cantera::MultiSpeciesThermo& spThermo = gas->speciesThermo();
   for( int i = 0; i != numSpecies_; ++i ){
     thermDataMap_.insert( std::pair< int, ThermData >( i, ThermData( spThermo, i ) ) );
     speciesNames_.push_back( gas->speciesName(i) );
@@ -386,12 +383,16 @@ void
 CanteraObjects::extract_kinetics_data()
 {
   assert( !hasBeenSetup_ );
-  IdealGas* gas = gas_.front();
-
-  const std::vector< Cantera::shared_ptr<Cantera::Reaction> >& rxnVec = gas->getReactionData(); // contains kinetics data for each reaction
+  const SolnPtr soln = soln_.front();
+  const auto kin = std::dynamic_pointer_cast<const Cantera::GasKinetics>( soln->kinetics() );
+  if( kin == nullptr ){
+    numRxns_ = 0;
+    return;
+  }
+  const std::vector< std::shared_ptr<Cantera::Reaction> >& rxnVec = kin->getReactionData(); // contains kinetics data for each reaction
   numRxns_ = rxnVec.size();
   for( size_t r=0; r<numRxns_; ++r){
-    RxnData rxnDat( *gas, *rxnVec[r], molecularWeights_);
+    RxnData rxnDat( soln->thermo(), *rxnVec[r], molecularWeights_);
     try{
       std::vector<RxnData::SpeciesRxnData>::iterator iThd = rxnDat.thdBdySpecies.begin();
       for( ; iThd != rxnDat.thdBdySpecies.end(); ++iThd) // we evaluate M assuming everything is default, this corrects for non-default species
@@ -416,17 +417,17 @@ CanteraObjects::extract_mix_transport_data()
 {
   assert( !hasBeenSetup_ );
   assert( hasTransport_ );
-  Trans* const trans = trans_.front();
-  if( trans->model() != Cantera::cMixtureAveraged){
+  const TransPtr trans = soln_.front()->transport();
+  const std::string transType = trans->transportType();
+  if( transType.compare("CK_Mix") != 0 and transType.compare("Mix") != 0 ){
     std::ostringstream msg;
     msg << __FILE__ << " : " << __LINE__
         << " \n Unsupported model for transport properties detected " << std::endl
         << " Only mixture average transport properties are currently supported" << std::endl
-        << " Supplied model = " << trans->model() << std::endl
-        << " See Cantera::TransportBase.h for model definitions" << std::endl;
+        << " Supplied model = " << transType << std::endl;
     throw std::runtime_error( msg.str() );
   }
-  Cantera::MixTransport* mixTrans = dynamic_cast<Cantera::MixTransport*>( trans ); // cast gas transport object as mix transport
+  const auto mixTrans = std::dynamic_pointer_cast<Cantera::MixTransport>( trans ); // cast gas transport object as mix transport
   diffusionCoefs_   = mixTrans->getDiffusionPolyCoefficients(); // diffusion coefficient parameters
   viscosityCoefs_   = mixTrans->getViscosityCoefficients();
   thermalCondCoefs_ = mixTrans->getConductivityCoefficients();
@@ -434,21 +435,40 @@ CanteraObjects::extract_mix_transport_data()
 
 //--------------------------------------------------------------------
 
-Cantera::IdealGasMix*
-CanteraObjects::get_gasmix()
+SolnPtr
+CanteraObjects::get_cantera_solution()
 {
   CanteraMutex lock;
   CanteraObjects& co = CanteraObjects::self();
   assert( co.hasBeenSetup_ );
-  if( co.gas_.size() == 0 ) co.build_new_gas();
-  IdealGas* gas = co.gas_.front();
-  co.gas_.pop();
+  if( co.soln_.size() == 0 ) co.build_new_soln();
+  SolnPtr soln = co.soln_.front();
+  co.soln_.pop();
+  return soln;
+}
+
+//--------------------------------------------------------------------
+
+IdealGasPtr
+CanteraObjects::get_thermo()
+{
+  // jcs potential bug. Thermo and Transport objects are linked (at least from transport -> thermo).
+  // We can get the thermo object from the transport object, but not vice-versa.
+  // That means that calls to restore_thermo will get things out of sync on these queues. This could cause big problems.
+  CanteraMutex lock;
+  CanteraObjects& co = CanteraObjects::self();
+  assert( co.hasBeenSetup_ );
+  if( co.soln_.size() == 0 ) co.build_new_soln();
+  SolnPtr soln = co.soln_.front();
+  co.soln_.pop();
+  IdealGasPtr gas = soln->thermo();
+  co.gasMapper_[gas] = soln;
   return gas;
 }
 
 //--------------------------------------------------------------------
 
-Cantera::Transport*
+TransPtr
 CanteraObjects::get_transport()
 {
   CanteraMutex lock;
@@ -466,9 +486,11 @@ CanteraObjects::get_transport()
     throw std::runtime_error( msg.str() );
   }
 
-  if( co.trans_.size() == 0 ) co.build_new_transport();
-  Trans* trans = co.trans_.front();
-  co.trans_.pop();
+  if( co.soln_.size() == 0 ) co.build_new_soln();
+  SolnPtr soln = co.soln_.front();
+  co.soln_.pop();
+  TransPtr trans = soln->transport();
+  co.transMapper_[trans] = soln;
   return trans;
 }
 
@@ -488,9 +510,9 @@ double
 CanteraObjects::reference_pressure()
 {
   CanteraMutex lock;
-  Cantera::IdealGasMix* thermo = CanteraObjects::get_gasmix();
+  IdealGasPtr thermo = CanteraObjects::get_thermo();
   const double rp = thermo->refPressure();
-  CanteraObjects::restore_gasmix(thermo);
+  CanteraObjects::restore_thermo(thermo);
   return rp;
 }
 
@@ -648,24 +670,35 @@ CanteraObjects::phase_name()
 //--------------------------------------------------------------------
 
 void
-CanteraObjects::restore_transport( Cantera::Transport* const trans )
+CanteraObjects::restore_soln( SolnPtr soln )
 {
   CanteraMutex lock;
   CanteraObjects& co = CanteraObjects::self();
   assert( co.hasBeenSetup_ );
-  assert( co.hasTransport_ );
-  co.trans_.push( trans );
+  co.soln_.push( soln );
 }
 
 //--------------------------------------------------------------------
 
 void
-CanteraObjects::restore_gasmix( Cantera::IdealGasMix* const gas )
+CanteraObjects::restore_transport( TransPtr trans )
 {
   CanteraMutex lock;
   CanteraObjects& co = CanteraObjects::self();
   assert( co.hasBeenSetup_ );
-  co.gas_.push( gas );
+  assert( co.hasTransport_ );
+  co.soln_.push( co.transMapper_[trans] );
+}
+
+//--------------------------------------------------------------------
+
+void
+CanteraObjects::restore_thermo( IdealGasPtr gas )
+{
+  CanteraMutex lock;
+  CanteraObjects& co = CanteraObjects::self();
+  assert( co.hasBeenSetup_ );
+  co.soln_.push( co.gasMapper_[gas] );
 }
 
 //--------------------------------------------------------------------

@@ -64,7 +64,7 @@ using SpeciesNT = pokitt::SpeciesN<CellFieldT>::Builder;
 
 int main()
 {
-  const std::string inputFileName = "h2-burke.xml";
+  const std::string inputFileName = "h2-burke.yaml";
 
   const CanteraObjects::Setup setup( "Mix", inputFileName );
   CanteraObjects::setup_cantera( setup );

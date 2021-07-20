@@ -70,8 +70,8 @@ using namespace pokitt;
 
 void print_fields( Expr::FieldManagerList& fml, const std::vector< TagList >& fieldTagLists, const int s, const double dt ){
   std::cout<<"Fields at time "<< s*dt << "; step " << s << std::endl;
-  BOOST_FOREACH( const TagList fieldTags, fieldTagLists ){
-    BOOST_FOREACH( const Tag iTag, fieldTags){
+  for( const TagList fieldTags : fieldTagLists ){
+    for( const Tag iTag : fieldTags){
       CellField& field = fml.field_ref< CellField >( iTag );
       std::cout << iTag.name() << std::endl;
 #ifdef ENABLE_CUDA
@@ -84,8 +84,8 @@ void print_fields( Expr::FieldManagerList& fml, const std::vector< TagList >& fi
 
 void print_matlab( Expr::FieldManagerList& fml, const std::vector< TagList >& fieldTagLists, const int s, const double dt ){
   std::cout<<"Writing fields at time "<< s*dt << "; step " << s << std::endl;
-  BOOST_FOREACH( const TagList fieldTags, fieldTagLists ){
-    BOOST_FOREACH( const Tag iTag, fieldTags){
+  for( const TagList fieldTags: fieldTagLists ){
+    for( const Tag iTag: fieldTags){
       CellField& field = fml.field_ref< CellField >( iTag );
 #ifdef ENABLE_CUDA
       field.validate_device_async( GPU_INDEX );
@@ -296,7 +296,7 @@ bool driver( const bool timings,
 
 int main( int iarg, char* carg[] )
 {
-  std::string inputFileName = "h2o2.xml";
+  std::string inputFileName = "h2o2.yaml";
   std::string inpGroup;
   bool timings = false;
   bool print   = false;
@@ -308,8 +308,8 @@ int main( int iarg, char* carg[] )
   po::options_description desc("Supported Options");
   desc.add_options()
                ( "help", "print help message" )
-               ( "xml-input-file,i", po::value<std::string>(&inputFileName)->default_value("h2o2.xml"), "Cantera xml input file name" )
-               ( "phase", po::value<std::string>(&inpGroup), "name of phase in Cantera xml input file" )
+               ( "yaml-input-file,i", po::value<std::string>(&inputFileName)->default_value("h2o2.yaml"), "Cantera yaml input file name" )
+               ( "phase", po::value<std::string>(&inpGroup), "name of phase in Cantera yaml input file" )
                ( "timings,t", "Generate comparison timings between Cantera and PoKiTT across several problem sizes" )
                ( "print-fields,p", "Print field values for Temperature, mass of H2, and mass of OH every 5000 time steps")
                ( "matlab", "Save field values for Temperature, mass of H2, and mass of OH every 10000 time steps")
@@ -354,7 +354,7 @@ int main( int iarg, char* carg[] )
           << "\n\t SpatialOps git hash: \t" << SOPS_REPO_HASH
           <<"\n--------------------------------------------------------------\n"
           << "MECHANISM INFORMATION\n"
-          << "\n\tXML input file: " << inputFileName
+          << "\n\tYAML input file: " << inputFileName
           << "\n\tPhase name    : " << CanteraObjects::phase_name()
           << "\n\t# species     : " << CanteraObjects::number_species()
           << "\n\t# reactions   : " << CanteraObjects::number_rxns()
@@ -369,8 +369,8 @@ int main( int iarg, char* carg[] )
       return 0;
     }
   }
-  catch( Cantera::CanteraError& ){
-    Cantera::showErrors();
+  catch( Cantera::CanteraError& err ){
+    std::cout << err.what() << std::endl;
   }
   catch( std::exception& err ){
     std::cout << err.what() << std::endl;

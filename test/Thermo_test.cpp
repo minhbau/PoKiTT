@@ -45,10 +45,9 @@
 #include <spatialops/util/TimeLogger.h>
 
 #include <boost/lexical_cast.hpp>
-#include <boost/foreach.hpp>
 #include <boost/program_options.hpp>
 
-#include <cantera/IdealGasMix.h>
+#include <cantera/thermo/ThermoPhase.h>
 
 namespace SO = SpatialOps;
 typedef SO::SVolField  CellField;
@@ -174,15 +173,16 @@ get_cantera_results( const bool mix,
                      const bool timings,
                      const size_t canteraReps,
                      const ThermoQuantity thermoQuantity,
-                     Cantera::IdealGasMix& gasMix,
                      Expr::FieldManagerList& fml,
                      const Expr::Tag& tTag,
                      const Expr::TagList& yiTags )
 {
   const std::vector< std::vector<double> > massFracs = extract_mass_fracs( yiTags, fml );
-  const double press = gasMix.pressure();
-  const int nSpec = gasMix.nSpecies();
-  const std::vector<double>& molecularWeights = gasMix.molecularWeights();
+  const int nSpec = CanteraObjects::number_species();
+  const std::vector<double>& molecularWeights = CanteraObjects::molecular_weights();
+
+  IdealGasPtr gasMix = CanteraObjects::get_thermo();
+  const double press = gasMix->pressure();
 
   CellField& temp   = fml.field_ref< CellField >( tTag );
 # ifdef ENABLE_CUDA
@@ -210,13 +210,13 @@ get_cantera_results( const bool mix,
       iTemp = temp.begin();
       iMass = massFracs.begin();
       for( iCant = canteraResults[0]->begin(); iCant!=iCantEnd; ++iTemp, ++iMass, ++iCant ){
-        gasMix.setMassFractions_NoNorm( &(*iMass)[0] );
-        gasMix.setState_TP( *iTemp, press );
+        gasMix->setMassFractions_NoNorm( &(*iMass)[0] );
+        gasMix->setState_TP( *iTemp, press );
         switch(thermoQuantity){
-        case CP  : *iCant=gasMix.cp_mass();        break;
-        case CV  : *iCant=gasMix.cv_mass();        break;
-        case ENTH: *iCant=gasMix.enthalpy_mass();  break;
-        case E   : *iCant=gasMix.intEnergy_mass(); break;
+        case CP  : *iCant=gasMix->cp_mass();        break;
+        case CV  : *iCant=gasMix->cv_mass();        break;
+        case ENTH: *iCant=gasMix->enthalpy_mass();  break;
+        case E   : *iCant=gasMix->intEnergy_mass(); break;
         } // switch(thermoQuantity)
       }
     }
@@ -231,13 +231,13 @@ get_cantera_results( const bool mix,
       size_t i = 0;
       iMass = massFracs.begin();
       for( iTemp = temp.begin(); iTemp != iTempEnd; ++iTemp, ++iMass, ++i){
-        gasMix.setMassFractions_NoNorm( &(*iMass)[0] );
-        gasMix.setState_TP( *iTemp, press );
+        gasMix->setMassFractions_NoNorm( &(*iMass)[0] );
+        gasMix->setState_TP( *iTemp, press );
         switch( thermoQuantity ){
-        case CP  : gasMix.getPartialMolarCp(&thermoResult[0]);          break;
-        case CV  : gasMix.getPartialMolarCp(&thermoResult[0]);          break;
-        case ENTH: gasMix.getPartialMolarEnthalpies(&thermoResult[0]);  break;
-        case E   : gasMix.getPartialMolarIntEnergies(&thermoResult[0]); break;
+        case CP  : gasMix->getPartialMolarCp(&thermoResult[0]);          break;
+        case CV  : gasMix->getPartialMolarCp(&thermoResult[0]);          break;
+        case ENTH: gasMix->getPartialMolarEnthalpies(&thermoResult[0]);  break;
+        case E   : gasMix->getPartialMolarIntEnergies(&thermoResult[0]); break;
         }
         for( size_t n=0; n<nSpec; ++n ){
           switch( thermoQuantity ){
@@ -265,8 +265,7 @@ bool driver( const bool timings,
              const ThermoQuantity thermoQuantity )
 {
   TestHelper status( !timings );
-  Cantera::IdealGasMix* const gasMix = CanteraObjects::get_gasmix();
-  const int nSpec=gasMix->nSpecies();
+  const int nSpec = CanteraObjects::number_species();
 
   const Expr::Tag xTag( "XCoord", Expr::STATE_NONE );
   Expr::TagList yiTags;
@@ -377,19 +376,18 @@ bool driver( const bool timings,
                                                                              timings,
                                                                              canteraReps,
                                                                              thermoQuantity,
-                                                                             *gasMix,
                                                                              fml,
                                                                              tTag,
                                                                              yiTags );
 #   ifdef ENABLE_CUDA
-    BOOST_FOREACH( Expr::Tag thermoTag, thermoTags){
+    for( Expr::Tag& thermoTag: thermoTags){
       CellField& thermo = fml.field_ref< CellField >( thermoTag );
       thermo.set_device_as_active(CPU_INDEX);
     }
 #   endif
 
     std::vector< CellFieldPtrT >::const_iterator iCantera = canteraResults.begin();
-    BOOST_FOREACH( const Expr::Tag& thermoTag, thermoTags ){
+    for( const Expr::Tag& thermoTag: thermoTags ){
       const CellField& thermo = fml.field_ref< CellField >( thermoTag );
       switch( thermoQuantity ){
         case CP  :
@@ -429,8 +427,8 @@ int main( int iarg, char* carg[] )
     po::options_description desc("Supported Options");
     desc.add_options()
            ( "help", "print help message" )
-           ( "xml-input-file", po::value<std::string>(&inputFileName)->default_value("h2o2.xml"), "Cantera xml input file name" )
-           ( "phase", po::value<std::string>(&inpGroup), "name of phase in Cantera xml input file" )
+           ( "yaml-input-file", po::value<std::string>(&inputFileName)->default_value("h2o2.yaml"), "Cantera yaml input file name" )
+           ( "phase", po::value<std::string>(&inpGroup), "name of phase in Cantera yaml input file" )
            ( "mix", "Triggers mixture heat capacity test.  Otherwise, species heat capacities are tested." )
            ( "timings", "Generate comparison timings between Cantera and PoKiTT across several problem sizes" )
            ( "pokitt-reps", po::value<size_t>(&pokittReps), "Repeat the PoKiTT tests and report the average execution time")
@@ -458,7 +456,7 @@ int main( int iarg, char* carg[] )
   }
 
   try{
-    const CanteraObjects::Setup setup( "Mix", inputFileName, inpGroup );
+    const CanteraObjects::Setup setup( "None", inputFileName, inpGroup );
     CanteraObjects::setup_cantera( setup );
 
     TestHelper status( !timings );
@@ -472,8 +470,8 @@ int main( int iarg, char* carg[] )
       return 0;
     }
   }
-  catch( Cantera::CanteraError& ){
-    Cantera::showErrors();
+  catch( Cantera::CanteraError& err ){
+    std::cout << err.what() << std::endl;
   }
   catch( std::exception& err ){
     std::cout << err.what() << std::endl;

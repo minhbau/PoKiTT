@@ -33,9 +33,7 @@
 #include <expression/Tag.h>
 #include <expression/FieldRequest.h>
 
-namespace Cantera{
-  class IdealGasMix;
-}
+#include <pokitt/CanteraObjects.h>
 
 ///** test the mixture fraction class.  Returns true for pass, false for fail */
 //bool perform_mixfrac_tests();
@@ -92,7 +90,7 @@ public:
    *  @param fuelFrac  : vector of   fuel   mass or mole fractions
    *  @param inputMassFrac : flag set to true if MASS fractions are provided.
    */
-  MixtureFraction( Cantera::IdealGasMix& gas,
+  MixtureFraction( IdealGasPtr gas,
                    const std::vector<double> & oxidFrac,
                    const std::vector<double> & fuelFrac,
                    const bool inputMassFrac );
@@ -129,7 +127,7 @@ public:
    *  oxidizer and fuel compositions and then call the initialize()
    *  method to complete initialization.
    */
-  void initialize( Cantera::IdealGasMix& gas,
+  void initialize( IdealGasPtr gas,
                    const std::vector<double> & oxid,
                    const std::vector<double> & fuel,
                    const bool massFrac );
@@ -375,7 +373,7 @@ public:
                 
 protected:
                 
-  void set_gammas( const Cantera::IdealGasMix& gas );
+  void set_gammas( const IdealGasPtr gas );
                 
   /** @brief Calculate the stoichiometric mixture fraction and return its value. */
   double compute_stoich_mixfrac() const;
@@ -388,7 +386,7 @@ protected:
   void compute_elem_mass_frac( const std::vector<double> & spec,
                                std::vector<double> & elem ) const;
                 
-  void set_stoichiometry( const Cantera::IdealGasMix& gas );
+  void set_stoichiometry( const IdealGasPtr gas );
 
   int nelem_, nspec_;
                 

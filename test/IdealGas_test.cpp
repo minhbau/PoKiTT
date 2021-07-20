@@ -47,7 +47,7 @@
 #include <boost/foreach.hpp>
 #include <boost/program_options.hpp>
 
-#include <cantera/IdealGasMix.h>
+#include <cantera/thermo/ThermoPhase.h>
 
 namespace SO = SpatialOps;
 typedef SO::SVolField  CellField;
@@ -108,7 +108,7 @@ CellFieldPtrT
 get_cantera_result( const bool timings,
                     const size_t canteraReps,
                     const GasQuantity gasQuantity,
-                    Cantera::IdealGasMix& gasMix,
+                    IdealGasPtr gasMix,
                     Expr::FieldManagerList& fml,
                     const Expr::TagList& yiTags,
                     const Expr::Tag& tTag,
@@ -136,19 +136,19 @@ get_cantera_result( const bool timings,
     iMass = massFracs.begin();
     iRef  = refQuantity.begin();
     for(iCant = canteraResult->begin(); iCant!=canteraResult->end(); ++iTemp, ++iRef, ++iMass, ++iCant){
-      gasMix.setMassFractions_NoNorm( &(*iMass)[0] );
+      gasMix->setMassFractions_NoNorm( &(*iMass)[0] );
       switch( gasQuantity ){
       case P:
-        gasMix.setState_TR( *iTemp, *iRef );
-        *iCant=gasMix.pressure();
+        gasMix->setState_TR( *iTemp, *iRef );
+        *iCant=gasMix->pressure();
         break;
       case RHO:
-        gasMix.setState_TP( *iTemp, *iRef );
-        *iCant=gasMix.density();
+        gasMix->setState_TP( *iTemp, *iRef );
+        *iCant=gasMix->density();
         break;
       case NU:
-        gasMix.setState_TP( *iTemp, *iRef );
-        *iCant=1/gasMix.density();
+        gasMix->setState_TP( *iTemp, *iRef );
+        *iCant=1/gasMix->density();
         break;
       }
     }
@@ -166,7 +166,7 @@ bool driver( const bool timings,
              const GasQuantity gasQuantity )
 {
   TestHelper status( !timings );
-  Cantera::IdealGasMix* const gasMix = CanteraObjects::get_gasmix();
+  IdealGasPtr gasMix = CanteraObjects::get_thermo();
   const int nSpec = gasMix->nSpecies();
 
   const Expr::Tag xTag( "XCoord",      Expr::STATE_NONE );
@@ -302,7 +302,7 @@ bool driver( const bool timings,
       std::cout << "PoKiTT  " + property_name(gasQuantity) + " time " << avgTime << std::endl;
     }
 
-    CellFieldPtrT canteraResult = get_cantera_result( timings, canteraReps, gasQuantity, *gasMix, fml, yiTags, tTag, refTag );
+    CellFieldPtrT canteraResult = get_cantera_result( timings, canteraReps, gasQuantity, gasMix, fml, yiTags, tTag, refTag );
     CellField& gasField = fml.field_ref< CellField >( gasTag );
 #   ifdef ENABLE_CUDA
     gasField.set_device_as_active( CPU_INDEX );
@@ -330,8 +330,8 @@ int main( int iarg, char* carg[] )
   po::options_description desc("Supported Options");
   desc.add_options()
                ( "help", "print help message" )
-               ( "xml-input-file", po::value<std::string>(&inputFileName)->default_value("h2o2.xml"), "Cantera xml input file name" )
-               ( "phase", po::value<std::string>(&inpGroup), "name of phase in Cantera xml input file" )
+               ( "yaml-input-file", po::value<std::string>(&inputFileName)->default_value("h2o2.yaml"), "Cantera yaml input file name" )
+               ( "phase", po::value<std::string>(&inpGroup), "name of phase in Cantera yaml input file" )
                ( "timings", "Generate comparison timings between Cantera and PoKiTT across several problem sizes" )
                ( "pokitt-reps", po::value<size_t>(&pokittReps), "Repeat the PoKiTT tests and report the average execution time")
                ( "cantera-reps", po::value<size_t>(&canteraReps), "Repeat the Cantera tests and report the average execution time");
@@ -368,8 +368,8 @@ int main( int iarg, char* carg[] )
       return 0;
     }
   }
-  catch( Cantera::CanteraError& ){
-    Cantera::showErrors();
+  catch( Cantera::CanteraError& err ){
+    std::cout << err.what() << std::endl;
   }
   catch( std::exception& err ){
     std::cout << err.what() << std::endl;

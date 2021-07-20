@@ -1,7 +1,7 @@
 function( test_jacobian_vs_gs testName inputFile calcFile goldFile )
 
   add_test( NAME ${testName}_generate_output
-            COMMAND aj_test --xml-input-file=${inputFile} --jacobian-vs-gs 
+            COMMAND aj_test --yaml-input-file=${inputFile} --jacobian-vs-gs
           )
 
   if( ${ARGC} EQUAL 4 )

@@ -35,7 +35,6 @@
 #include <cmath>
 
 #include <boost/lexical_cast.hpp>
-#include <boost/foreach.hpp>
 #include <boost/program_options.hpp>
 #include <boost/algorithm/string.hpp>
 
@@ -45,23 +44,22 @@
 #include <spatialops/structured/FieldComparisons.h>
 #include <spatialops/structured/Grid.h>
 #include <spatialops/structured/MatVecFields.h>
-#include <spatialops/structured/MatVecOps.h>
 #include <spatialops/util/TimeLogger.h>
 #include <spatialops/util/MemoryUsage.h>
 
 #include <expression/ExprLib.h>
 #include <expression/Expression.h>
 
-#include <cantera/IdealGasMix.h>
+#include <cantera/thermo/ThermoPhase.h>
+#include <cantera/base/Solution.h>
+#include <cantera/kinetics/Kinetics.h>
 
+#include "LinearMassFracs.h"
 #include <pokitt/CanteraObjects.h>
 #include <pokitt/kinetics/AnalyticalJacobian.h>
-#include "LinearMassFracs.h"
 #include <pokitt/MixtureMolWeight.h>
 #include <pokitt/kinetics/ReactionRates.h>
 #include <pokitt/thermo/Density.h>
-#include <pokitt/thermo/InternalEnergy.h>
-#include <pokitt/thermo/HeatCapacity_Cv.h>
 
 using namespace pokitt;
 namespace so = SpatialOps;
@@ -498,14 +496,17 @@ extract_mass_fracs( const Expr::TagList yiTags, Expr::FieldManagerList& fml ){
 //==============================================================================
 
 const std::vector< CellFieldPtrT >
-get_cantera_results( Cantera::IdealGasMix& gasMix,
-                     Expr::FieldManagerList& fml,
+get_cantera_results( Expr::FieldManagerList& fml,
                      const Expr::Tag& tTag,
                      const Expr::TagList& yiTags,
-                     const Expr::Tag& pTag){
+                     const Expr::Tag& pTag)
+{
+  SolnPtr soln = CanteraObjects::get_cantera_solution();
+  IdealGasPtr gasMix = soln->thermo();
+  std::shared_ptr<Cantera::Kinetics> kinetics = soln->kinetics();
 
-  const std::vector<double>& molecularWeights = gasMix.molecularWeights();
-  const int nSpec = gasMix.nSpecies();
+  const std::vector<double>& molecularWeights = gasMix->molecularWeights();
+  const int nSpec = CanteraObjects::number_species();
 
   const std::vector< std::vector<double> > massFracs = extract_mass_fracs( yiTags, fml );
 
@@ -531,9 +532,9 @@ get_cantera_results( Cantera::IdealGasMix& gasMix,
   iMass  = massFracs.begin();
   size_t i = 0;
   for( iTemp = temp.begin(); iTemp != temp.end(); ++iTemp, ++iMass, ++i){
-    gasMix.setMassFractions_NoNorm( &(*iMass)[0] );
-    gasMix.setState_TP( *iTemp, *iPress );
-    gasMix.getNetProductionRates(&rResult[0]);
+    gasMix->setMassFractions_NoNorm( &(*iMass)[0] );
+    gasMix->setState_TP( *iTemp, *iPress );
+    kinetics->getNetProductionRates(&rResult[0]);
     for( size_t n=0; n<nSpec; ++n){
       (*canteraResults[n])[i] = rResult[n] * molecularWeights[n];
     }
@@ -545,8 +546,8 @@ get_cantera_results( Cantera::IdealGasMix& gasMix,
 bool driver( const double pressure = 101325 )
 {
   TestHelper status;
-  Cantera::IdealGasMix* const gasMix = CanteraObjects::get_gasmix();
-  const int nSpec=gasMix->nSpecies();
+
+  const int nSpec = CanteraObjects::number_species();
 
   const Expr::Tag xTag  ( "XCoord",      Expr::STATE_NONE );
   const Expr::Tag tTag  ( "Temperature", Expr::STATE_NONE);
@@ -676,8 +677,7 @@ bool driver( const double pressure = 101325 )
 
   csj.evaluate_rates_and_jacobian( primitiveSensitivities, productionRates, T, rho, YPtrForJac, Mmix );
 
-  const std::vector< CellFieldPtrT > canteraResults = get_cantera_results( *gasMix,
-                                                                           fml,
+  const std::vector< CellFieldPtrT > canteraResults = get_cantera_results( fml,
                                                                            tTag,
                                                                            yiTags,
                                                                            pTag );
@@ -689,7 +689,7 @@ bool driver( const double pressure = 101325 )
 
   std::vector< CellFieldPtrT >::const_iterator iCantera = canteraResults.begin();
   size_t i=0;
-  BOOST_FOREACH( const Expr::Tag& rTag, rTags ){
+  for( const Expr::Tag& rTag : rTags ){
     status( field_equal( productionRates(i), **iCantera, 1e-8 ) || field_equal_abs( productionRates(i), **iCantera, 1e-10 ), rTag.name() );
     ++iCantera;
     ++i;
@@ -706,7 +706,7 @@ bool driver( const double pressure = 101325 )
 int main( int iarg, char* carg[] )
 {
 
-  std::string inputFileName = "h2-burke.xml"; // mechanism input in xml format
+  std::string inputFileName = "h2-burke.yaml"; // mechanism input in yaml format
   bool doTimings = false;
   bool doJacVsGs = false;
   bool doProdRates = false;
@@ -715,7 +715,7 @@ int main( int iarg, char* carg[] )
     po::options_description desc("Supported Options");
     desc.add_options()
       ( "help", "print help message" )
-      ( "xml-input-file", po::value<std::string>(&inputFileName)->default_value(inputFileName), "Cantera xml input file name" )
+      ( "yaml-input-file", po::value<std::string>(&inputFileName)->default_value(inputFileName), "Cantera yaml input file name" )
       ( "timings" , "provide timings" )
       ( "jacobian-vs-gs", "test Jacobian vs gold standards" )
       ( "rates-vs-cantera", "test production rates vs Cantera" )
