@@ -42,7 +42,7 @@ endif( NOT CMAKE_BUILD_TYPE )
 #-- Set the location for the installation.  Comment this out to install to /usr/local
 if( CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT )
   set( CMAKE_INSTALL_PREFIX
-       ${CMAKE_CURRENT_BINARY_DIR}/install
+       ${CMAKE_CURRENT_BINARY_DIR}
        CACHE PATH "Installation directory" FORCE
        )
 endif( CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT )
@@ -115,7 +115,7 @@ if( BUILD_UPSTREAM_LIBS )
   set( NTHREADS 1 CACHE STRING "Number of threads if ENABLE_THREADS is ON" )
 
   # Build SpatialOps
-  set( TPL_DIR ${PROJECT_BINARY_DIR}/tpl )
+  set( TPL_DIR ${CMAKE_BINARY_DIR}/tpl )
   file( MAKE_DIRECTORY ${TPL_DIR}/build/spatialops )
   execute_process( COMMAND ${GIT_EXECUTABLE} clone --depth 1 https://gitlab.multiscale.utah.edu/common/SpatialOps.git
                    WORKING_DIRECTORY ${TPL_DIR}
@@ -156,20 +156,17 @@ if( BUILD_UPSTREAM_LIBS )
 
 else( BUILD_UPSTREAM_LIBS )
 
-  find_package( ExprLib REQUIRED PATHS ${ExprLib_DIR} ${ExprLib_DIR}/share )
+  find_package( ExprLib REQUIRED PATHS ${ExprLib_DIR} PATH_SUFFIXES share )
   
 endif( BUILD_UPSTREAM_LIBS )
-
-set( TPL_INCLUDES ${TPL_INCLUDES} ${ExprLib_INCLUDE_DIR} )
-set( TPL_LIBRARIES ${TPL_LIBRARIES} exprlib )
 
 
 #-------------------------------------------------------------------------------
 #----------------------------------- Cantera -----------------------------------
 #-------------------------------------------------------------------------------
 
-find_library( Cantera_LIBRARIES NAMES cantera HINTS ${Cantera_DIR}/lib NO_DEFAULT_PATH )
-find_path( Cantera_INCLUDE_DIR NAMES thermo.h PATHS ${Cantera_DIR}/include NO_DEFAULT_PATH PATH_SUFFIXES cantera )
+find_library( Cantera_LIBRARIES NAMES cantera HINTS ${Cantera_DIR} PATH_SUFFIXES lib NO_DEFAULT_PATH )
+find_path( Cantera_INCLUDE_DIR NAMES thermo.h PATHS ${Cantera_DIR} PATH_SUFFIXES include include/cantera NO_DEFAULT_PATH PATH_SUFFIXES )
 if( ${Cantera_INCLUDE_DIR} STREQUAL Cantera_INCLUDE_DIR-NOTFOUND )
   message( WARNING "Could not find Cantera in suggested location ${Cantera_DIR}. Looking in other locations\n" )
   # try other locations
@@ -187,24 +184,14 @@ message( STATUS "Cantera includes  at " ${Cantera_INCLUDE_DIR} )
 #-------------------------------------------------------------------------------
 #------------------------------- BLAS & Threads --------------------------------
 #-------------------------------------------------------------------------------
-find_package( BLAS REQUIRED )
-
-set( TPL_LIBRARIES ${TPL_LIBRARIES} ${Cantera_LIBRARIES}  ${BLAS_LIBRARIES} )
-set( TPL_INCLUDES ${TPL_INCLUDES} ${Cantera_INCLUDE_DIR} )
+find_package( BLAS REQUIRED )  # BLAS_LIBRARIES
 
 # jcs it appears that on linux, the cantera library requires linkage with thread libraries.
-find_package( Threads REQUIRED )
-set( TPL_LIBRARIES ${TPL_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} )
-
+find_package( Threads REQUIRED )  # CMAKE_THREAD_LIBS_INIT
 
 #-------------------------------------------------------------------------------
 #------------------------------ Build Everything -------------------------------
 #-------------------------------------------------------------------------------
-
-include_directories( 
-  ${TPL_INCLUDES}
-  ${CMAKE_SOURCE_DIR}
-  )
 
 add_subdirectory( pokitt )
 
@@ -221,18 +208,20 @@ endif( ENABLE_EXAMPLES )
 #-------------------------------------------------------------------------------
 #-------------------------------- INSTALLATION ---------------------------------
 #-------------------------------------------------------------------------------
-configure_file(
-  ${PROJECT_SOURCE_DIR}/PoKiTTConfig.cmake.in
-  ${CMAKE_BINARY_DIR}/config/PoKiTTConfig.cmake
-  @ONLY
+include( CMakePackageConfigHelpers )
+
+configure_package_config_file(
+    ${CMAKE_SOURCE_DIR}/PoKiTTConfig.cmake.in
+    ${CMAKE_BINARY_DIR}/config/PoKiTTConfig.cmake
+      INSTALL_DESTINATION ${CMAKE_INSTALL_PREFIX}/share
   )
 
 install( FILES
-  ${CMAKE_BINARY_DIR}/config/PoKiTTConfig.cmake
-  DESTINATION ${PoKiTT_CONFIG_INSTALL}
+    ${CMAKE_BINARY_DIR}/config/PoKiTTConfig.cmake
+    DESTINATION ${PoKiTT_CONFIG_INSTALL}
   )
 
 install( FILES
-  ${PROJECT_BINARY_DIR}/config/PoKiTTVersion.h
-  DESTINATION ${CMAKE_INSTALL_PREFIX}/include/pokitt
+    ${PROJECT_BINARY_DIR}/config/PoKiTTVersion.h
+    DESTINATION ${CMAKE_INSTALL_PREFIX}/include/pokitt
   )

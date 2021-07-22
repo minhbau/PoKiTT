@@ -8,19 +8,24 @@
 #
 # typical usage:
 #   find_package( PoKiTT )
-#   include_directories_( ${PoKiTT_INCLUDE_DIR} )
+#   target_link_libraries( mylib pokitt )
 #
 
-set( PoKiTT_INCLUDE_DIR 
+@PACKAGE_INIT@
+include(CMakeFindDependencyMacro)
+
+set_and_check( PoKiTT_INCLUDE_DIR
      @CMAKE_INSTALL_PREFIX@/include
-     @TPL_INCLUDES@ 
+     @Cantera_INCLUDE_DIR@
+     @ExprLib_INCLUDE_DIR@
    )
-set( PoKiTT_LIBS pokitt @TPL_LIBRARIES@ )
 
-find_package( ExprLib PATHS @ExprLib_DIR@ )
+find_dependency( ExprLib REQUIRED PATHS @ExprLib_DIR@ )
 
-include( @CMAKE_INSTALL_PREFIX@/lib/pokitt/PoKiTT.cmake )
+include( @CMAKE_INSTALL_PREFIX@/lib/pokitt/PoKiTT_Targets.cmake )
 
 # Information for downstream builds that need specific locations for cantera
 set( Cantera_INCLUDE_DIR @Cantera_INCLUDE_DIR@ )
 set( Cantera_LIBRARIES @Cantera_LIBRARIES@ )
+
+set( PoKiTT_FOUND True )
