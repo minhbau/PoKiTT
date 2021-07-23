@@ -29,6 +29,7 @@ option( ENABLE_TESTS "Enable tests" ON )
 option( ENABLE_EXAMPLES "Enable reaction-diffusion and continuation method examples" ON )
 
 set( Cantera_DIR "" CACHE PATH "Location where cantera was installed" )
+set( YAML_DIR "" CACHE PATH "Location where YAML is installed" )
 
 
 # default to release builds
@@ -164,22 +165,9 @@ endif( BUILD_UPSTREAM_LIBS )
 #-------------------------------------------------------------------------------
 #----------------------------------- Cantera -----------------------------------
 #-------------------------------------------------------------------------------
-
-find_library( Cantera_LIBRARIES NAMES cantera HINTS ${Cantera_DIR} PATH_SUFFIXES lib NO_DEFAULT_PATH )
-find_path( Cantera_INCLUDE_DIR NAMES thermo.h PATHS ${Cantera_DIR} PATH_SUFFIXES include include/cantera NO_DEFAULT_PATH PATH_SUFFIXES )
-if( ${Cantera_INCLUDE_DIR} STREQUAL Cantera_INCLUDE_DIR-NOTFOUND )
-  message( WARNING "Could not find Cantera in suggested location ${Cantera_DIR}. Looking in other locations\n" )
-  # try other locations
-  find_library( Cantera_LIBRARIES NAMES cantera PATHS /usr/local /usr/local/cantera PATH_SUFFIXES lib cantera )
-  find_path( Cantera_INCLUDE_DIR NAMES thermo.h PATHS /usr/local/include /usr/local/cantera/include PATH_SUFFIXES cantera )
-  if( ${Cantera_INCLUDE_DIR} STREQUAL Cantera_INCLUDE_DIR-NOTFOUND )
-    message( FATAL_ERROR "Could not find Cantera\n" )
-  endif()
-endif()
-string( REPLACE "include/cantera" "include" Cantera_INCLUDE_DIR ${Cantera_INCLUDE_DIR} )
-message( STATUS "Cantera libraries at " ${Cantera_LIBRARIES} )
-message( STATUS "Cantera includes  at " ${Cantera_INCLUDE_DIR} )
-
+set( CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR} )  # look for FindCantera.cmake here
+find_package( Cantera REQUIRED )
+message( STATUS "Cantera:\n\tVersion: ${Cantera_VERSION}\n\tLibrary: ${Cantera_LIBRARY}\n\tHeaders: ${Cantera_INCLUDE_DIR}" )
 
 #-------------------------------------------------------------------------------
 #------------------------------- BLAS & Threads --------------------------------
@@ -224,4 +212,9 @@ install( FILES
 install( FILES
     ${PROJECT_BINARY_DIR}/config/PoKiTTVersion.h
     DESTINATION ${CMAKE_INSTALL_PREFIX}/include/pokitt
+  )
+
+install( FILES
+      ${CMAKE_SOURCE_DIR}/FindCantera.cmake
+      DESTINATION ${CMAKE_INSTALL_PREFIX}/share
   )

@@ -109,9 +109,11 @@ RxnData::RxnData( const IdealGasPtr gas,
   for( int i=0; i<4; ++i ) troeParams[i]=0;
 
   // ensure that the type of each reaction is supported by PoKiTT.
-  if( rxnType.compare( "elementary" ) != 0 &&
-      rxnType.compare( "three-body" ) != 0 &&
-      rxnType.compare( "falloff"    ) != 0  )
+  if( rxnType.compare( "elementary"        ) != 0 &&
+      rxnType.compare( "elementary-legacy" ) != 0 &&
+      rxnType.compare( "three-body"        ) != 0 &&
+      rxnType.compare( "three-body-legacy" ) != 0 &&
+      rxnType.compare( "falloff"           ) != 0  )
   {
     std::ostringstream msg;
     msg << __FILE__ << " : " << __LINE__

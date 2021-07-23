@@ -20,7 +20,13 @@ set_and_check( PoKiTT_INCLUDE_DIR
      @ExprLib_INCLUDE_DIR@
    )
 
+list( APPEND CMAKE_MODULE_PATH
+    @CMAKE_INSTALL_PREFIX@/share   # look for FindCantera.cmake here
+ )
+
 find_dependency( ExprLib REQUIRED PATHS @ExprLib_DIR@ )
+find_dependency( Cantera REQUIRED )
+find_dependency( yaml-cpp REQUIRED )
 
 include( @CMAKE_INSTALL_PREFIX@/lib/pokitt/PoKiTT_Targets.cmake )
 

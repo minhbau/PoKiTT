@@ -11,8 +11,8 @@ add_library( pokitt
 target_link_libraries( pokitt
     PUBLIC
         exprlib
+        cantera
     PRIVATE
-        ${Cantera_LIBRARIES}
         ${BLAS_LIBRARIES}
     )
 
