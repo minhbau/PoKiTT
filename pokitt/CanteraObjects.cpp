@@ -27,6 +27,8 @@
 #include <iostream>
 #include <memory>
 
+#include <expression/ExprLib_Configure.h> // for ExprLib_ENABLE_THREADS
+
 #include "CanteraObjects.h"
 
 #include <cantera/thermo.h>
@@ -38,7 +40,7 @@
 #include <cantera/kinetics/Reaction.h>
 #include <cantera/transport/MixTransport.h>
 
-#ifdef EXPRESSION_THREADS
+#ifdef ExprLib_ENABLE_THREADS
 
 #include <boost/thread/mutex.hpp>
 class CanteraMutex
@@ -60,7 +62,7 @@ struct CanteraMutex{
   inline ~CanteraMutex(){}
 };
 
-#endif  // EXPRESSION_THREADS
+#endif  // ExprLib_ENABLE_THREADS
 
 ThermData::ThermData( const Cantera::MultiSpeciesThermo& spThermo, const int i )
   : index( i )
