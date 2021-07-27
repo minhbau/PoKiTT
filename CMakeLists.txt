@@ -175,7 +175,7 @@ message( STATUS "Cantera:\n\tVersion: ${Cantera_VERSION}\n\tLibrary: ${Cantera_L
 find_package( BLAS REQUIRED )  # BLAS_LIBRARIES
 
 # jcs it appears that on linux, the cantera library requires linkage with thread libraries.
-find_package( Threads REQUIRED )  # CMAKE_THREAD_LIBS_INIT
+#find_package( Threads REQUIRED )  # CMAKE_THREAD_LIBS_INIT
 
 #-------------------------------------------------------------------------------
 #------------------------------ Build Everything -------------------------------

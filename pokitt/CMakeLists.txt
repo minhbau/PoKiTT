@@ -19,7 +19,6 @@ target_link_libraries( pokitt
 target_include_directories( pokitt
     PUBLIC
         ${Cantera_INCLUDE_DIR}
-        ${CMAKE_THREAD_LIBS_INIT}
         $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}>
         $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/config>
         $<INSTALL_INTERFACE:include>

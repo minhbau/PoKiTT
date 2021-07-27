@@ -15,8 +15,8 @@
 
 #--------------------------------------------------------------------
 #--------------------- Upstream library builds: ---------------------
-.clone_spatialops      : &clone_so   git clone https://gitlab.multiscale.utah.edu/common/SpatialOps.git; cd SpatialOps; git reset --hard 92958f3cc111d336c9902b7b479625db56a41f48; cd ..
-.clone_exprlib         : &clone_expr git clone https://gitlab.multiscale.utah.edu/common/ExprLib.git;    cd ExprLib;    git reset --hard b35e5e1ca3a10a092761fc5dd2235d27465d4990; cd ..
+.clone_spatialops      : &clone_so   git clone https://gitlab.multiscale.utah.edu/common/SpatialOps.git; cd SpatialOps; git reset --hard 684304a90639eebee20d6ee0170d7a88bd49434d; cd ..
+.clone_exprlib         : &clone_expr git clone https://gitlab.multiscale.utah.edu/common/ExprLib.git;    cd ExprLib;    git reset --hard 80dd5eae1b14c5812fbae4e740f347616254e50c; cd ..
 
 .conf_spatialops       : &conf_so        cmake ../SpatialOps -DCMAKE_BUILD_TYPE=Release -DENABLE_TESTS=OFF -DENABLE_EXAMPLES=OFF -DCMAKE_INSTALL_PREFIX=$CI_PROJECT_DIR/install 
 .conf_spatialops_thread: &conf_so_thread cmake ../SpatialOps -DCMAKE_BUILD_TYPE=Release -DENABLE_TESTS=OFF -DENABLE_EXAMPLES=OFF -DCMAKE_INSTALL_PREFIX=$CI_PROJECT_DIR/install -DENABLE_THREADS=ON -DNTHREADS=8
