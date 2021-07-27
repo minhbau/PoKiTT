@@ -14,6 +14,7 @@ target_link_libraries( pokitt
         cantera
     PRIVATE
         ${BLAS_LIBRARIES}
+        ${CMAKE_THREAD_LIBS_INIT}
     )
 
 target_include_directories( pokitt
