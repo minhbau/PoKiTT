@@ -120,7 +120,12 @@ if( NOT ${Cantera_INCLUDE_DIR} STREQUAL Cantera_INCLUDE_DIR-NOTFOUND )
         find_package( BLAS REQUIRED )
         find_package( Threads REQUIRED )
 
-        target_link_libraries( cantera INTERFACE yaml-cpp ${BLAS_LIBRARIES} Threads::Threads )
+        if( ${CMAKE_VERSION} VERSION_GREATER_EQUAL 3.11 )
+          target_link_libraries( cantera INTERFACE yaml-cpp ${BLAS_LIBRARIES} Threads::Threads )
+        else()
+          # older versions don't work right using target_link_libraries on imported targets. Set the property directly:
+          set_target_properties( cantera PROPERTIES INTERFACE_LINK_LIBRARIES yaml-cpp ${BLAS_LIBRARIES} Threads::Threads )
+        endif()
 
     endif()
 
