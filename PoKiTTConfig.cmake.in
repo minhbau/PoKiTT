@@ -25,13 +25,8 @@ list( APPEND CMAKE_MODULE_PATH
  )
 
 find_dependency( ExprLib REQUIRED PATHS @ExprLib_DIR@ )
-find_dependency( Cantera REQUIRED )
-find_dependency( yaml-cpp REQUIRED )
+find_dependency( Cantera REQUIRED PATHS @Cantera_DIR@ )
 
 include( @CMAKE_INSTALL_PREFIX@/lib/pokitt/PoKiTT_Targets.cmake )
-
-# Information for downstream builds that need specific locations for cantera
-set( Cantera_INCLUDE_DIR @Cantera_INCLUDE_DIR@ )
-set( Cantera_LIBRARIES @Cantera_LIBRARIES@ )
 
 set( PoKiTT_FOUND True )

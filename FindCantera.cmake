@@ -12,7 +12,7 @@ include(FindPackageHandleStandardArgs)
 include(CMakePrintHelpers)
 
 # some system tools to help locate the library
-find_package( PkgConfig )
+find_package( PkgConfig QUIET )
 pkg_check_modules( PC_cantera
         QUIET
         cantera>=2.6
@@ -116,25 +116,11 @@ if( NOT ${Cantera_INCLUDE_DIR} STREQUAL Cantera_INCLUDE_DIR-NOTFOUND )
             )
 #        cmake_print_properties( TARGETS yaml-cpp PROPERTIES LOCATION INTERFACE_INCLUDE_DIRECTORIES )
 #        cmake_print_variables( yaml-cpp_LIBRARIES yaml-cpp_INCLUDE_DIR yaml-cpp_VERSION )
-        target_link_libraries( cantera INTERFACE yaml-cpp )
 
-#        find_library( YAML_LIBRARY REQUIRED NAMES yaml-cpp PATHS ${PC_yamlcpp_LIBRARY_DIRS} )
-#        find_path( YAML_INCLUDE_DIR NAMES yaml.h
-#                PATHS ${PC_cantera_INCLUDE_DIRS}
-#                PATH_SUFFIXES yaml-cpp
-#                DOC "Path to yaml-cpp header files"
-#            )
-#
-#        set( YAML_VERSION PC_yamlcpp_VERSION )
-#
-#        if( NOT TARGET YAML::yaml-cpp )
-#            add_library( YAML::yaml-cpp UNKNOWN IMPORTED )
-#            set_target_properties( YAML::yaml-cpp PROPERTIES
-#                    IMPORTED_LOCATION "${YAML_LIBRARY}"
-#                    INTERFACE_INCLUDE_DIRECTORIES "${YAML_INCLUDE_DIR}"
-#                )
-#        endif()
-#        target_link_libraries( cantera INTERFACE YAML::yaml-cpp )
+        find_package( BLAS REQUIRED )
+        find_package( Threads REQUIRED )
+
+        target_link_libraries( cantera INTERFACE yaml-cpp ${BLAS_LIBRARIES} Threads::Threads )
 
     endif()
 

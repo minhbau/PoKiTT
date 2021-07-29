@@ -165,7 +165,7 @@ endif( BUILD_UPSTREAM_LIBS )
 #-------------------------------------------------------------------------------
 #----------------------------------- Cantera -----------------------------------
 #-------------------------------------------------------------------------------
-set( CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR} )  # look for FindCantera.cmake here
+list( APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR} )  # look for FindCantera.cmake here
 find_package( Cantera REQUIRED )
 message( STATUS "Cantera:\n\tVersion: ${Cantera_VERSION}\n\tLibrary: ${Cantera_LIBRARY}\n\tHeaders: ${Cantera_INCLUDE_DIR}" )
 
