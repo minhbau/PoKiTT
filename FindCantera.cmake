@@ -29,9 +29,8 @@ pkg_check_modules( PC_cantera
 #    )
 
 find_path( Cantera_INCLUDE_DIR
-        NAMES thermo.h
+        NAMES cantera/thermo.h
         PATHS ${Cantera_DIR} ${PC_cantera_INCLUDE_DIRS}
-        PATH_SUFFIXES include include/cantera
         DOC "Path to Cantera header files"
     )
 
@@ -45,6 +44,7 @@ find_library( Cantera_LIBRARY
 if( NOT ${Cantera_INCLUDE_DIR} STREQUAL Cantera_INCLUDE_DIR-NOTFOUND )
 
     string( REPLACE "include/cantera" "include" Cantera_INCLUDE_DIR ${Cantera_INCLUDE_DIR} )
+    string( REPLACE "/include" "" Cantera_DIR ${Cantera_INCLUDE_DIR} )
 
     set( Cantera_config_file ${Cantera_INCLUDE_DIR}/cantera/base/config.h )
 
