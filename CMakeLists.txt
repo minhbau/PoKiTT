@@ -157,7 +157,7 @@ if( BUILD_UPSTREAM_LIBS )
 
 else( BUILD_UPSTREAM_LIBS )
 
-  find_package( ExprLib REQUIRED PATHS ${ExprLib_DIR} PATH_SUFFIXES share )
+  find_package( ExprLib REQUIRED CONFIG PATHS ${ExprLib_DIR} PATH_SUFFIXES share )
   
 endif( BUILD_UPSTREAM_LIBS )
 
@@ -166,7 +166,7 @@ endif( BUILD_UPSTREAM_LIBS )
 #----------------------------------- Cantera -----------------------------------
 #-------------------------------------------------------------------------------
 list( APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR} )  # look for FindCantera.cmake here
-find_package( Cantera REQUIRED )
+find_package( Cantera REQUIRED MODULE )
 message( STATUS "Cantera:\n\tVersion: ${Cantera_VERSION}\n\tLibrary: ${Cantera_LIBRARY}\n\tHeaders: ${Cantera_INCLUDE_DIR}" )
 
 #-------------------------------------------------------------------------------
