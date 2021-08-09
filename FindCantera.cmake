@@ -7,6 +7,8 @@
 # Sets the following:
 #  Cantera_FOUND = [true|false]
 #  cantera - a target to link against
+#  Cantera_INCLUDE_DIR - path to the headers
+#  Cantera_LIBRARY - the cantera library
 
 include(FindPackageHandleStandardArgs)
 include(CMakePrintHelpers)
@@ -30,7 +32,8 @@ pkg_check_modules( PC_cantera
 
 find_path( Cantera_INCLUDE_DIR
         NAMES cantera/thermo.h
-        PATHS ${Cantera_DIR} ${PC_cantera_INCLUDE_DIRS}
+        HINTS ${Cantera_DIR} ${PC_cantera_INCLUDE_DIRS}
+        PATH_SUFFIXES include
         DOC "Path to Cantera header files"
     )
 
@@ -59,16 +62,6 @@ if( NOT ${Cantera_INCLUDE_DIR} STREQUAL Cantera_INCLUDE_DIR-NOTFOUND )
     # Parse into separate numbers
     list( GET version_split 1 Cantera_VERSION_MINOR )
     list( GET version_split 0 Cantera_VERSION_MAJOR )
-
-    # Check all required information
-    find_package_handle_standard_args( Cantera
-        FOUND_VAR Cantera_FOUND
-        REQUIRED_VARS
-            Cantera_INCLUDE_DIR
-            Cantera_LIBRARY
-        VERSION_VAR
-            Cantera_VERSION
-    )
 
     if( NOT TARGET cantera )
         add_library( cantera UNKNOWN IMPORTED )
@@ -130,3 +123,14 @@ if( NOT ${Cantera_INCLUDE_DIR} STREQUAL Cantera_INCLUDE_DIR-NOTFOUND )
     endif()
 
 endif()
+
+# ensure all required information is present
+find_package_handle_standard_args( Cantera
+    FOUND_VAR
+      Cantera_FOUND
+    REQUIRED_VARS
+      Cantera_INCLUDE_DIR
+      Cantera_LIBRARY
+    VERSION_VAR
+      Cantera_VERSION
+    )
